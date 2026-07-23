@@ -7,11 +7,12 @@ import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { FlameHero } from '@/components/FlameHero';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { ProgressBar } from '@/components/ProgressBar';
+import { ProgressRing } from '@/components/ProgressRing';
 import { StatTile } from '@/components/StatTile';
 import { AchievementGrid } from '@/components/AchievementGrid';
-import { colors, font, spacing } from '@/theme';
+import { colors, font, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
+import { IconName } from '@/types';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -38,7 +39,9 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <View style={styles.emptyWrap}>
-          <Ionicons name="flame" size={72} color={colors.primary} />
+          <View style={styles.emptyIcon}>
+            <Ionicons name="flame" size={44} color={colors.primary} />
+          </View>
           <Text style={styles.emptyTitle}>続ける第一歩</Text>
           <Text style={styles.emptyText}>
             まずは目標を設定しましょう。{'\n'}
@@ -47,6 +50,7 @@ export default function HomeScreen() {
           </Text>
           <PrimaryButton
             label="目標を設定する"
+            icon="add"
             onPress={() => router.push('/goal-setup')}
             style={{ marginTop: spacing.xl, alignSelf: 'stretch' }}
           />
@@ -58,7 +62,7 @@ export default function HomeScreen() {
   const category = categoryOf(goal.category);
   const currentWeek = weeks.find((w) => w.isCurrent) ?? weeks[0];
   const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
-  const toBest = Math.max(0, progress.bestStreak + 1 - progress.streak);
+  const weekPct = Math.round(weekRatio * 100);
 
   return (
     <ScrollView
@@ -66,20 +70,38 @@ export default function HomeScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* 連続達成のヒーロー（主役） */}
-      <FlameHero iconSize={130}>
-        <Text style={styles.heroKicker}>連続達成</Text>
+      {/* あいさつ */}
+      <View>
+        <Text style={styles.hello}>こんにちは</Text>
+        <Text style={styles.helloSub}>今日も積み上げていこう</Text>
+      </View>
+
+      {/* 今週の進捗リング（主役） */}
+      <FlameHero icon={null}>
+        <Text style={styles.heroLabel}>今週の進捗</Text>
         <View style={styles.heroRow}>
-          <Text style={styles.heroBig}>{progress.streak}</Text>
-          <Text style={styles.heroUnit}>日</Text>
+          <ProgressRing ratio={weekRatio} size={132}>
+            <Text style={styles.ringPct}>{weekPct}%</Text>
+            <Text style={styles.ringCount}>
+              {currentWeek.done}/{currentWeek.scheduled}
+            </Text>
+          </ProgressRing>
+
+          <View style={styles.chipCol}>
+            <StatChip
+              icon="flame"
+              accent={colors.orange}
+              value={`${progress.streak}日`}
+              label="連続達成"
+            />
+            <StatChip
+              icon="star"
+              accent={colors.purple}
+              value={`${progress.points}pt`}
+              label="ポイント"
+            />
+          </View>
         </View>
-        <Text style={styles.heroSub}>
-          {progress.streak > 0 && progress.streak >= progress.bestStreak
-            ? '自己ベスト更新中！この炎を絶やすな'
-            : progress.streak === 0
-            ? 'きょう達成して、炎をともそう'
-            : `あと${toBest}日で自己ベスト更新！`}
-        </Text>
       </FlameHero>
 
       {/* 今日やること */}
@@ -111,6 +133,7 @@ export default function HomeScreen() {
             </View>
             <PrimaryButton
               label="達成する"
+              icon="play"
               onPress={() => router.push('/today')}
               style={{ marginTop: spacing.md }}
             />
@@ -120,27 +143,20 @@ export default function HomeScreen() {
 
       {/* 数値サマリー */}
       <View style={styles.tileRow}>
-        <StatTile value={progress.points} label="ポイント" icon="star" accent={colors.warning} />
-        <View style={{ width: spacing.md }} />
         <StatTile
           value={progress.rank.label}
           label="現在のランク"
           icon={progress.rank.icon}
           accent={progress.rank.color}
         />
+        <View style={{ width: spacing.md }} />
+        <StatTile
+          value={`${progress.bestStreak}日`}
+          label="最高連続"
+          icon="medal"
+          accent={colors.warning}
+        />
       </View>
-
-      {/* 今週の進捗 */}
-      <Card>
-        <View style={styles.rowBetween}>
-          <Text style={styles.label}>今週の進捗（{currentWeek.label}）</Text>
-          <Text style={styles.weekCount}>
-            {currentWeek.done}/{currentWeek.scheduled}
-          </Text>
-        </View>
-        <View style={{ height: spacing.sm }} />
-        <ProgressBar ratio={weekRatio} height={12} />
-      </Card>
 
       {/* 積み上がりの可視化 */}
       <Card>
@@ -150,12 +166,37 @@ export default function HomeScreen() {
         <View style={styles.legend}>
           <Legend color={colors.primary} label="達成" />
           <Legend color={colors.danger} label="未達" />
-          <Legend color={colors.surface} label="これから" />
+          <Legend color={colors.surfaceAlt} label="これから" />
         </View>
       </Card>
 
       <View style={{ height: spacing.xl }} />
     </ScrollView>
+  );
+}
+
+/** ヒーロー右側の色付きチップ（参考デザインのカロリーチップ風） */
+function StatChip({
+  icon,
+  accent,
+  value,
+  label,
+}: {
+  icon: IconName;
+  accent: string;
+  value: string;
+  label: string;
+}) {
+  return (
+    <View style={styles.chip}>
+      <View style={[styles.chipIcon, { backgroundColor: `${accent}1F` }]}>
+        <Ionicons name={icon} size={16} color={accent} />
+      </View>
+      <View>
+        <Text style={styles.chipValue}>{value}</Text>
+        <Text style={styles.chipLabel}>{label}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -174,6 +215,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  emptyIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: 26,
+    backgroundColor: 'rgba(198,244,50,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.lg },
   emptyText: {
     fontSize: font.body,
@@ -183,29 +232,37 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  heroKicker: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-    color: colors.onFlame,
-    opacity: 0.9,
+  hello: { fontSize: font.title, fontWeight: '900', color: colors.text },
+  helloSub: { fontSize: font.sub, color: colors.textSub, marginTop: 2 },
+
+  heroLabel: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
   },
-  heroRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 2 },
-  heroBig: {
-    fontSize: font.hero,
-    fontWeight: '900',
-    color: colors.onFlame,
-    lineHeight: font.hero,
-    letterSpacing: -1,
+  ringPct: { fontSize: 30, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+  ringCount: { fontSize: font.small, fontWeight: '700', color: colors.textSub, marginTop: 2 },
+
+  chipCol: { flex: 1, marginLeft: spacing.lg, gap: spacing.md },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: spacing.sm,
   },
-  heroUnit: {
-    fontSize: font.heading,
-    fontWeight: '800',
-    color: colors.onFlame,
-    marginLeft: 6,
-    marginBottom: 6,
+  chipIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  heroSub: { fontSize: font.sub, fontWeight: '600', color: colors.onFlame, opacity: 0.95, marginTop: 4 },
+  chipValue: { fontSize: font.body, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+  chipLabel: { fontSize: 11, color: colors.textSub, fontWeight: '600' },
 
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   label: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
@@ -230,8 +287,6 @@ const styles = StyleSheet.create({
   pillText: { fontSize: font.body, fontWeight: '700' },
 
   tileRow: { flexDirection: 'row' },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  weekCount: { fontSize: font.body, fontWeight: '900', color: colors.primary },
 
   legend: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.lg },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },

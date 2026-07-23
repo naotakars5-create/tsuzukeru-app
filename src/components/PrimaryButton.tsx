@@ -8,18 +8,20 @@ import {
   StyleProp,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors, radius, font, spacing, gradients, shadow } from '@/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { IconName } from '@/types';
+import { colors, radius, font, spacing, shadow } from '@/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
 
-/** アプリ共通のボタン。primary は炎のグラデーション。 */
+/** アプリ共通のボタン。primary はネオンライムのピル（黒文字）。 */
 export function PrimaryButton({
   label,
   onPress,
   disabled,
   loading,
   variant = 'primary',
+  icon,
   style,
 }: {
   label: string;
@@ -27,53 +29,33 @@ export function PrimaryButton({
   disabled?: boolean;
   loading?: boolean;
   variant?: Variant;
+  icon?: IconName;
   style?: StyleProp<ViewStyle>;
 }) {
   const isDisabled = disabled || loading;
-
-  const content = loading ? (
-    <ActivityIndicator color={variant === 'primary' ? colors.onFlame : colors.primary} />
-  ) : (
-    <Text
-      style={[
-        styles.label,
-        variant === 'primary' ? styles.labelLight : styles.labelAccent,
-      ]}
-    >
-      {label}
-    </Text>
-  );
+  const fg = variant === 'primary' ? colors.onAccent : colors.primary;
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
-        styles.wrap,
+        styles.base,
+        variant === 'primary' && styles.primary,
         variant === 'primary' && shadow.glow,
+        variant === 'secondary' && styles.secondary,
+        variant === 'ghost' && styles.ghost,
         pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
         style,
       ]}
     >
-      {variant === 'primary' ? (
-        <LinearGradient
-          colors={gradients.flameSoft}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.base}
-        >
-          {content}
-        </LinearGradient>
+      {loading ? (
+        <ActivityIndicator color={fg} />
       ) : (
-        <View
-          style={[
-            styles.base,
-            variant === 'secondary' && styles.secondary,
-            variant === 'ghost' && styles.ghost,
-          ]}
-        >
-          {content}
+        <View style={styles.contentRow}>
+          {icon ? <Ionicons name={icon} size={18} color={fg} /> : null}
+          <Text style={[styles.label, { color: fg }]}>{label}</Text>
         </View>
       )}
     </Pressable>
@@ -81,23 +63,22 @@ export function PrimaryButton({
 }
 
 const styles = StyleSheet.create({
-  wrap: { borderRadius: radius.md, overflow: 'hidden' },
   base: {
     height: 54,
-    borderRadius: radius.md,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
+  contentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  primary: { backgroundColor: colors.primary },
   secondary: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
   },
   ghost: { backgroundColor: 'transparent' },
-  pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
   disabled: { opacity: 0.45 },
   label: { fontSize: font.body, fontWeight: '800' },
-  labelLight: { color: colors.onFlame },
-  labelAccent: { color: colors.primary },
 });

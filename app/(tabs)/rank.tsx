@@ -34,16 +34,13 @@ export default function RankScreen() {
     >
       {/* 現在ランクのヒーロー */}
       <FlameHero icon={progress.rank.icon} iconSize={130} style={styles.hero}>
-        <Ionicons name={progress.rank.icon} size={56} color={colors.onFlame} />
+        <View style={[styles.heroIconWrap, { backgroundColor: `${progress.rank.color}1F` }]}>
+          <Ionicons name={progress.rank.icon} size={40} color={progress.rank.color} />
+        </View>
         <Text style={styles.heroLabel}>{progress.rank.label}</Text>
         <Text style={styles.heroPoints}>{progress.points} pt</Text>
         <View style={{ height: spacing.lg, alignSelf: 'stretch' }} />
-        <ProgressBar
-          ratio={spanRatio}
-          height={10}
-          solidColor={colors.onFlame}
-          track="rgba(255,255,255,0.25)"
-        />
+        <ProgressBar ratio={spanRatio} height={10} />
         <Text style={styles.nextText}>
           {nextRank
             ? `次の ${nextRank.label} まであと ${progress.pointsToNext}pt`
@@ -120,6 +117,13 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: font.body, color: colors.textSub },
 
   hero: { alignItems: 'center', paddingVertical: spacing.xl },
+  heroIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   heroLabel: { fontSize: font.title, fontWeight: '900', color: colors.onFlame, marginTop: spacing.sm },
   heroPoints: {
     fontSize: font.heading,
@@ -154,12 +158,12 @@ const styles = StyleSheet.create({
   tierReq: { fontSize: font.small, color: colors.textMuted, marginTop: 2 },
   dim: { opacity: 0.4 },
   currentTag: {
-    backgroundColor: colors.flame,
+    backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
     paddingVertical: 4,
     borderRadius: radius.full,
   },
-  currentTagText: { color: colors.onFlame, fontSize: font.small, fontWeight: '800' },
+  currentTagText: { color: colors.onAccent, fontSize: font.small, fontWeight: '800' },
 
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18 },
 });

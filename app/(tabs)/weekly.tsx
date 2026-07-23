@@ -1,11 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { ProgressBar } from '@/components/ProgressBar';
-import { colors, font, gradients, radius, spacing } from '@/theme';
+import { colors, font, radius, spacing } from '@/theme';
 import { formatDisplay } from '@/logic/date';
 import { WeekSummary } from '@/types';
 
@@ -39,25 +38,28 @@ export default function WeeklyScreen() {
 
       {/* 合計課金（モック） */}
       {totalCharged > 0 ? (
-        <LinearGradient
-          colors={gradients.flame}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={styles.totalCard}
-        >
-          <Text style={[styles.totalLabel, { color: colors.onFlame, opacity: 0.9 }]}>
-            合計課金（モック）
-          </Text>
-          <Text style={[styles.totalValue, { color: colors.onFlame }]}>
+        <Card style={{ borderColor: colors.danger }}>
+          <View style={styles.totalHead}>
+            <View style={[styles.totalIcon, { backgroundColor: `${colors.danger}1F` }]}>
+              <Ionicons name="card" size={18} color={colors.danger} />
+            </View>
+            <Text style={styles.totalLabel}>合計課金（モック）</Text>
+          </View>
+          <Text style={[styles.totalValue, { color: colors.danger }]}>
             ¥{totalCharged.toLocaleString()}
           </Text>
-          <Text style={[styles.totalHint, { color: colors.onFlame, opacity: 0.85 }]}>
+          <Text style={styles.totalHint}>
             ※ 実際の決済は行いません。仕組みを体験するためのダミー表示です。
           </Text>
-        </LinearGradient>
+        </Card>
       ) : (
-        <Card style={{ backgroundColor: colors.successBg, borderColor: colors.success }}>
-          <Text style={[styles.totalLabel, { color: colors.success }]}>合計課金（モック）</Text>
+        <Card style={{ borderColor: colors.success }}>
+          <View style={styles.totalHead}>
+            <View style={[styles.totalIcon, { backgroundColor: `${colors.success}1F` }]}>
+              <Ionicons name="shield-checkmark" size={18} color={colors.success} />
+            </View>
+            <Text style={styles.totalLabel}>合計課金（モック）</Text>
+          </View>
           <Text style={[styles.totalValue, { color: colors.success }]}>¥0</Text>
           <Text style={styles.totalHint}>未達なし。この調子で続けましょう</Text>
         </Card>
@@ -144,12 +146,12 @@ const styles = StyleSheet.create({
   weekLabel: { fontSize: font.heading, fontWeight: '900', color: colors.text },
   weekRange: { fontSize: font.small, color: colors.textMuted },
   nowBadge: {
-    backgroundColor: colors.flame,
+    backgroundColor: colors.primary,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.full,
   },
-  nowBadgeText: { color: colors.onFlame, fontSize: font.small, fontWeight: '800' },
+  nowBadgeText: { color: colors.onAccent, fontSize: font.small, fontWeight: '800' },
 
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg },
   stat: { alignItems: 'center', flex: 1 },
@@ -169,8 +171,20 @@ const styles = StyleSheet.create({
   perfectBox: { backgroundColor: colors.successBg },
   chargeText: { fontSize: font.sub, fontWeight: '800', color: colors.danger },
 
-  totalCard: { borderRadius: radius.lg, padding: spacing.lg },
+  totalHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  totalIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   totalLabel: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
-  totalValue: { fontSize: font.hero, fontWeight: '900', marginTop: spacing.xs },
+  totalValue: {
+    fontSize: font.hero,
+    fontWeight: '900',
+    marginTop: spacing.sm,
+    fontVariant: ['tabular-nums'],
+  },
   totalHint: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm },
 });

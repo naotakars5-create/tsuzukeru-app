@@ -1,41 +1,50 @@
 /**
  * アプリ全体のデザイントークン（色・余白・フォント）。
- * デザイン案B「情熱（Bold）」— 力強いダーク基調＋炎のグラデーション。
+ * テイスト: モダンフィットネス系「ダーク × ネオンライム」。
+ * 深いチャコール背景に、ライムのアクセント（ボタンは黒文字のライムピル）、
+ * データはオレンジ/パープルの色付きチップで彩る。
  * ここを変えると全画面の見た目が変わる = デザインの一元管理。
  */
 
 export const colors = {
-  // 炎のアクセント（グラデーションの端点）
-  primary: '#FF8A4C', // アイコン・強調テキスト用の明るい炎色
-  ember: '#FF7A2F', // グラデ開始
-  flame: '#F0472E', // グラデ中間
-  magma: '#C4265E', // グラデ終端（ピンク寄り）
+  // アクセント（ネオンライム）
+  primary: '#C6F432', // メインのライム
+  ember: '#D9F94F', // 明るいライム（グラデ端）
+  flame: '#C6F432', // アクティブ要素の塗り（=primary）
+  magma: '#9CCB1D', // 深いライム（グラデ端）
+  /** ライムの上に載せる文字（黒に近い色） */
+  onAccent: '#0C0F14',
+
+  // データ用のサブカラー（画像のチップ配色）
+  orange: '#FF9F43',
+  purple: '#A78BFA',
 
   // 背景・面
-  bg: '#0E1015', // ほぼ黒
-  surface: '#181B22', // カード
-  surfaceAlt: '#1F232B', // 一段明るい面
-  border: '#23272F',
+  bg: '#0A0D12', // 深いチャコール
+  surface: '#141920', // カード
+  surfaceAlt: '#1C232C', // 一段明るい面
+  border: '#242C36',
 
   // テキスト
-  text: '#F3F4F7',
-  textSub: '#8B93A4',
-  textMuted: '#5B6270',
+  text: '#F4F6F8',
+  textSub: '#8C97A5',
+  textMuted: '#5A6472',
 
   // 意味的な色
-  success: '#31D07F',
-  successBg: '#12251B',
-  danger: '#FF7A6B',
-  dangerBg: '#2B1F24',
+  success: '#4ADE80',
+  successBg: '#12271B',
+  danger: '#FF6B6B',
+  dangerBg: '#2A1A1D',
   warning: '#FFC24B',
 
-  onFlame: '#FFFFFF', // グラデ上に載せる文字
+  /** 暗いカードの上に載せる文字（白系） */
+  onFlame: '#F4F6F8',
 } as const;
 
-/** 炎のグラデーション（LinearGradient用の配色） */
+/** ライムのグラデーション（LinearGradient用の配色） */
 export const gradients = {
-  flame: ['#FF7A2F', '#F0472E', '#C4265E'] as const,
-  flameSoft: ['#FF7A2F', '#F0472E'] as const,
+  flame: ['#D9F94F', '#C6F432', '#9CCB1D'] as const,
+  flameSoft: ['#D9F94F', '#B7E62E'] as const,
 } as const;
 
 export const spacing = {
@@ -68,15 +77,15 @@ export const shadow = {
   card: {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 6,
   },
   glow: {
-    shadowColor: '#F0472E',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
+    shadowColor: '#C6F432',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
     elevation: 8,
   },
 } as const;

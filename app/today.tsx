@@ -5,14 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { FlameHero } from '@/components/FlameHero';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { Card } from '@/components/Card';
+import { ProgressRing } from '@/components/ProgressRing';
 import { colors, font, spacing, radius } from '@/theme';
 import { formatCountdown, formatDisplay, msUntilEndOfDay, todayStr } from '@/logic/date';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * レベル1: ボタン+タイマー方式の達成判定画面。
- * 期限（当日23:59:59）までのカウントダウンを表示し、
- * 「達成」ボタンを押すと今日を done として記録する。
+ * 残り時間を円形リングで表示し、「達成」ボタンで今日を done として記録する。
  */
 export default function TodayScreen() {
   const router = useRouter();
@@ -60,6 +61,7 @@ export default function TodayScreen() {
   };
 
   const alreadyDone = todayStatus === 'done';
+  const remainRatio = remain / DAY_MS;
 
   return (
     <ScrollView
@@ -67,16 +69,22 @@ export default function TodayScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <FlameHero icon="time" iconSize={130} style={styles.hero}>
+      <FlameHero icon="time" iconSize={120} style={styles.hero}>
         <Text style={styles.date}>{formatDisplay(todayStr())}</Text>
+        <Text style={styles.goalName}>{goal?.name ?? ''}</Text>
+
         {!isTodayScheduled ? (
-          <Text style={styles.notScheduled}>今日は予定日ではありません</Text>
+          <View style={styles.notScheduledRow}>
+            <Ionicons name="leaf" size={16} color={colors.textSub} />
+            <Text style={styles.notScheduled}>今日は予定日ではありません</Text>
+          </View>
         ) : (
-          <>
-            <Text style={styles.timerLabel}>きょうの期限まで</Text>
-            <Text style={styles.timer}>{formatCountdown(remain)}</Text>
-            <Text style={styles.goalName}>{goal?.name ?? ''}</Text>
-          </>
+          <View style={styles.ringWrap}>
+            <ProgressRing ratio={remainRatio} size={190} strokeWidth={13}>
+              <Text style={styles.timerLabel}>期限まで</Text>
+              <Text style={styles.timer}>{formatCountdown(remain)}</Text>
+            </ProgressRing>
+          </View>
         )}
       </FlameHero>
 
@@ -102,13 +110,13 @@ export default function TodayScreen() {
             <Ionicons name="checkmark-circle" size={60} color={colors.success} />
             <Text style={styles.doneTitle}>達成！</Text>
             <View style={styles.doneSubRow}>
-              <Text style={styles.doneSub}>この炎を絶やさずに</Text>
+              <Text style={styles.doneSub}>この積み上げを絶やさずに</Text>
               <Ionicons name="flame" size={14} color={colors.success} />
             </View>
           </Animated.View>
         ) : (
           <Animated.View style={{ transform: [{ scale }], alignSelf: 'stretch' }}>
-            <PrimaryButton label="達成する" onPress={onAchieve} style={styles.bigButton} />
+            <PrimaryButton label="達成する" icon="checkmark" onPress={onAchieve} style={styles.bigButton} />
           </Animated.View>
         ))}
 
@@ -125,38 +133,32 @@ export default function TodayScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, gap: spacing.lg, paddingTop: spacing.xl },
-  hero: { alignItems: 'center', paddingVertical: spacing.xxl },
-  date: { fontSize: font.sub, color: colors.onFlame, opacity: 0.9, fontWeight: '700' },
-  timerLabel: {
-    marginTop: spacing.lg,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-    color: colors.onFlame,
-    opacity: 0.9,
-  },
-  timer: {
-    fontSize: 48,
-    fontWeight: '900',
-    color: colors.onFlame,
-    letterSpacing: 1,
-    marginTop: spacing.xs,
-    fontVariant: ['tabular-nums'],
-  },
+  hero: { alignItems: 'center', paddingVertical: spacing.xl },
+  date: { fontSize: font.sub, color: colors.textSub, fontWeight: '700' },
   goalName: {
-    fontSize: font.body,
-    fontWeight: '700',
-    color: colors.onFlame,
-    opacity: 0.95,
-    marginTop: spacing.sm,
+    fontSize: font.heading,
+    fontWeight: '800',
+    color: colors.text,
+    marginTop: spacing.xs,
     textAlign: 'center',
   },
-  notScheduled: {
-    marginTop: spacing.lg,
-    fontSize: font.body,
-    color: colors.onFlame,
-    fontWeight: '700',
+  ringWrap: { marginTop: spacing.xl },
+  timerLabel: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
+  timer: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: colors.text,
+    letterSpacing: 1,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
+  notScheduledRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.xl,
+  },
+  notScheduled: { fontSize: font.body, color: colors.textSub, fontWeight: '700' },
   hint: {
     fontSize: font.small,
     color: colors.textMuted,

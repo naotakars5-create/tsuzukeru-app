@@ -31,7 +31,7 @@ export function AchievementGrid({ goal, records }: { goal: Goal; records: Record
               end={{ x: 1, y: 1 }}
               style={[styles.cell, isToday && styles.today]}
             >
-              <Text style={[styles.cellText, { color: colors.onFlame }]}>{dayNum}</Text>
+              <Text style={[styles.cellText, { color: colors.onAccent }]}>{dayNum}</Text>
             </LinearGradient>
           );
         }
@@ -70,6 +70,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  today: { borderWidth: 2, borderColor: colors.warning },
+  today: { borderWidth: 2, borderColor: colors.primary },
   cellText: { fontSize: font.small, fontWeight: '800' },
 });

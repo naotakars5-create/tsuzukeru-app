@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   heroBig: {
     fontSize: font.hero,
     fontWeight: '900',
-    color: colors.onFlame,
+    color: colors.primary,
     lineHeight: font.hero,
     letterSpacing: -1,
   },
@@ -242,9 +242,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   meRow: {
-    backgroundColor: 'rgba(240,71,46,0.10)',
+    backgroundColor: 'rgba(198,244,50,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(240,71,46,0.45)',
+    borderColor: 'rgba(198,244,50,0.4)',
   },
   posWrap: { width: 26, alignItems: 'center' },
   posText: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },

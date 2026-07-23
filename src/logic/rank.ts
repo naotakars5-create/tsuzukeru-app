@@ -14,9 +14,9 @@ export const STREAK_BONUS_POINTS = 20;
 
 /** 成長ランク（ベクターアイコンで表現） */
 export const RANK_TIERS: RankTier[] = [
-  { key: 'beginner', label: 'ビギナー', icon: 'leaf', minPoints: 0, color: '#7ED957' },
-  { key: 'runner', label: 'ランナー', icon: 'flame', minPoints: 60, color: '#FF8A4C' },
-  { key: 'master', label: 'マスター', icon: 'barbell', minPoints: 180, color: '#FF6B5E' },
+  { key: 'beginner', label: 'ビギナー', icon: 'leaf', minPoints: 0, color: '#4ADE80' },
+  { key: 'runner', label: 'ランナー', icon: 'flame', minPoints: 60, color: '#FF9F43' },
+  { key: 'master', label: 'マスター', icon: 'barbell', minPoints: 180, color: '#A78BFA' },
   { key: 'legend', label: 'レジェンド', icon: 'trophy', minPoints: 360, color: '#FFC24B' },
 ];
 

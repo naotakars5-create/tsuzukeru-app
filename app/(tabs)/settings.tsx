@@ -107,7 +107,7 @@ export default function SettingsScreen() {
           <Switch
             value={reminder.enabled}
             onValueChange={onToggleReminder}
-            trackColor={{ false: colors.surfaceAlt, true: colors.flame }}
+            trackColor={{ false: colors.surfaceAlt, true: colors.primary }}
             thumbColor="#ffffff"
           />
         </View>
@@ -237,9 +237,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  chipActive: { backgroundColor: colors.flame, borderColor: colors.flame },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: font.small, fontWeight: '700', color: colors.text },
-  chipTextActive: { color: colors.onFlame },
+  chipTextActive: { color: colors.onAccent },
   helperNote: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.md, lineHeight: 17 },
 
   futureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
