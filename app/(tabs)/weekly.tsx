@@ -16,6 +16,44 @@ function stateOf(week: WeekSummary): WeekState {
   return week.missed > 0 ? 'missed' : 'done';
 }
 
+/** 週¥100の積立ステータスピル: 返金 / 課金 / 預かり中 / 預かり予定 */
+function StakePill({ week, state }: { week: WeekSummary; state: WeekState }) {
+  if (week.chargedAmount > 0) {
+    return (
+      <View style={[styles.stakePill, { backgroundColor: 'rgba(255,107,107,0.14)' }]}>
+        <Ionicons name="card" size={14} color={colors.danger} />
+        <Text style={[styles.stakePillText, { color: colors.danger }]}>
+          課金 ¥{week.chargedAmount.toLocaleString()}
+        </Text>
+      </View>
+    );
+  }
+  if (week.refundedAmount > 0) {
+    return (
+      <View style={[styles.stakePill, { backgroundColor: 'rgba(74,222,128,0.14)' }]}>
+        <Ionicons name="arrow-undo" size={14} color={colors.success} />
+        <Text style={[styles.stakePillText, { color: colors.success }]}>
+          返金 ¥{week.refundedAmount.toLocaleString()}
+        </Text>
+      </View>
+    );
+  }
+  if (state === 'current') {
+    return (
+      <View style={[styles.stakePill, { backgroundColor: 'rgba(255,194,75,0.14)' }]}>
+        <Ionicons name="lock-closed" size={13} color={colors.warning} />
+        <Text style={[styles.stakePillText, { color: colors.warning }]}>¥100 預かり中</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.stakePill, { backgroundColor: colors.surfaceAlt }]}>
+      <Ionicons name="lock-closed" size={13} color={colors.textMuted} />
+      <Text style={[styles.stakePillText, { color: colors.textMuted }]}>¥100 預かり予定</Text>
+    </View>
+  );
+}
+
 /**
  * 週次レポート: 4週の達成状況をひと目で。
  * 未達週のみ「請求書」トーンで課金（ダミー）を出し、達成週は静かなまま。
@@ -32,6 +70,7 @@ export default function WeeklyScreen() {
   }
 
   const totalCharged = weeks.reduce((s, w) => s + w.chargedAmount, 0);
+  const totalRefunded = weeks.reduce((s, w) => s + w.refundedAmount, 0);
 
   return (
     <ScrollView
@@ -55,7 +94,10 @@ export default function WeeklyScreen() {
         >
           <View style={{ flex: 1 }}>
             <Text style={styles.totalLabel}>今月の合計課金（ダミー）</Text>
-            <Text style={styles.totalCopy}>サボった分の積立。達成で相殺できます。</Text>
+            <Text style={styles.totalCopy}>
+              サボった週の¥100は返金されません。
+              {totalRefunded > 0 ? `（返金済み ¥${totalRefunded.toLocaleString()}）` : ''}
+            </Text>
           </View>
           <Text style={styles.totalValue}>¥{totalCharged.toLocaleString()}</Text>
         </LinearGradient>
@@ -65,14 +107,19 @@ export default function WeeklyScreen() {
             <Text style={[styles.totalLabel, { color: colors.success }]}>
               今月の合計課金（ダミー）
             </Text>
-            <Text style={styles.totalCopy}>未達なし。この調子で続けましょう。</Text>
+            <Text style={styles.totalCopy}>
+              没収なし。
+              {totalRefunded > 0
+                ? `これまで ¥${totalRefunded.toLocaleString()} 返金されています。`
+                : '達成した週の¥100は返金されます。'}
+            </Text>
           </View>
           <Text style={[styles.totalValue, { color: colors.success }]}>¥0</Text>
         </View>
       )}
 
       <Text style={styles.note}>
-        ※ 実際の決済は行いません。仕組みを体験するためのダミー表示です。
+        ※ 週¥100の積立はモックです。実際の決済は行いません。
       </Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
@@ -123,14 +170,7 @@ function WeekCard({ week }: { week: WeekSummary }) {
             ? `達成 ${week.done} ・ 残り ${week.pending} ・ 予定 ${week.scheduled}`
             : `達成 ${week.done} ・ 未達 ${week.missed} ・ 予定 ${week.scheduled}`}
         </Text>
-        {isMissed && week.chargedAmount > 0 && (
-          <View style={styles.chargePill}>
-            <Ionicons name="card" size={14} color={colors.danger} />
-            <Text style={styles.chargePillText}>
-              課金 ¥{week.chargedAmount.toLocaleString()}
-            </Text>
-          </View>
-        )}
+        <StakePill week={week} state={state} />
       </View>
     </View>
   );
@@ -183,19 +223,17 @@ const styles = StyleSheet.create({
     color: colors.textSub,
     fontVariant: ['tabular-nums'],
   },
-  chargePill: {
+  stakePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,107,107,0.14)',
     borderRadius: 10,
     paddingVertical: 5,
     paddingHorizontal: 10,
   },
-  chargePillText: {
+  stakePillText: {
     fontSize: 13,
     fontWeight: '800',
-    color: colors.danger,
     fontVariant: ['tabular-nums'],
   },
 

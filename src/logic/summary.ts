@@ -7,7 +7,7 @@ import { Goal, RecordMap, ProgressSummary, WeekSummary } from '@/types';
 import { addDays, compareDate, todayStr } from './date';
 import { scheduledDates, statusOf } from './schedule';
 import { calcPoints, rankForPoints, nextRankAfter } from './rank';
-import { chargeForMisses } from './billing';
+import { WEEKLY_STAKE } from './billing';
 
 /**
  * 現在の連続達成日数と最高連続を計算。
@@ -113,6 +113,11 @@ export function buildWeeks(goal: Goal | null, records: RecordMap): WeekSummary[]
 
     const isCurrent =
       compareDate(today, startDate) >= 0 && compareDate(today, endDate) <= 0;
+    const isPast = compareDate(endDate, today) < 0;
+
+    // 週¥100モデル: 未達が1日でもあれば課金確定、週が終わって未達ゼロなら返金
+    const chargedAmount = missed > 0 ? WEEKLY_STAKE : 0;
+    const refundedAmount = isPast && missed === 0 && inWeek.length > 0 ? WEEKLY_STAKE : 0;
 
     weeks.push({
       weekIndex: w,
@@ -123,7 +128,8 @@ export function buildWeeks(goal: Goal | null, records: RecordMap): WeekSummary[]
       done,
       missed,
       pending,
-      chargedAmount: chargeForMisses(goal, missed),
+      chargedAmount,
+      refundedAmount,
       isCurrent,
     });
   }

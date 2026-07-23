@@ -74,8 +74,7 @@ export default function SettingsScreen() {
               <Text style={styles.goalName}>{goal.name}</Text>
             </View>
             <Text style={styles.goalMeta}>
-              {category.label}・{frequencyLabel(goal)}・4週間・積立 ¥
-              {goal.stakeAmount.toLocaleString()}
+              {category.label}・{frequencyLabel(goal)}・4週間・週¥100積立（モック）
             </Text>
             <Text style={styles.goalMeta}>開始日: {formatDisplay(goal.startDate)}</Text>
             <PrimaryButton

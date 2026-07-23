@@ -18,10 +18,10 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { Frequency, GoalCategory, IconName } from '@/types';
 import { CATEGORIES } from '@/logic/category';
+import { WEEKLY_STAKE } from '@/logic/billing';
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const DURATION_WEEKS = 4; // MVPは4週固定
-const STAKE_PRESETS = [1000, 3000, 5000, 10000];
 
 export default function GoalSetupScreen() {
   const router = useRouter();
@@ -31,7 +31,6 @@ export default function GoalSetupScreen() {
   const [category, setCategory] = useState<GoalCategory>(goal?.category ?? 'exercise');
   const [frequency, setFrequency] = useState<Frequency>(goal?.frequency ?? 'daily');
   const [weekdays, setWeekdays] = useState<number[]>(goal?.weekdays ?? [1, 2, 3, 4, 5]);
-  const [stake, setStake] = useState<string>(goal ? String(goal.stakeAmount) : '3000');
 
   const toggleWeekday = (d: number) => {
     setWeekdays((prev) =>
@@ -55,11 +54,6 @@ export default function GoalSetupScreen() {
       Alert.alert('目標名を入力してください');
       return;
     }
-    const stakeNum = Number(stake);
-    if (!Number.isFinite(stakeNum) || stakeNum < 0) {
-      Alert.alert('積立額は0以上の数値で入力してください');
-      return;
-    }
     if (frequency === 'weekdays' && weekdays.length === 0) {
       Alert.alert('曜日を1つ以上選んでください');
       return;
@@ -71,7 +65,7 @@ export default function GoalSetupScreen() {
         category,
         frequency,
         weekdays: frequency === 'weekdays' ? weekdays : [],
-        stakeAmount: Math.round(stakeNum),
+        stakeAmount: WEEKLY_STAKE * DURATION_WEEKS,
         durationWeeks: DURATION_WEEKS,
       });
       router.back();
@@ -215,27 +209,28 @@ export default function GoalSetupScreen() {
           <Text style={styles.helper}>今日から4週間、続けていきます。</Text>
         </Card>
 
-        {/* 積立額 */}
+        {/* 積立（週¥100固定・モック） */}
         <Card>
-          <Text style={styles.label}>積立額（モック・実際の決済はしません）</Text>
-          <View style={styles.amountRow}>
-            <Text style={styles.yen}>¥</Text>
-            <TextInput
-              style={[styles.input, styles.amountInput]}
-              placeholder="3000"
-              placeholderTextColor={colors.textMuted}
-              value={stake}
-              onChangeText={(t) => setStake(t.replace(/[^0-9]/g, ''))}
-              keyboardType="number-pad"
-              maxLength={7}
-            />
+          <Text style={styles.label}>積立（モック・実際の決済はしません）</Text>
+          <View style={styles.stakeRow}>
+            <View style={styles.stakeIcon}>
+              <Ionicons name="card" size={20} color={colors.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.stakeValue}>週 ¥{WEEKLY_STAKE}</Text>
+              <Text style={styles.stakeSub}>4週間で最大 ¥{WEEKLY_STAKE * DURATION_WEEKS}</Text>
+            </View>
           </View>
-          <View style={styles.presetRow}>
-            {STAKE_PRESETS.map((v) => (
-              <PresetChip key={v} label={`¥${v.toLocaleString()}`} onPress={() => setStake(String(v))} />
-            ))}
+          <View style={styles.stakeRules}>
+            <View style={styles.stakeRule}>
+              <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+              <Text style={styles.stakeRuleText}>週の予定をすべて達成 → ¥{WEEKLY_STAKE} 全額返金</Text>
+            </View>
+            <View style={styles.stakeRule}>
+              <Ionicons name="close-circle" size={15} color={colors.danger} />
+              <Text style={styles.stakeRuleText}>1日でもサボる → 返金なし。そのまま課金</Text>
+            </View>
           </View>
-          <Text style={styles.helper}>未達があると、この積立から「課金（ダミー）」が発生します。</Text>
         </Card>
 
         <PrimaryButton
@@ -368,7 +363,34 @@ const styles = StyleSheet.create({
   freqSummaryText: { fontSize: font.sub, color: colors.text, fontWeight: '600', lineHeight: 20, flex: 1 },
   freqCount: { color: colors.primary, fontWeight: '900' },
 
-  amountRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
-  yen: { fontSize: font.heading, fontWeight: '900', color: colors.text, marginRight: 4 },
-  amountInput: { flex: 1, marginTop: 0 },
+  stakeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
+  stakeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stakeValue: {
+    fontSize: font.heading,
+    fontWeight: '900',
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  stakeSub: {
+    fontSize: font.small,
+    color: colors.textSub,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  stakeRules: { marginTop: spacing.md, gap: spacing.sm },
+  stakeRule: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stakeRuleText: {
+    fontSize: font.sub,
+    color: colors.textSub,
+    fontWeight: '600',
+    flex: 1,
+    fontVariant: ['tabular-nums'],
+  },
 });

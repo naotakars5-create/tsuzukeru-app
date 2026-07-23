@@ -89,8 +89,10 @@ export interface WeekSummary {
   done: number;
   missed: number;
   pending: number;
-  /** この週で発生した課金（モック） */
+  /** この週で確定した課金（モック・未達があると週¥100没収） */
   chargedAmount: number;
+  /** この週で返金された額（モック・週の予定を完全達成で¥100返金） */
+  refundedAmount: number;
   isCurrent: boolean;
 }
 

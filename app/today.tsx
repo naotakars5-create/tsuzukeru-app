@@ -7,7 +7,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { colors, font, spacing, radius } from '@/theme';
 import { formatHM, msUntilEndOfDay } from '@/logic/date';
-import { chargeForMisses } from '@/logic/billing';
+import { WEEKLY_STAKE } from '@/logic/billing';
 import { POINTS_PER_DONE } from '@/logic/rank';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -19,7 +19,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 export default function TodayScreen() {
   const router = useRouter();
-  const { goal, progress, isTodayScheduled, todayStatus, markTodayDone } = useApp();
+  const { goal, progress, weeks, isTodayScheduled, todayStatus, markTodayDone } = useApp();
 
   const [remain, setRemain] = useState(() => msUntilEndOfDay());
   const [celebrating, setCelebrating] = useState(false);
@@ -64,7 +64,9 @@ export default function TodayScreen() {
 
   const alreadyDone = todayStatus === 'done';
   const remainRatio = remain / DAY_MS;
-  const dailyCharge = goal ? chargeForMisses(goal, 1) : 0;
+  // 今週すでに未達があるか（あれば今週の¥100は没収確定済み）
+  const currentWeek = weeks.find((w) => w.isCurrent);
+  const weekAlreadyCharged = (currentWeek?.missed ?? 0) > 0;
 
   return (
     <View style={styles.screen}>
@@ -75,7 +77,9 @@ export default function TodayScreen() {
         <View style={styles.banner}>
           <Ionicons name="alert-circle" size={18} color={colors.danger} />
           <Text style={styles.bannerText}>
-            今日中に達成しないと ¥{dailyCharge.toLocaleString()} の積立が発生
+            {weekAlreadyCharged
+              ? `今週の ¥${WEEKLY_STAKE} は没収確定。連続記録は今日から守れる`
+              : `今日サボると、今週の積立 ¥${WEEKLY_STAKE} は返金されません`}
           </Text>
         </View>
       )}
