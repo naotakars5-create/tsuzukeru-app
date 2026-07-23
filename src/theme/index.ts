@@ -37,9 +37,33 @@ export const colors = {
   dangerBg: '#2A1A1D',
   warning: '#FFC24B',
 
+  // 達成グリッドのヒートマップ（連続するほど濃く）
+  heat1: '#6E8A1F',
+  heat2: '#9CC427',
+  heat3: '#C6F432',
+  gridEmpty: '#242C36', // 未来のマス
+  gridMiss: '#1C232C', // 未達のマス（静かに）
+
+  // 課金（請求書トーン）
+  surfaceDanger: '#1C1214',
+  borderDanger: 'rgba(255,107,107,0.45)',
+
+  // メダル
+  gold: '#FFC24B',
+  silver: '#C0C7D0',
+  bronze: '#D8956B',
+
   /** 暗いカードの上に載せる文字（白系） */
   onFlame: '#F4F6F8',
 } as const;
+
+/** セクション見出し（type/label）: 11px / 700 / トラッキング広め */
+export const labelStyle = {
+  fontSize: 11,
+  fontWeight: '700' as const,
+  letterSpacing: 1.5,
+  color: '#5A6472',
+};
 
 /** ライムのグラデーション（LinearGradient用の配色） */
 export const gradients = {

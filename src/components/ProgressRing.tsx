@@ -7,7 +7,8 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 /**
  * 円形プログレスリング（デザインの主役）。
- * ratio 0..1 をライムのリングで表示し、中央に children を重ねる。
+ * ratio 0..1 をリングで表示し、中央に children を重ねる。
+ * glow を有効にすると、進捗の下に太く薄い同色リングを敷いて発光風に見せる。
  */
 export function ProgressRing({
   ratio,
@@ -15,6 +16,7 @@ export function ProgressRing({
   strokeWidth = 11,
   color = colors.primary,
   track = colors.surfaceAlt,
+  glow = true,
   children,
 }: {
   ratio: number;
@@ -22,10 +24,11 @@ export function ProgressRing({
   strokeWidth?: number;
   color?: string;
   track?: string;
+  glow?: boolean;
   children?: React.ReactNode;
 }) {
   const clamped = Math.max(0, Math.min(1, ratio));
-  const r = (size - strokeWidth) / 2;
+  const r = (size - strokeWidth) / 2 - (glow ? 4 : 0);
   const circumference = 2 * Math.PI * r;
 
   const anim = useRef(new Animated.Value(0)).current;
@@ -54,6 +57,20 @@ export function ProgressRing({
           strokeWidth={strokeWidth}
           fill="none"
         />
+        {glow && (
+          <AnimatedCircle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke={color}
+            strokeWidth={strokeWidth + 8}
+            opacity={0.28}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${circumference}`}
+            strokeDashoffset={offset}
+          />
+        )}
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}

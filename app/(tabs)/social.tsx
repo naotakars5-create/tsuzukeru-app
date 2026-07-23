@@ -1,19 +1,16 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
-import { Card } from '@/components/Card';
-import { FlameHero } from '@/components/FlameHero';
-import { Avatar } from '@/components/Avatar';
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, labelStyle, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
-import { buildLeaderboard, buildTeamMembers } from '@/logic/social';
+import { buildLeaderboard, weeklyRankDelta } from '@/logic/social';
 import { LeaderboardEntry } from '@/types';
 
 /**
- * 仲間タブ: 同じカテゴリのチーム（モック）とランキング（モック）。
- * サーバーが無いため、仲間はダミーデータ。将来ここをAPI連携に差し替える。
+ * 仲間タブ: 自分の順位を主役に、チーム内での立ち位置と次の目標ptを示す。
+ * サーバーが無いため仲間はダミーデータ。将来ここをAPI連携に差し替える。
  */
 export default function SocialScreen() {
   const { goal, progress } = useApp();
@@ -24,26 +21,22 @@ export default function SocialScreen() {
     () => buildLeaderboard(category.key, progress.points, progress.streak),
     [category.key, progress.points, progress.streak]
   );
-  const team = useMemo(
-    () => buildTeamMembers(category.key, progress.points, progress.streak),
-    [category.key, progress.points, progress.streak]
-  );
 
   if (!goal) {
     return (
       <View style={styles.center}>
-        <Ionicons name="people" size={48} color={colors.textMuted} />
-        <Text style={styles.emptyText}>目標を設定すると、同じカテゴリの{'\n'}仲間とつながれます。</Text>
+        <Ionicons name="people-outline" size={48} color={colors.textMuted} />
+        <Text style={styles.emptyText}>
+          目標を設定すると、同じカテゴリの{'\n'}仲間とランキングで競えます。
+        </Text>
       </View>
     );
   }
 
-  const myRankIndex = leaderboard.findIndex((e) => e.isMe);
-  const teamTotal = team.reduce((s, m) => s + m.points, 0);
-
-  const onInvite = () => {
-    Alert.alert('招待リンク（ダミー）', '招待リンクをコピーしました。\n※ 実際の共有機能は今後追加予定です。');
-  };
+  const myIndex = leaderboard.findIndex((e) => e.isMe);
+  const myPosition = myIndex + 1;
+  const above = myIndex > 0 ? leaderboard[myIndex - 1] : null;
+  const delta = weeklyRankDelta(category.key);
 
   return (
     <ScrollView
@@ -51,66 +44,58 @@ export default function SocialScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* 自分の順位ヒーロー */}
-      <FlameHero icon="podium" iconSize={120}>
-        <View style={styles.catRow}>
-          <Ionicons name={category.icon} size={14} color={colors.onFlame} />
-          <Text style={styles.catText}>{category.label}カテゴリ</Text>
-        </View>
-        <View style={styles.heroRow}>
-          <Text style={styles.heroBig}>{myRankIndex + 1}</Text>
-          <Text style={styles.heroUnit}>位</Text>
-          <Text style={styles.heroTotal}>/ {leaderboard.length}人中</Text>
-        </View>
-        <Text style={styles.heroSub}>
-          {myRankIndex === 0
-            ? 'カテゴリ1位！この座を守り抜こう'
-            : `${leaderboard[myRankIndex - 1].name} まであと ${
-                leaderboard[myRankIndex - 1].points - progress.points
-              }pt`}
+      {/* 自分の順位ヒーロー（主役） */}
+      <LinearGradient
+        colors={['#1C232C', '#141920']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.6, y: 1 }}
+        style={styles.hero}
+      >
+        <Text style={styles.heroLabel}>
+          あなたの順位 ・ {category.teamName}
         </Text>
-      </FlameHero>
-
-      {/* チーム */}
-      <Card>
-        <View style={styles.rowBetween}>
-          <View style={styles.titleRow}>
-            <Ionicons name="people" size={18} color={colors.primary} />
-            <Text style={styles.sectionTitle}>{category.teamName}</Text>
+        <View style={styles.heroRow}>
+          <View style={styles.heroNumRow}>
+            <Text style={styles.heroNum}>{myPosition}</Text>
+            <Text style={styles.heroNumUnit}>位</Text>
           </View>
-          <View style={styles.teamTotalPill}>
-            <Ionicons name="flash" size={12} color={colors.warning} />
-            <Text style={styles.teamTotalText}>{teamTotal.toLocaleString()}pt</Text>
+          <Text style={styles.heroTotal}>/ {leaderboard.length}人中</Text>
+          <View style={styles.deltaWrap}>
+            {delta > 0 ? (
+              <View style={styles.deltaRow}>
+                <Ionicons name="arrow-up" size={14} color={colors.success} />
+                <Text style={styles.deltaText}>先週から{delta}つ上昇</Text>
+              </View>
+            ) : (
+              <Text style={styles.deltaSame}>先週と同じ順位</Text>
+            )}
           </View>
         </View>
-        <Text style={styles.sectionSub}>同じカテゴリの仲間チーム（ダミー）</Text>
-
-        <View style={{ height: spacing.sm }} />
-        {team.map((m) => (
-          <MemberRow key={m.id} entry={m} />
-        ))}
-
-        <PrimaryButton
-          label="仲間を招待する"
-          variant="secondary"
-          onPress={onInvite}
-          style={{ marginTop: spacing.md }}
-        />
-      </Card>
+        <Text style={styles.heroNext}>
+          {above ? (
+            <>
+              {myPosition - 1}位まであと{' '}
+              <Text style={styles.heroNextNum}>
+                {(above.points - progress.points).toLocaleString()} pt
+              </Text>
+            </>
+          ) : (
+            '1位キープ中。逃げ切ろう。'
+          )}
+        </Text>
+      </LinearGradient>
 
       {/* ランキング */}
-      <Card>
-        <View style={styles.titleRow}>
-          <Ionicons name="podium" size={18} color={colors.primary} />
-          <Text style={styles.sectionTitle}>{category.label}ランキング</Text>
-        </View>
-        <Text style={styles.sectionSub}>同じカテゴリで頑張る人たちと競おう（ダミー）</Text>
-        <View style={{ height: spacing.sm }} />
+      <View style={styles.rankHead}>
+        <Text style={styles.sectionLabel}>ランキング</Text>
+        <Text style={styles.rankPeriod}>今週</Text>
+      </View>
 
+      <View style={styles.list}>
         {leaderboard.map((e, i) => (
           <RankRow key={e.id} entry={e} position={i + 1} />
         ))}
-      </Card>
+      </View>
 
       <Text style={styles.note}>
         ※ 仲間・ランキングは試作用のダミーデータです。実際の友だち連携は今後追加予定です。
@@ -120,51 +105,51 @@ export default function SocialScreen() {
   );
 }
 
-/** チームメンバー行 */
-function MemberRow({ entry }: { entry: LeaderboardEntry }) {
-  return (
-    <View style={[styles.memberRow, entry.isMe && styles.meRow]}>
-      <Avatar name={entry.name} isMe={entry.isMe} size={38} />
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.memberName, entry.isMe && { color: colors.primary }]}>
-          {entry.name}
-        </Text>
-        <View style={styles.streakRow}>
-          <Ionicons name="flame" size={12} color={colors.primary} />
-          <Text style={styles.streakText}>連続{entry.streak}日</Text>
-        </View>
-      </View>
-      <Text style={styles.memberPoints}>{entry.points.toLocaleString()}pt</Text>
-    </View>
-  );
-}
-
-/** ランキング行（上位3位はメダル色） */
-const MEDAL_COLORS = ['#FFC24B', '#C9CDD6', '#D8956B'];
+const MEDAL_COLORS = [colors.gold, colors.silver, colors.bronze];
 
 function RankRow({ entry, position }: { entry: LeaderboardEntry; position: number }) {
   const isTop3 = position <= 3;
   return (
-    <View style={[styles.rankRow, entry.isMe && styles.meRow]}>
+    <View
+      style={[
+        styles.row,
+        entry.isMe && styles.meRow,
+        entry.broken && styles.brokenRow,
+      ]}
+    >
       <View style={styles.posWrap}>
         {isTop3 ? (
           <Ionicons name="medal" size={22} color={MEDAL_COLORS[position - 1]} />
         ) : (
-          <Text style={styles.posText}>{position}</Text>
+          <Text style={[styles.posText, entry.isMe && { color: colors.primary }]}>
+            {position}
+          </Text>
         )}
       </View>
-      <Avatar name={entry.name} isMe={entry.isMe} size={36} />
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.memberName, entry.isMe && { color: colors.primary }]}>
-          {entry.name}
-        </Text>
-        <View style={styles.streakRow}>
-          <Ionicons name="flame" size={11} color={colors.textMuted} />
-          <Text style={styles.streakText}>連続{entry.streak}日</Text>
+
+      {entry.isMe ? (
+        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+          <Ionicons name="person" size={20} color={colors.onAccent} />
         </View>
+      ) : (
+        <View style={styles.avatar}>
+          <Text style={styles.avatarInitial}>{entry.name.slice(0, 1)}</Text>
+        </View>
+      )}
+
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.name, entry.isMe && { fontWeight: '800' }]}>{entry.name}</Text>
+        {entry.broken ? (
+          <Text style={styles.subBroken}>連続0日 ・ 昨日途切れ</Text>
+        ) : (
+          <Text style={[styles.sub, (entry.isMe || position <= 1) && { color: colors.orange }]}>
+            連続{entry.streak}日
+          </Text>
+        )}
       </View>
-      <Text style={[styles.memberPoints, entry.isMe && { color: colors.primary }]}>
-        {entry.points.toLocaleString()}pt
+
+      <Text style={[styles.points, entry.isMe && { color: colors.primary }]}>
+        {entry.points.toLocaleString()}
       </Text>
     </View>
   );
@@ -172,7 +157,7 @@ function RankRow({ entry, position }: { entry: LeaderboardEntry; position: numbe
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, gap: spacing.lg },
+  content: { paddingHorizontal: 22, paddingTop: spacing.sm },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -183,80 +168,81 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: font.body, color: colors.textSub, textAlign: 'center', lineHeight: 24 },
 
-  catRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  catText: {
-    fontSize: 12,
+  hero: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 22,
+  },
+  heroLabel: { ...labelStyle, color: colors.textSub, marginBottom: 8 },
+  heroRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  heroNumRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  heroNum: {
+    fontSize: 72,
     fontWeight: '800',
-    letterSpacing: 1,
-    color: colors.onFlame,
-    opacity: 0.9,
+    lineHeight: 66,
+    letterSpacing: -2,
+    color: colors.orange,
+    fontVariant: ['tabular-nums'],
   },
-  heroRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 2 },
-  heroBig: {
-    fontSize: font.hero,
-    fontWeight: '900',
-    color: colors.primary,
-    lineHeight: font.hero,
-    letterSpacing: -1,
-  },
-  heroUnit: { fontSize: font.heading, fontWeight: '800', color: colors.onFlame, marginLeft: 4, marginBottom: 6 },
+  heroNumUnit: { fontSize: 26, fontWeight: '700', color: colors.textSub, marginBottom: 4 },
   heroTotal: {
-    fontSize: font.sub,
-    fontWeight: '700',
-    color: colors.onFlame,
-    opacity: 0.85,
-    marginLeft: 8,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textSub,
+    marginLeft: 12,
     marginBottom: 8,
   },
-  heroSub: { fontSize: font.sub, fontWeight: '600', color: colors.onFlame, opacity: 0.95, marginTop: 4 },
+  deltaWrap: { marginLeft: 'auto', marginBottom: 8 },
+  deltaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  deltaText: { fontSize: 13, fontWeight: '700', color: colors.success },
+  deltaSame: { fontSize: 13, fontWeight: '600', color: colors.textSub },
+  heroNext: { marginTop: 14, fontSize: 13, color: colors.textSub },
+  heroNextNum: { color: colors.text, fontWeight: '800', fontVariant: ['tabular-nums'] },
 
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  sectionTitle: { fontSize: font.body, fontWeight: '900', color: colors.text },
-  sectionSub: { fontSize: font.small, color: colors.textMuted, marginTop: 4 },
-  teamTotalPill: {
+  rankHead: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.full,
+    marginTop: 22,
+    marginBottom: 12,
+    paddingHorizontal: 2,
   },
-  teamTotalText: { fontSize: font.small, fontWeight: '800', color: colors.warning },
+  sectionLabel: { ...labelStyle },
+  rankPeriod: { fontSize: 12, color: colors.textSub },
 
-  memberRow: {
+  list: { gap: 8 },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
-  },
-  rankRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   meRow: {
     backgroundColor: 'rgba(198,244,50,0.08)',
-    borderWidth: 1,
     borderColor: 'rgba(198,244,50,0.4)',
   },
+  brokenRow: { opacity: 0.7 },
   posWrap: { width: 26, alignItems: 'center' },
-  posText: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
-  memberName: { fontSize: font.sub, fontWeight: '800', color: colors.text },
-  streakRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
-  streakText: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
-  memberPoints: {
-    fontSize: font.sub,
-    fontWeight: '900',
-    color: colors.text,
-    fontVariant: ['tabular-nums'],
+  posText: { fontSize: 15, fontWeight: '700', color: colors.textSub, fontVariant: ['tabular-nums'] },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#2A3340',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  avatarInitial: { fontSize: 15, fontWeight: '800', color: colors.textSub },
+  name: { fontSize: 15, fontWeight: '700', color: colors.text },
+  sub: { fontSize: 12, color: colors.textSub, marginTop: 1, fontVariant: ['tabular-nums'] },
+  subBroken: { fontSize: 12, color: colors.danger, marginTop: 1 },
+  points: { fontSize: 16, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
 
-  note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18 },
+  note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18, marginTop: 18 },
 });

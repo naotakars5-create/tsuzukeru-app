@@ -1,18 +1,31 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet } from 'react-native';
 import { Goal, RecordMap } from '@/types';
 import { scheduledDates, statusOf } from '@/logic/schedule';
-import { todayStr, compareDate, fromDateStr } from '@/logic/date';
-import { colors, font, radius, spacing, gradients } from '@/theme';
+import { todayStr, compareDate } from '@/logic/date';
+import { colors } from '@/theme';
 
 /**
- * 4週間の予定日をマス目で可視化するグリッド。
- * 達成=炎グラデ / 未達=赤 / 今日=枠強調 / 未来=暗いグレー。
+ * 4週間の予定日をヒートマップで可視化するグリッド。
+ * - 達成マスは「連続の長さ」で濃淡（1日=弱 / 2日=中 / 3日以上=ライム満点）
+ * - 未達は静かな暗色（赤で騒がない）、未来は空マス
+ * - 今日のマスは二重リングで点灯
  */
 export function AchievementGrid({ goal, records }: { goal: Goal; records: RecordMap }) {
   const today = todayStr();
   const dates = scheduledDates(goal);
+
+  // 各日の「その時点での連続日数」を計算して濃淡を決める
+  const heat: Record<string, number> = {};
+  let run = 0;
+  for (const date of dates) {
+    if (statusOf(records, date) === 'done') {
+      run += 1;
+      heat[date] = Math.min(run, 3);
+    } else {
+      run = 0;
+    }
+  }
 
   return (
     <View style={styles.grid}>
@@ -20,40 +33,29 @@ export function AchievementGrid({ goal, records }: { goal: Goal; records: Record
         const st = statusOf(records, date);
         const isFuture = compareDate(date, today) > 0;
         const isToday = date === today;
-        const dayNum = fromDateStr(date).getDate();
 
+        let bg: string = colors.gridEmpty;
         if (st === 'done') {
+          bg = heat[date] === 1 ? colors.heat1 : heat[date] === 2 ? colors.heat2 : colors.heat3;
+        } else if (isFuture) {
+          bg = colors.gridEmpty;
+        } else if (st === 'missed') {
+          bg = colors.gridMiss;
+        } else {
+          // 今日まだ未達成
+          bg = colors.gridEmpty;
+        }
+
+        if (isToday) {
+          // 二重リング: 外枠ライム + 地の色の隙間 + 中のマス
           return (
-            <LinearGradient
-              key={date}
-              colors={gradients.flameSoft}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.cell, isToday && styles.today]}
-            >
-              <Text style={[styles.cellText, { color: colors.onAccent }]}>{dayNum}</Text>
-            </LinearGradient>
+            <View key={date} style={styles.todayOuter}>
+              <View style={[styles.todayInner, { backgroundColor: bg }]} />
+            </View>
           );
         }
 
-        let bg: string = colors.surfaceAlt;
-        let fg: string = colors.textMuted;
-        if (st === 'missed') {
-          bg = colors.dangerBg;
-          fg = colors.danger;
-        } else if (isFuture) {
-          bg = colors.surface;
-          fg = colors.textMuted;
-        }
-
-        return (
-          <View
-            key={date}
-            style={[styles.cell, { backgroundColor: bg }, isToday && styles.today]}
-          >
-            <Text style={[styles.cellText, { color: fg }]}>{dayNum}</Text>
-          </View>
-        );
+        return <View key={date} style={[styles.cell, { backgroundColor: bg }]} />;
       })}
     </View>
   );
@@ -62,14 +64,20 @@ export function AchievementGrid({ goal, records }: { goal: Goal; records: Record
 const CELL = 36;
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  cell: {
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  cell: { width: CELL, height: CELL, borderRadius: 7 },
+  todayOuter: {
     width: CELL,
     height: CELL,
-    borderRadius: radius.sm,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  today: { borderWidth: 2, borderColor: colors.primary },
-  cellText: { fontSize: font.small, fontWeight: '800' },
+  todayInner: {
+    width: CELL - 10,
+    height: CELL - 10,
+    borderRadius: 5,
+  },
 });

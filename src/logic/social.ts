@@ -80,19 +80,26 @@ function rivalStreak(name: string): number {
 
 /**
  * 同カテゴリのランキング（自分を含む・ポイント降順）。
+ * ベース値が最小のライバル1人は「昨日連続が途切れた人」として演出する。
  */
 export function buildLeaderboard(
   category: GoalCategory,
   myPoints: number,
   myStreak: number
 ): LeaderboardEntry[] {
-  const rivals: LeaderboardEntry[] = RIVALS[category].map((r) => ({
-    id: r.name,
-    name: r.name,
-    points: rivalPoints(r.name, r.base),
-    streak: rivalStreak(r.name),
-    isMe: false,
-  }));
+  const list = RIVALS[category];
+  const minBase = Math.min(...list.map((r) => r.base));
+  const rivals: LeaderboardEntry[] = list.map((r) => {
+    const broken = r.base === minBase;
+    return {
+      id: r.name,
+      name: r.name,
+      points: rivalPoints(r.name, r.base),
+      streak: broken ? 0 : rivalStreak(r.name),
+      isMe: false,
+      broken,
+    };
+  });
   const me: LeaderboardEntry = {
     id: 'me',
     name: 'あなた',
@@ -103,20 +110,8 @@ export function buildLeaderboard(
   return [...rivals, me].sort((a, b) => b.points - a.points);
 }
 
-/** チームメンバー（モック: ライバル上位3人 + 自分） */
-export function buildTeamMembers(
-  category: GoalCategory,
-  myPoints: number,
-  myStreak: number
-): LeaderboardEntry[] {
-  const board = buildLeaderboard(category, myPoints, myStreak);
-  const me = board.find((e) => e.isMe)!;
-  const others = board.filter((e) => !e.isMe).slice(0, 3);
-  return [me, ...others];
+/** 先週からの順位変動（モック: 日付から決まる 0〜2） */
+export function weeklyRankDelta(category: GoalCategory): number {
+  return hash('delta' + category + todayStr()) % 3;
 }
 
-/** アバターの背景色（名前から安定して決まる） */
-const AVATAR_COLORS = ['#FF8A4C', '#6AA6FF', '#7ED957', '#FF6B8A', '#B48CFF', '#FFC24B', '#4FD1C5'];
-export function avatarColor(name: string): string {
-  return AVATAR_COLORS[hash(name) % AVATAR_COLORS.length];
-}

@@ -54,6 +54,14 @@ export function formatCountdown(ms: number): string {
   return `${h}:${m}:${s}`;
 }
 
+/** ミリ秒 -> 'H:MM'（時:分のみ） */
+export function formatHM(ms: number): string {
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = String(totalMin % 60).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
 /** 'YYYY-MM-DD' -> '7/21(月)' のような表示用 */
 export function formatDisplay(s: string): string {
   const d = fromDateStr(s);

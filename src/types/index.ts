@@ -101,4 +101,6 @@ export interface LeaderboardEntry {
   points: number;
   streak: number;
   isMe: boolean;
+  /** 連続が昨日途切れた（モック演出用） */
+  broken?: boolean;
 }
