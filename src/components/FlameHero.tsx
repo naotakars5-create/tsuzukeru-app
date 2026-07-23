@@ -1,22 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { IconName } from '@/types';
 import { gradients, radius, spacing, colors, shadow } from '@/theme';
 
 /**
- * 炎のグラデーションを敷いたヒーローカード（案Bの主役）。
- * 右上にうっすら炎の絵文字を重ねて熱量を演出する。
+ * 炎のグラデーションを敷いたヒーローカード（デザインの主役）。
+ * 右上にうっすらベクターアイコンを重ねて熱量を演出する。
  */
 export function FlameHero({
   children,
   style,
-  showFlame = true,
-  flameSize = 92,
+  icon = 'flame',
+  iconSize = 110,
 }: {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-  showFlame?: boolean;
-  flameSize?: number;
+  icon?: IconName | null;
+  iconSize?: number;
 }) {
   return (
     <LinearGradient
@@ -25,11 +27,14 @@ export function FlameHero({
       end={{ x: 0, y: 1 }}
       style={[styles.hero, style]}
     >
-      {showFlame && (
-        <Text style={[styles.flame, { fontSize: flameSize }]} allowFontScaling={false}>
-          🔥
-        </Text>
-      )}
+      {icon ? (
+        <Ionicons
+          name={icon}
+          size={iconSize}
+          color={colors.onFlame}
+          style={styles.watermark}
+        />
+      ) : null}
       <View style={styles.inner}>{children}</View>
     </LinearGradient>
   );
@@ -43,12 +48,12 @@ const styles = StyleSheet.create({
     ...shadow.glow,
   },
   inner: { position: 'relative', zIndex: 2 },
-  flame: {
+  watermark: {
     position: 'absolute',
-    right: -8,
-    top: -14,
+    right: -14,
+    top: -18,
     opacity: 0.16,
-    color: colors.onFlame,
     zIndex: 1,
+    transform: [{ rotate: '12deg' }],
   },
 });

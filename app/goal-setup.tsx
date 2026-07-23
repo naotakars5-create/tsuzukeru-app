@@ -11,11 +11,13 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
-import { Frequency } from '@/types';
+import { Frequency, GoalCategory, IconName } from '@/types';
+import { CATEGORIES } from '@/logic/category';
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const DURATION_WEEKS = 4; // MVPは4週固定
@@ -26,6 +28,7 @@ export default function GoalSetupScreen() {
   const { goal, createGoal } = useApp();
 
   const [name, setName] = useState(goal?.name ?? '');
+  const [category, setCategory] = useState<GoalCategory>(goal?.category ?? 'exercise');
   const [frequency, setFrequency] = useState<Frequency>(goal?.frequency ?? 'daily');
   const [weekdays, setWeekdays] = useState<number[]>(goal?.weekdays ?? [1, 2, 3, 4, 5]);
   const [stake, setStake] = useState<string>(goal ? String(goal.stakeAmount) : '3000');
@@ -65,6 +68,7 @@ export default function GoalSetupScreen() {
     const doSave = async () => {
       await createGoal({
         name: trimmed,
+        category,
         frequency,
         weekdays: frequency === 'weekdays' ? weekdays : [],
         stakeAmount: Math.round(stakeNum),
@@ -106,6 +110,36 @@ export default function GoalSetupScreen() {
           />
         </Card>
 
+        {/* カテゴリ */}
+        <Card>
+          <Text style={styles.label}>カテゴリ</Text>
+          <Text style={styles.helper}>同じカテゴリの仲間とランキングで競えます。</Text>
+          <View style={styles.catRow}>
+            {CATEGORIES.map((c) => {
+              const active = category === c.key;
+              return (
+                <Pressable
+                  key={c.key}
+                  onPress={() => setCategory(c.key)}
+                  style={[
+                    styles.catChip,
+                    active && { backgroundColor: `${c.color}26`, borderColor: c.color },
+                  ]}
+                >
+                  <Ionicons
+                    name={c.icon}
+                    size={16}
+                    color={active ? c.color : colors.textSub}
+                  />
+                  <Text style={[styles.catChipText, active && { color: c.color }]}>
+                    {c.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+
         {/* 頻度 */}
         <Card>
           <Text style={styles.label}>どのくらいの頻度で続ける？</Text>
@@ -113,14 +147,14 @@ export default function GoalSetupScreen() {
           <View style={styles.segment}>
             <SegmentButton
               active={frequency === 'daily'}
-              emoji="🔥"
+              icon="flame"
               title="毎日"
               sub="毎日つづける"
               onPress={() => setFrequency('daily')}
             />
             <SegmentButton
               active={frequency === 'weekdays'}
-              emoji="📅"
+              icon="calendar"
               title="特定の曜日"
               sub="曜日を選ぶ"
               onPress={() => setFrequency('weekdays')}
@@ -166,9 +200,10 @@ export default function GoalSetupScreen() {
           )}
 
           <View style={styles.freqSummary}>
+            <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
             <Text style={styles.freqSummaryText}>
-              👉 1週間に <Text style={styles.freqCount}>{scheduledPerWeek}回</Text>
-              、4週間で <Text style={styles.freqCount}>{scheduledPerWeek * 4}回</Text> がんばります
+              1週間に <Text style={styles.freqCount}>{scheduledPerWeek}回</Text>、4週間で{' '}
+              <Text style={styles.freqCount}>{scheduledPerWeek * 4}回</Text> がんばります
             </Text>
           </View>
         </Card>
@@ -216,20 +251,20 @@ export default function GoalSetupScreen() {
 
 function SegmentButton({
   active,
-  emoji,
+  icon,
   title,
   sub,
   onPress,
 }: {
   active: boolean;
-  emoji: string;
+  icon: IconName;
   title: string;
   sub: string;
   onPress: () => void;
 }) {
   return (
     <Pressable onPress={onPress} style={[styles.segmentBtn, active && styles.segmentBtnActive]}>
-      <Text style={styles.segmentEmoji}>{emoji}</Text>
+      <Ionicons name={icon} size={22} color={active ? colors.primary : colors.textMuted} />
       <Text style={[styles.segmentTitle, active && styles.segmentTitleActive]}>{title}</Text>
       <Text style={[styles.segmentSub, active && styles.segmentSubActive]}>{sub}</Text>
     </Pressable>
@@ -263,6 +298,20 @@ const styles = StyleSheet.create({
   helper: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 17 },
   fixedValue: { marginTop: spacing.sm, fontSize: font.heading, fontWeight: '900', color: colors.text },
 
+  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  catChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  catChipText: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
+
   segment: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   segmentBtn: {
     flex: 1,
@@ -274,7 +323,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   segmentBtnActive: { backgroundColor: 'rgba(240,71,46,0.14)', borderColor: colors.flame },
-  segmentEmoji: { fontSize: 24 },
   segmentTitle: { fontSize: font.body, fontWeight: '800', color: colors.textSub, marginTop: 6 },
   segmentTitleActive: { color: colors.text },
   segmentSub: { fontSize: font.small, color: colors.textMuted, marginTop: 2 },
@@ -313,8 +361,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  freqSummaryText: { fontSize: font.sub, color: colors.text, fontWeight: '600', lineHeight: 20 },
+  freqSummaryText: { fontSize: font.sub, color: colors.text, fontWeight: '600', lineHeight: 20, flex: 1 },
   freqCount: { color: colors.primary, fontWeight: '900' },
 
   amountRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },

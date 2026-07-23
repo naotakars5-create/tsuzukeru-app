@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { FlameHero } from '@/components/FlameHero';
@@ -10,7 +11,7 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { StatTile } from '@/components/StatTile';
 import { AchievementGrid } from '@/components/AchievementGrid';
 import { colors, font, spacing } from '@/theme';
-import { formatDisplay, todayStr } from '@/logic/date';
+import { categoryOf } from '@/logic/category';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -37,7 +38,7 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyEmoji}>🔥</Text>
+          <Ionicons name="flame" size={72} color={colors.primary} />
           <Text style={styles.emptyTitle}>続ける第一歩</Text>
           <Text style={styles.emptyText}>
             まずは目標を設定しましょう。{'\n'}
@@ -54,6 +55,7 @@ export default function HomeScreen() {
     );
   }
 
+  const category = categoryOf(goal.category);
   const currentWeek = weeks.find((w) => w.isCurrent) ?? weeks[0];
   const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
   const toBest = Math.max(0, progress.bestStreak + 1 - progress.streak);
@@ -65,7 +67,7 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* 連続達成のヒーロー（主役） */}
-      <FlameHero flameSize={104}>
+      <FlameHero iconSize={130}>
         <Text style={styles.heroKicker}>連続達成</Text>
         <View style={styles.heroRow}>
           <Text style={styles.heroBig}>{progress.streak}</Text>
@@ -73,7 +75,7 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.heroSub}>
           {progress.streak > 0 && progress.streak >= progress.bestStreak
-            ? '自己ベスト更新中！この炎を絶やすな 🔥'
+            ? '自己ベスト更新中！この炎を絶やすな'
             : progress.streak === 0
             ? 'きょう達成して、炎をともそう'
             : `あと${toBest}日で自己ベスト更新！`}
@@ -82,23 +84,31 @@ export default function HomeScreen() {
 
       {/* 今日やること */}
       <Card>
-        <Text style={styles.label}>きょうの習慣</Text>
+        <View style={styles.labelRow}>
+          <Ionicons name={category.icon} size={14} color={category.color} />
+          <Text style={styles.label}>きょうの習慣（{category.label}）</Text>
+        </View>
         <Text style={styles.goalName}>{goal.name}</Text>
         {!isTodayScheduled ? (
           <View style={[styles.pill, { backgroundColor: colors.surfaceAlt }]}>
+            <Ionicons name="leaf" size={16} color={colors.textSub} />
             <Text style={[styles.pillText, { color: colors.textSub }]}>
-              今日は予定日ではありません 🌿
+              今日は予定日ではありません
             </Text>
           </View>
         ) : todayStatus === 'done' ? (
           <View style={[styles.pill, { backgroundColor: colors.successBg }]}>
+            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
             <Text style={[styles.pillText, { color: colors.success }]}>
-              ✅ 今日は達成済み！お見事です
+              今日は達成済み！お見事です
             </Text>
           </View>
         ) : (
           <>
-            <Text style={styles.deadline}>期限 23:59 まで</Text>
+            <View style={styles.deadlineRow}>
+              <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.deadline}>期限 23:59 まで</Text>
+            </View>
             <PrimaryButton
               label="達成する"
               onPress={() => router.push('/today')}
@@ -110,12 +120,13 @@ export default function HomeScreen() {
 
       {/* 数値サマリー */}
       <View style={styles.tileRow}>
-        <StatTile value={progress.points} label="ポイント" emoji="⭐" accent={colors.warning} />
+        <StatTile value={progress.points} label="ポイント" icon="star" accent={colors.warning} />
         <View style={{ width: spacing.md }} />
         <StatTile
-          value={`${progress.rank.emoji}${progress.rank.label}`}
+          value={progress.rank.label}
           label="現在のランク"
-          accent={colors.primary}
+          icon={progress.rank.icon}
+          accent={progress.rank.color}
         />
       </View>
 
@@ -163,8 +174,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  emptyEmoji: { fontSize: 64, marginBottom: spacing.lg },
-  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text },
+  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.lg },
   emptyText: {
     fontSize: font.body,
     color: colors.textSub,
@@ -197,6 +207,7 @@ const styles = StyleSheet.create({
   },
   heroSub: { fontSize: font.sub, fontWeight: '600', color: colors.onFlame, opacity: 0.95, marginTop: 4 },
 
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   label: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
   goalName: {
     fontSize: font.heading,
@@ -204,9 +215,18 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: spacing.xs,
   },
-  deadline: { fontSize: font.sub, color: colors.textMuted, marginTop: 4 },
+  deadlineRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  deadline: { fontSize: font.sub, color: colors.textMuted },
 
-  pill: { marginTop: spacing.md, paddingVertical: spacing.md, borderRadius: 14, alignItems: 'center' },
+  pill: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
   pillText: { fontSize: font.body, fontWeight: '700' },
 
   tileRow: { flexDirection: 'row' },

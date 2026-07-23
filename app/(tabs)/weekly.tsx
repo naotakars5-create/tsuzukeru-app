@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { ProgressBar } from '@/components/ProgressBar';
@@ -58,7 +59,7 @@ export default function WeeklyScreen() {
         <Card style={{ backgroundColor: colors.successBg, borderColor: colors.success }}>
           <Text style={[styles.totalLabel, { color: colors.success }]}>合計課金（モック）</Text>
           <Text style={[styles.totalValue, { color: colors.success }]}>¥0</Text>
-          <Text style={styles.totalHint}>未達なし。この調子で続けましょう 🔥</Text>
+          <Text style={styles.totalHint}>未達なし。この調子で続けましょう</Text>
         </Card>
       )}
 
@@ -100,13 +101,15 @@ function WeekCard({ week }: { week: WeekSummary }) {
 
       {hasCharge ? (
         <View style={styles.chargeBox}>
+          <Ionicons name="card" size={15} color={colors.danger} />
           <Text style={styles.chargeText}>
-            💸 課金が発生しました（ダミー）: ¥{week.chargedAmount.toLocaleString()}
+            課金が発生しました（ダミー）: ¥{week.chargedAmount.toLocaleString()}
           </Text>
         </View>
       ) : perfect ? (
         <View style={[styles.chargeBox, styles.perfectBox]}>
-          <Text style={[styles.chargeText, { color: colors.success }]}>✅ 完全達成！課金なし</Text>
+          <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+          <Text style={[styles.chargeText, { color: colors.success }]}>完全達成！課金なし</Text>
         </View>
       ) : null}
     </Card>
@@ -159,6 +162,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   perfectBox: { backgroundColor: colors.successBg },
   chargeText: { fontSize: font.sub, fontWeight: '800', color: colors.danger },

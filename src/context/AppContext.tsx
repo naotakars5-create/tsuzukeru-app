@@ -1,7 +1,7 @@
 /**
- * アプリ全体の状態（目標・達成記録）を保持する Context。
+ * アプリ全体の状態（目標・達成記録・リマインド設定）を保持する Context。
  * - 起動時に AsyncStorage から読み込み、期限切れを自動 missed に補正
- * - 目標保存 / 今日の達成 / リセット などの操作を提供
+ * - 目標保存 / 今日の達成 / リマインド設定 / リセット などの操作を提供
  * 画面はこの Context を通じてデータにアクセスする。
  */
 
@@ -13,16 +13,18 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { Goal, RecordMap } from '@/types';
-import { loadState, saveGoal, saveRecords, clearAll } from '@/storage';
+import { Goal, RecordMap, ReminderSettings } from '@/types';
+import { loadState, saveGoal, saveRecords, saveReminder, clearAll } from '@/storage';
 import { applyAutoMiss, isScheduledDay } from '@/logic/schedule';
 import { todayStr } from '@/logic/date';
 import { buildProgress, buildWeeks } from '@/logic/summary';
+import { scheduleDailyReminder, cancelReminders } from '@/logic/reminder';
 
 interface AppContextValue {
   ready: boolean;
   goal: Goal | null;
   records: RecordMap;
+  reminder: ReminderSettings;
   /** 派生値 */
   progress: ReturnType<typeof buildProgress>;
   weeks: ReturnType<typeof buildWeeks>;
@@ -33,11 +35,14 @@ interface AppContextValue {
   /** 操作 */
   createGoal: (input: NewGoalInput) => Promise<void>;
   markTodayDone: () => Promise<void>;
+  /** リマインド設定を更新。通知権限が無く有効化できなかったら false */
+  updateReminder: (settings: ReminderSettings) => Promise<boolean>;
   resetAll: () => Promise<void>;
 }
 
 export interface NewGoalInput {
   name: string;
+  category: Goal['category'];
   frequency: Goal['frequency'];
   weekdays: number[];
   stakeAmount: number;
@@ -50,6 +55,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [records, setRecords] = useState<RecordMap>({});
+  const [reminder, setReminder] = useState<ReminderSettings>({
+    enabled: false,
+    hour: 20,
+    minute: 0,
+  });
 
   // 起動時に読み込み＆自動未達補正
   useEffect(() => {
@@ -58,28 +68,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const corrected = applyAutoMiss(state.goal, state.records);
       setGoal(state.goal);
       setRecords(corrected);
+      setReminder(state.reminder);
       // 補正結果を保存（前回起動以降に過ぎた日を確定させる）
       if (state.goal) await saveRecords(corrected);
       setReady(true);
     })();
   }, []);
 
-  const createGoal = useCallback(async (input: NewGoalInput) => {
-    const newGoal: Goal = {
-      id: `${Date.now()}`,
-      name: input.name.trim(),
-      frequency: input.frequency,
-      weekdays: input.weekdays,
-      stakeAmount: input.stakeAmount,
-      startDate: todayStr(),
-      durationWeeks: input.durationWeeks,
-      createdAt: new Date().toISOString(),
-    };
-    // 新しい目標を作ると記録はリセット
-    setGoal(newGoal);
-    setRecords({});
-    await Promise.all([saveGoal(newGoal), saveRecords({})]);
-  }, []);
+  const createGoal = useCallback(
+    async (input: NewGoalInput) => {
+      const newGoal: Goal = {
+        id: `${Date.now()}`,
+        name: input.name.trim(),
+        category: input.category,
+        frequency: input.frequency,
+        weekdays: input.weekdays,
+        stakeAmount: input.stakeAmount,
+        startDate: todayStr(),
+        durationWeeks: input.durationWeeks,
+        createdAt: new Date().toISOString(),
+      };
+      // 新しい目標を作ると記録はリセット
+      setGoal(newGoal);
+      setRecords({});
+      await Promise.all([saveGoal(newGoal), saveRecords({})]);
+      // リマインドが有効なら、新しい目標名で通知を組み直す
+      if (reminder.enabled) {
+        await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
+      }
+    },
+    [reminder]
+  );
 
   const markTodayDone = useCallback(async () => {
     if (!goal) return;
@@ -93,9 +112,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [goal]);
 
+  const updateReminder = useCallback(
+    async (settings: ReminderSettings): Promise<boolean> => {
+      if (settings.enabled) {
+        const ok = await scheduleDailyReminder(
+          settings.hour,
+          settings.minute,
+          goal?.name ?? '今日の習慣'
+        );
+        if (!ok) {
+          // 権限が無い等で設定できなかった → オフのまま保存
+          const off = { ...settings, enabled: false };
+          setReminder(off);
+          await saveReminder(off);
+          return false;
+        }
+      } else {
+        await cancelReminders();
+      }
+      setReminder(settings);
+      await saveReminder(settings);
+      return true;
+    },
+    [goal]
+  );
+
   const resetAll = useCallback(async () => {
     setGoal(null);
     setRecords({});
+    setReminder({ enabled: false, hour: 20, minute: 0 });
+    await cancelReminders();
     await clearAll();
   }, []);
 
@@ -115,12 +161,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ready,
     goal,
     records,
+    reminder,
     progress,
     weeks,
     isTodayScheduled,
     todayStatus,
     createGoal,
     markTodayDone,
+    updateReminder,
     resetAll,
   };
 

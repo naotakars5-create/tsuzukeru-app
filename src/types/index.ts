@@ -3,8 +3,17 @@
  * 将来サーバー保存や仲間機能を足すときも、まずここに型を足すのが起点になる。
  */
 
+import type { ComponentProps } from 'react';
+import type { Ionicons } from '@expo/vector-icons';
+
+/** Ioniconsのアイコン名（ベクターアイコン） */
+export type IconName = ComponentProps<typeof Ionicons>['name'];
+
 /** 目標の頻度 */
 export type Frequency = 'daily' | 'weekdays';
+
+/** 目標のカテゴリ（仲間・ランキングのグループ分けに使う） */
+export type GoalCategory = 'exercise' | 'study' | 'morning' | 'health' | 'other';
 
 /** その日の達成状態 */
 export type DayStatus = 'done' | 'missed' | 'pending';
@@ -14,6 +23,8 @@ export interface Goal {
   id: string;
   /** 目標名（例: 毎日10分ランニング） */
   name: string;
+  /** カテゴリ（同じカテゴリの仲間と競う） */
+  category: GoalCategory;
   /** 頻度: 毎日 or 特定曜日 */
   frequency: Frequency;
   /** frequency === 'weekdays' のとき対象曜日 (0=日, 1=月, ... 6=土) */
@@ -31,17 +42,25 @@ export interface Goal {
 /** 日付をキーにした達成記録 { '2026-07-21': 'done' } */
 export type RecordMap = Record<string, DayStatus>;
 
+/** リマインド通知の設定（端末内のローカル通知） */
+export interface ReminderSettings {
+  enabled: boolean;
+  hour: number; // 0-23
+  minute: number; // 0-59
+}
+
 /** 保存されるアプリの状態のスナップショット */
 export interface PersistedState {
   goal: Goal | null;
   records: RecordMap;
+  reminder: ReminderSettings;
 }
 
 /** ランク（称号）の定義 */
 export interface RankTier {
   key: string;
   label: string;
-  emoji: string;
+  icon: IconName;
   /** このランクに到達するのに必要な最低ポイント */
   minPoints: number;
   color: string;
@@ -73,4 +92,13 @@ export interface WeekSummary {
   /** この週で発生した課金（モック） */
   chargedAmount: number;
   isCurrent: boolean;
+}
+
+/** ランキングの1行（モックの仲間 or 自分） */
+export interface LeaderboardEntry {
+  id: string;
+  name: string;
+  points: number;
+  streak: number;
+  isMe: boolean;
 }

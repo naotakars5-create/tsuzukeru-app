@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 
-/** 下部タブ: ホーム / 週次 / ランク / 設定 */
+/** 下部タブ: ホーム / 週次 / 仲間 / ランク / 設定 */
 export default function TabsLayout() {
   return (
     <Tabs
@@ -21,7 +21,7 @@ export default function TabsLayout() {
           paddingBottom: 9,
           paddingTop: 7,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '700' },
       }}
     >
       <Tabs.Screen
@@ -41,6 +41,16 @@ export default function TabsLayout() {
           headerTitle: '週次チェックポイント',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="social"
+        options={{
+          title: '仲間',
+          headerTitle: '仲間とランキング',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people" size={size} color={color} />
           ),
         }}
       />

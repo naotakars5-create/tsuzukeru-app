@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { FlameHero } from '@/components/FlameHero';
@@ -32,26 +33,36 @@ export default function RankScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* 現在ランクのヒーロー */}
-      <FlameHero flameSize={120} style={styles.hero}>
-        <Text style={styles.heroEmoji}>{progress.rank.emoji}</Text>
+      <FlameHero icon={progress.rank.icon} iconSize={130} style={styles.hero}>
+        <Ionicons name={progress.rank.icon} size={56} color={colors.onFlame} />
         <Text style={styles.heroLabel}>{progress.rank.label}</Text>
         <Text style={styles.heroPoints}>{progress.points} pt</Text>
         <View style={{ height: spacing.lg, alignSelf: 'stretch' }} />
-        <ProgressBar ratio={spanRatio} height={10} solidColor={colors.onFlame} track="rgba(255,255,255,0.25)" />
+        <ProgressBar
+          ratio={spanRatio}
+          height={10}
+          solidColor={colors.onFlame}
+          track="rgba(255,255,255,0.25)"
+        />
         <Text style={styles.nextText}>
           {nextRank
-            ? `次の ${nextRank.emoji}${nextRank.label} まであと ${progress.pointsToNext}pt`
-            : '最高ランクに到達しました！🏆'}
+            ? `次の ${nextRank.label} まであと ${progress.pointsToNext}pt`
+            : '最高ランクに到達しました！'}
         </Text>
       </FlameHero>
 
       {/* サマリー数値 */}
       <View style={styles.tileRow}>
-        <StatTile value={progress.streak} label="連続達成" emoji="🔥" />
+        <StatTile value={progress.streak} label="連続達成" icon="flame" />
         <View style={{ width: spacing.md }} />
-        <StatTile value={progress.bestStreak} label="最高連続" emoji="🏅" accent={colors.warning} />
+        <StatTile value={progress.bestStreak} label="最高連続" icon="medal" accent={colors.warning} />
         <View style={{ width: spacing.md }} />
-        <StatTile value={progress.doneCount} label="達成日数" emoji="✅" accent={colors.success} />
+        <StatTile
+          value={progress.doneCount}
+          label="達成日数"
+          icon="checkmark-circle"
+          accent={colors.success}
+        />
       </View>
 
       {/* ランク一覧 */}
@@ -63,7 +74,13 @@ export default function RankScreen() {
           const isCurrent = tier.key === progress.rank.key;
           return (
             <View key={tier.key} style={[styles.tierRow, isCurrent && styles.tierRowCurrent]}>
-              <Text style={[styles.tierEmoji, !reached && styles.dim]}>{tier.emoji}</Text>
+              <View style={[styles.tierIcon, { backgroundColor: reached ? `${tier.color}22` : colors.surfaceAlt }]}>
+                <Ionicons
+                  name={tier.icon}
+                  size={22}
+                  color={reached ? tier.color : colors.textMuted}
+                />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.tierLabel, !reached && styles.dim]}>{tier.label}</Text>
                 <Text style={styles.tierReq}>{tier.minPoints}pt〜</Text>
@@ -73,9 +90,9 @@ export default function RankScreen() {
                   <Text style={styles.currentTagText}>現在</Text>
                 </View>
               ) : reached ? (
-                <Text style={styles.check}>✓</Text>
+                <Ionicons name="checkmark" size={20} color={colors.success} />
               ) : (
-                <Text style={styles.lock}>🔒</Text>
+                <Ionicons name="lock-closed" size={16} color={colors.textMuted} />
               )}
             </View>
           );
@@ -103,9 +120,15 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: font.body, color: colors.textSub },
 
   hero: { alignItems: 'center', paddingVertical: spacing.xl },
-  heroEmoji: { fontSize: 64 },
-  heroLabel: { fontSize: font.title, fontWeight: '900', color: colors.onFlame, marginTop: spacing.xs },
-  heroPoints: { fontSize: font.heading, fontWeight: '800', color: colors.onFlame, opacity: 0.95, marginTop: 2 },
+  heroLabel: { fontSize: font.title, fontWeight: '900', color: colors.onFlame, marginTop: spacing.sm },
+  heroPoints: {
+    fontSize: font.heading,
+    fontWeight: '800',
+    color: colors.onFlame,
+    opacity: 0.95,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
   nextText: { marginTop: spacing.md, fontSize: font.sub, color: colors.onFlame, opacity: 0.95, fontWeight: '700' },
 
   tileRow: { flexDirection: 'row' },
@@ -120,12 +143,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   tierRowCurrent: { backgroundColor: colors.surfaceAlt },
-  tierEmoji: { fontSize: 30 },
+  tierIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tierLabel: { fontSize: font.body, fontWeight: '800', color: colors.text },
   tierReq: { fontSize: font.small, color: colors.textMuted, marginTop: 2 },
   dim: { opacity: 0.4 },
-  check: { fontSize: font.heading, color: colors.success, fontWeight: '900' },
-  lock: { fontSize: font.body },
   currentTag: {
     backgroundColor: colors.flame,
     paddingHorizontal: spacing.md,

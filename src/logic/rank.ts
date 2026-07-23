@@ -12,12 +12,12 @@ export const POINTS_PER_DONE = 10;
 export const STREAK_BONUS_EVERY = 7;
 export const STREAK_BONUS_POINTS = 20;
 
-/** 炎系の成長ランク（③で選択） */
+/** 成長ランク（ベクターアイコンで表現） */
 export const RANK_TIERS: RankTier[] = [
-  { key: 'beginner', label: 'ビギナー', emoji: '🌱', minPoints: 0, color: '#84CC16' },
-  { key: 'runner', label: 'ランナー', emoji: '🔥', minPoints: 60, color: '#F97316' },
-  { key: 'master', label: 'マスター', emoji: '💪', minPoints: 180, color: '#EF4444' },
-  { key: 'legend', label: 'レジェンド', emoji: '👑', minPoints: 360, color: '#EAB308' },
+  { key: 'beginner', label: 'ビギナー', icon: 'leaf', minPoints: 0, color: '#7ED957' },
+  { key: 'runner', label: 'ランナー', icon: 'flame', minPoints: 60, color: '#FF8A4C' },
+  { key: 'master', label: 'マスター', icon: 'barbell', minPoints: 180, color: '#FF6B5E' },
+  { key: 'legend', label: 'レジェンド', icon: 'trophy', minPoints: 360, color: '#FFC24B' },
 ];
 
 /** ポイントから現在ランクを求める */

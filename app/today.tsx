@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { FlameHero } from '@/components/FlameHero';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -66,10 +67,10 @@ export default function TodayScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <FlameHero flameSize={120} style={styles.hero}>
+      <FlameHero icon="time" iconSize={130} style={styles.hero}>
         <Text style={styles.date}>{formatDisplay(todayStr())}</Text>
         {!isTodayScheduled ? (
-          <Text style={styles.notScheduled}>今日は予定日ではありません 🌿</Text>
+          <Text style={styles.notScheduled}>今日は予定日ではありません</Text>
         ) : (
           <>
             <Text style={styles.timerLabel}>きょうの期限まで</Text>
@@ -98,9 +99,12 @@ export default function TodayScreen() {
               },
             ]}
           >
-            <Text style={styles.doneEmoji}>🎉</Text>
+            <Ionicons name="checkmark-circle" size={60} color={colors.success} />
             <Text style={styles.doneTitle}>達成！</Text>
-            <Text style={styles.doneSub}>keep the fire burning 🔥</Text>
+            <View style={styles.doneSubRow}>
+              <Text style={styles.doneSub}>この炎を絶やさずに</Text>
+              <Ionicons name="flame" size={14} color={colors.success} />
+            </View>
           </Animated.View>
         ) : (
           <Animated.View style={{ transform: [{ scale }], alignSelf: 'stretch' }}>
@@ -169,7 +173,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.success,
   },
-  doneEmoji: { fontSize: 56 },
   doneTitle: { fontSize: font.title, fontWeight: '900', color: colors.success, marginTop: spacing.sm },
-  doneSub: { fontSize: font.sub, color: colors.success, marginTop: 2 },
+  doneSubRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  doneSub: { fontSize: font.sub, color: colors.success },
 });
