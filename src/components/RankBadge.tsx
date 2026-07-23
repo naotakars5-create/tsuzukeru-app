@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radius.full,
     borderWidth: 2,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
     alignSelf: 'flex-start',
   },
   label: { fontWeight: '800' },

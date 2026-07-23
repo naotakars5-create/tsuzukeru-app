@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Goal, RecordMap } from '@/types';
 import { scheduledDates, statusOf } from '@/logic/schedule';
 import { todayStr, compareDate, fromDateStr } from '@/logic/date';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, radius, spacing, gradients } from '@/theme';
 
 /**
  * 4週間の予定日をマス目で可視化するグリッド。
- * 達成=オレンジ / 未達=赤 / 今日=枠強調 / 未来=薄いグレー。
- * 「積み上がり」が一目で見えるカレンダー的表現。
+ * 達成=炎グラデ / 未達=赤 / 今日=枠強調 / 未来=暗いグレー。
  */
 export function AchievementGrid({ goal, records }: { goal: Goal; records: RecordMap }) {
   const today = todayStr();
@@ -22,27 +22,34 @@ export function AchievementGrid({ goal, records }: { goal: Goal; records: Record
         const isToday = date === today;
         const dayNum = fromDateStr(date).getDate();
 
-        let bg: string = colors.track;
-        let fg: string = colors.textMuted;
         if (st === 'done') {
-          bg = colors.primary;
-          fg = '#fff';
-        } else if (st === 'missed') {
+          return (
+            <LinearGradient
+              key={date}
+              colors={gradients.flameSoft}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.cell, isToday && styles.today]}
+            >
+              <Text style={[styles.cellText, { color: colors.onFlame }]}>{dayNum}</Text>
+            </LinearGradient>
+          );
+        }
+
+        let bg: string = colors.surfaceAlt;
+        let fg: string = colors.textMuted;
+        if (st === 'missed') {
           bg = colors.dangerBg;
           fg = colors.danger;
         } else if (isFuture) {
-          bg = colors.surfaceAlt;
+          bg = colors.surface;
           fg = colors.textMuted;
         }
 
         return (
           <View
             key={date}
-            style={[
-              styles.cell,
-              { backgroundColor: bg },
-              isToday && styles.today,
-            ]}
+            style={[styles.cell, { backgroundColor: bg }, isToday && styles.today]}
           >
             <Text style={[styles.cellText, { color: fg }]}>{dayNum}</Text>
           </View>
@@ -52,14 +59,10 @@ export function AchievementGrid({ goal, records }: { goal: Goal; records: Record
   );
 }
 
-const CELL = 38;
+const CELL = 36;
 
 const styles = StyleSheet.create({
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   cell: {
     width: CELL,
     height: CELL,
@@ -67,9 +70,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  today: {
-    borderWidth: 2,
-    borderColor: colors.accent,
-  },
-  cellText: { fontSize: font.small, fontWeight: '700' },
+  today: { borderWidth: 2, borderColor: colors.warning },
+  cellText: { fontSize: font.small, fontWeight: '800' },
 });

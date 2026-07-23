@@ -6,12 +6,14 @@ import {
   ActivityIndicator,
   ViewStyle,
   StyleProp,
+  View,
 } from 'react-native';
-import { colors, radius, font, spacing } from '@/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, radius, font, spacing, gradients, shadow } from '@/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
 
-/** アプリ共通のボタン。 */
+/** アプリ共通のボタン。primary は炎のグラデーション。 */
 export function PrimaryButton({
   label,
   onPress,
@@ -28,54 +30,74 @@ export function PrimaryButton({
   style?: StyleProp<ViewStyle>;
 }) {
   const isDisabled = disabled || loading;
+
+  const content = loading ? (
+    <ActivityIndicator color={variant === 'primary' ? colors.onFlame : colors.primary} />
+  ) : (
+    <Text
+      style={[
+        styles.label,
+        variant === 'primary' ? styles.labelLight : styles.labelAccent,
+      ]}
+    >
+      {label}
+    </Text>
+  );
+
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
-        styles.base,
-        variant === 'primary' && styles.primary,
-        variant === 'secondary' && styles.secondary,
-        variant === 'ghost' && styles.ghost,
+        styles.wrap,
+        variant === 'primary' && shadow.glow,
         pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? '#fff' : colors.primary} />
+      {variant === 'primary' ? (
+        <LinearGradient
+          colors={gradients.flameSoft}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.base}
+        >
+          {content}
+        </LinearGradient>
       ) : (
-        <Text
+        <View
           style={[
-            styles.label,
-            variant === 'primary' ? styles.labelLight : styles.labelDark,
+            styles.base,
+            variant === 'secondary' && styles.secondary,
+            variant === 'ghost' && styles.ghost,
           ]}
         >
-          {label}
-        </Text>
+          {content}
+        </View>
       )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: { borderRadius: radius.md, overflow: 'hidden' },
   base: {
     height: 54,
-    borderRadius: radius.full,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
-  primary: { backgroundColor: colors.primary },
   secondary: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: colors.primaryLight,
+    borderColor: colors.border,
   },
   ghost: { backgroundColor: 'transparent' },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
-  disabled: { opacity: 0.5 },
-  label: { fontSize: font.body, fontWeight: '700' },
-  labelLight: { color: '#fff' },
-  labelDark: { color: colors.primaryDark },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
+  disabled: { opacity: 0.45 },
+  label: { fontSize: font.body, fontWeight: '800' },
+  labelLight: { color: colors.onFlame },
+  labelAccent: { color: colors.primary },
 });

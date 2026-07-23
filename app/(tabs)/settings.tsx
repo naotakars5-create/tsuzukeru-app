@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -7,6 +7,7 @@ import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { formatDisplay } from '@/logic/date';
+import { frequencyLabel } from '@/logic/schedule';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -36,8 +37,7 @@ export default function SettingsScreen() {
           <>
             <Text style={styles.goalName}>{goal.name}</Text>
             <Text style={styles.goalMeta}>
-              {goal.frequency === 'daily' ? '毎日' : '特定の曜日'}・4週間・積立 ¥
-              {goal.stakeAmount.toLocaleString()}
+              {frequencyLabel(goal)}・4週間・積立 ¥{goal.stakeAmount.toLocaleString()}
             </Text>
             <Text style={styles.goalMeta}>開始日: {formatDisplay(goal.startDate)}</Text>
             <PrimaryButton
@@ -59,7 +59,7 @@ export default function SettingsScreen() {
         )}
       </Card>
 
-      {/* 将来の機能（仲間/チーム）— 今回はスコープ外。入口だけ用意。 */}
+      {/* 将来の機能 — 今回はスコープ外。入口だけ用意。 */}
       <Card>
         <Text style={styles.sectionLabel}>これからの機能</Text>
         <FutureRow icon="people" title="仲間 / チーム" desc="みんなで続ける（今後追加予定）" />
@@ -70,9 +70,7 @@ export default function SettingsScreen() {
       {/* データ管理 */}
       <Card>
         <Text style={styles.sectionLabel}>データ管理</Text>
-        <Text style={styles.goalMeta}>
-          データはこの端末内にのみ保存されます（サーバーなし）。
-        </Text>
+        <Text style={styles.goalMeta}>データはこの端末内にのみ保存されます（サーバーなし）。</Text>
         <PrimaryButton
           label="すべてのデータをリセット"
           variant="ghost"
@@ -115,21 +113,11 @@ function FutureRow({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, gap: spacing.lg },
-  sectionLabel: { fontSize: font.sub, fontWeight: '700', color: colors.textSub },
-  goalName: {
-    fontSize: font.heading,
-    fontWeight: '800',
-    color: colors.text,
-    marginTop: spacing.xs,
-  },
+  sectionLabel: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
+  goalName: { fontSize: font.heading, fontWeight: '800', color: colors.text, marginTop: spacing.xs },
   goalMeta: { fontSize: font.sub, color: colors.textSub, marginTop: 4 },
 
-  futureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-  },
+  futureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
   futureIcon: {
     width: 40,
     height: 40,
@@ -148,10 +136,5 @@ const styles = StyleSheet.create({
   },
   soonText: { fontSize: 10, color: colors.textSub, fontWeight: '700' },
 
-  version: {
-    textAlign: 'center',
-    fontSize: font.small,
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-  },
+  version: { textAlign: 'center', fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm },
 });

@@ -51,3 +51,13 @@ export function applyAutoMiss(goal: Goal | null, records: RecordMap): RecordMap 
 export function statusOf(records: RecordMap, date: string): DayStatus {
   return records[date] ?? 'pending';
 }
+
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+/** 頻度を人が読める文字列にする（例: 「毎日」「月・水・金」） */
+export function frequencyLabel(goal: Goal): string {
+  if (goal.frequency === 'daily') return '毎日';
+  const days = [...goal.weekdays].sort((a, b) => a - b);
+  if (days.length === 0) return '曜日未設定';
+  return days.map((d) => WEEKDAY_LABELS[d]).join('・');
+}

@@ -1,14 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  Easing,
-  ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '@/context/AppContext';
+import { FlameHero } from '@/components/FlameHero';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { Card } from '@/components/Card';
 import { colors, font, spacing, radius } from '@/theme';
@@ -28,7 +22,6 @@ export default function TodayScreen() {
   const scale = useRef(new Animated.Value(1)).current;
   const pop = useRef(new Animated.Value(0)).current;
 
-  // 1秒ごとにカウントダウン更新
   useEffect(() => {
     const t = setInterval(() => setRemain(msUntilEndOfDay()), 1000);
     return () => clearInterval(t);
@@ -61,13 +54,7 @@ export default function TodayScreen() {
     await markTodayDone();
     setCelebrating(true);
     pop.setValue(0);
-    Animated.spring(pop, {
-      toValue: 1,
-      friction: 5,
-      tension: 80,
-      useNativeDriver: true,
-    }).start();
-    // 少し余韻を見せてからホームへ戻る
+    Animated.spring(pop, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
     setTimeout(() => router.back(), 1400);
   };
 
@@ -79,24 +66,24 @@ export default function TodayScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Card style={styles.card}>
-        <Text style={styles.dateText}>{formatDisplay(todayStr())}</Text>
-        <Text style={styles.goalName}>{goal?.name ?? ''}</Text>
-
+      <FlameHero flameSize={120} style={styles.hero}>
+        <Text style={styles.date}>{formatDisplay(todayStr())}</Text>
         {!isTodayScheduled ? (
-          <View style={styles.info}>
-            <Text style={styles.infoText}>今日は予定日ではありません 🌿</Text>
-          </View>
+          <Text style={styles.notScheduled}>今日は予定日ではありません 🌿</Text>
         ) : (
           <>
-            <Text style={styles.timerLabel}>今日の期限まで</Text>
+            <Text style={styles.timerLabel}>きょうの期限まで</Text>
             <Text style={styles.timer}>{formatCountdown(remain)}</Text>
-            <Text style={styles.hint}>
-              日付が変わるまでに押さないと{'\n'}自動的に「未達」になります
-            </Text>
+            <Text style={styles.goalName}>{goal?.name ?? ''}</Text>
           </>
         )}
-      </Card>
+      </FlameHero>
+
+      {isTodayScheduled && (
+        <Text style={styles.hint}>
+          日付が変わるまでに押さないと{'\n'}自動的に「未達」になります
+        </Text>
+      )}
 
       {isTodayScheduled &&
         (alreadyDone || celebrating ? (
@@ -105,12 +92,7 @@ export default function TodayScreen() {
               styles.doneWrap,
               {
                 transform: [
-                  {
-                    scale: pop.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.6, 1],
-                    }),
-                  },
+                  { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
                 ],
                 opacity: celebrating ? pop : 1,
               },
@@ -118,15 +100,11 @@ export default function TodayScreen() {
           >
             <Text style={styles.doneEmoji}>🎉</Text>
             <Text style={styles.doneTitle}>達成！</Text>
-            <Text style={styles.doneSub}>continue the streak 🔥</Text>
+            <Text style={styles.doneSub}>keep the fire burning 🔥</Text>
           </Animated.View>
         ) : (
           <Animated.View style={{ transform: [{ scale }], alignSelf: 'stretch' }}>
-            <PrimaryButton
-              label="達成する"
-              onPress={onAchieve}
-              style={styles.bigButton}
-            />
+            <PrimaryButton label="達成する" onPress={onAchieve} style={styles.bigButton} />
           </Animated.View>
         ))}
 
@@ -134,7 +112,7 @@ export default function TodayScreen() {
         label="戻る"
         variant="ghost"
         onPress={() => router.back()}
-        style={{ marginTop: spacing.lg }}
+        style={{ marginTop: spacing.sm }}
       />
     </ScrollView>
   );
@@ -142,53 +120,56 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, gap: spacing.xl, paddingTop: spacing.xl },
-  card: { alignItems: 'center', paddingVertical: spacing.xxl },
-  dateText: { fontSize: font.sub, color: colors.textMuted, fontWeight: '600' },
-  goalName: {
-    fontSize: font.heading,
-    fontWeight: '800',
-    color: colors.text,
-    marginTop: spacing.xs,
-    textAlign: 'center',
-  },
+  content: { padding: spacing.lg, gap: spacing.lg, paddingTop: spacing.xl },
+  hero: { alignItems: 'center', paddingVertical: spacing.xxl },
+  date: { fontSize: font.sub, color: colors.onFlame, opacity: 0.9, fontWeight: '700' },
   timerLabel: {
-    marginTop: spacing.xl,
-    fontSize: font.sub,
-    color: colors.textSub,
+    marginTop: spacing.lg,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: colors.onFlame,
+    opacity: 0.9,
   },
   timer: {
-    fontSize: 52,
+    fontSize: 48,
     fontWeight: '900',
-    color: colors.primaryDark,
-    letterSpacing: 2,
+    color: colors.onFlame,
+    letterSpacing: 1,
     marginTop: spacing.xs,
     fontVariant: ['tabular-nums'],
   },
+  goalName: {
+    fontSize: font.body,
+    fontWeight: '700',
+    color: colors.onFlame,
+    opacity: 0.95,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  notScheduled: {
+    marginTop: spacing.lg,
+    fontSize: font.body,
+    color: colors.onFlame,
+    fontWeight: '700',
+  },
   hint: {
-    marginTop: spacing.md,
     fontSize: font.small,
     color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 18,
+    marginTop: -spacing.xs,
   },
-  info: { marginTop: spacing.xl },
-  infoText: { fontSize: font.body, color: colors.textSub },
-
   bigButton: { height: 64 },
-
   doneWrap: {
     alignItems: 'center',
     backgroundColor: colors.successBg,
     borderRadius: radius.lg,
     paddingVertical: spacing.xxl,
+    borderWidth: 1,
+    borderColor: colors.success,
   },
   doneEmoji: { fontSize: 56 },
-  doneTitle: {
-    fontSize: font.title,
-    fontWeight: '900',
-    color: colors.success,
-    marginTop: spacing.sm,
-  },
+  doneTitle: { fontSize: font.title, fontWeight: '900', color: colors.success, marginTop: spacing.sm },
   doneSub: { fontSize: font.sub, color: colors.success, marginTop: 2 },
 });

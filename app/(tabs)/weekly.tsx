@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { ProgressBar } from '@/components/ProgressBar';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, gradients, radius, spacing } from '@/theme';
 import { formatDisplay } from '@/logic/date';
 import { WeekSummary } from '@/types';
 
@@ -36,20 +37,30 @@ export default function WeeklyScreen() {
       ))}
 
       {/* 合計課金（モック） */}
-      <Card style={{ backgroundColor: totalCharged > 0 ? colors.dangerBg : colors.successBg }}>
-        <Text style={styles.totalLabel}>合計課金（モック）</Text>
-        <Text
-          style={[
-            styles.totalValue,
-            { color: totalCharged > 0 ? colors.danger : colors.success },
-          ]}
+      {totalCharged > 0 ? (
+        <LinearGradient
+          colors={gradients.flame}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.totalCard}
         >
-          ¥{totalCharged.toLocaleString()}
-        </Text>
-        <Text style={styles.totalHint}>
-          ※ 実際の決済は行いません。仕組みを体験するためのダミー表示です。
-        </Text>
-      </Card>
+          <Text style={[styles.totalLabel, { color: colors.onFlame, opacity: 0.9 }]}>
+            合計課金（モック）
+          </Text>
+          <Text style={[styles.totalValue, { color: colors.onFlame }]}>
+            ¥{totalCharged.toLocaleString()}
+          </Text>
+          <Text style={[styles.totalHint, { color: colors.onFlame, opacity: 0.85 }]}>
+            ※ 実際の決済は行いません。仕組みを体験するためのダミー表示です。
+          </Text>
+        </LinearGradient>
+      ) : (
+        <Card style={{ backgroundColor: colors.successBg, borderColor: colors.success }}>
+          <Text style={[styles.totalLabel, { color: colors.success }]}>合計課金（モック）</Text>
+          <Text style={[styles.totalValue, { color: colors.success }]}>¥0</Text>
+          <Text style={styles.totalHint}>未達なし。この調子で続けましょう 🔥</Text>
+        </Card>
+      )}
 
       <View style={{ height: spacing.xl }} />
     </ScrollView>
@@ -59,6 +70,7 @@ export default function WeeklyScreen() {
 function WeekCard({ week }: { week: WeekSummary }) {
   const ratio = week.scheduled ? week.done / week.scheduled : 0;
   const hasCharge = week.chargedAmount > 0;
+  const perfect = week.scheduled > 0 && week.pending === 0 && week.missed === 0;
 
   return (
     <Card style={week.isCurrent ? styles.currentCard : undefined}>
@@ -77,7 +89,7 @@ function WeekCard({ week }: { week: WeekSummary }) {
       </View>
 
       <View style={{ height: spacing.md }} />
-      <ProgressBar ratio={ratio} height={12} />
+      <ProgressBar ratio={ratio} height={10} solidColor={perfect ? colors.success : undefined} />
 
       <View style={styles.statsRow}>
         <Stat label="達成" value={week.done} color={colors.success} />
@@ -92,11 +104,9 @@ function WeekCard({ week }: { week: WeekSummary }) {
             💸 課金が発生しました（ダミー）: ¥{week.chargedAmount.toLocaleString()}
           </Text>
         </View>
-      ) : week.scheduled > 0 && week.pending === 0 ? (
-        <View style={[styles.chargeBox, { backgroundColor: colors.successBg }]}>
-          <Text style={[styles.chargeText, { color: colors.success }]}>
-            ✅ 完全達成！課金なし
-          </Text>
+      ) : perfect ? (
+        <View style={[styles.chargeBox, styles.perfectBox]}>
+          <Text style={[styles.chargeText, { color: colors.success }]}>✅ 完全達成！課金なし</Text>
         </View>
       ) : null}
     </Card>
@@ -125,30 +135,22 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: font.body, color: colors.textSub },
   intro: { fontSize: font.sub, color: colors.textSub, lineHeight: 20 },
 
-  currentCard: { borderColor: colors.primaryLight, borderWidth: 2 },
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  currentCard: { borderColor: colors.primary, borderWidth: 1.5 },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  weekLabel: { fontSize: font.heading, fontWeight: '800', color: colors.text },
+  weekLabel: { fontSize: font.heading, fontWeight: '900', color: colors.text },
   weekRange: { fontSize: font.small, color: colors.textMuted },
   nowBadge: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.flame,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.full,
   },
-  nowBadgeText: { color: '#fff', fontSize: font.small, fontWeight: '700' },
+  nowBadgeText: { color: colors.onFlame, fontSize: font.small, fontWeight: '800' },
 
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.lg,
-  },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg },
   stat: { alignItems: 'center', flex: 1 },
-  statValue: { fontSize: font.heading, fontWeight: '800' },
+  statValue: { fontSize: font.heading, fontWeight: '900' },
   statLabel: { fontSize: font.small, color: colors.textSub, marginTop: 2 },
 
   chargeBox: {
@@ -158,9 +160,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     alignItems: 'center',
   },
-  chargeText: { fontSize: font.sub, fontWeight: '700', color: colors.danger },
+  perfectBox: { backgroundColor: colors.successBg },
+  chargeText: { fontSize: font.sub, fontWeight: '800', color: colors.danger },
 
-  totalLabel: { fontSize: font.sub, fontWeight: '700', color: colors.textSub },
+  totalCard: { borderRadius: radius.lg, padding: spacing.lg },
+  totalLabel: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
   totalValue: { fontSize: font.hero, fontWeight: '900', marginTop: spacing.xs },
   totalHint: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm },
 });

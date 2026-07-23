@@ -19,6 +19,7 @@ import { Frequency } from '@/types';
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const DURATION_WEEKS = 4; // MVPは4週固定
+const STAKE_PRESETS = [1000, 3000, 5000, 10000];
 
 export default function GoalSetupScreen() {
   const router = useRouter();
@@ -26,18 +27,24 @@ export default function GoalSetupScreen() {
 
   const [name, setName] = useState(goal?.name ?? '');
   const [frequency, setFrequency] = useState<Frequency>(goal?.frequency ?? 'daily');
-  const [weekdays, setWeekdays] = useState<number[]>(
-    goal?.weekdays ?? [1, 2, 3, 4, 5]
-  );
-  const [stake, setStake] = useState<string>(
-    goal ? String(goal.stakeAmount) : '3000'
-  );
+  const [weekdays, setWeekdays] = useState<number[]>(goal?.weekdays ?? [1, 2, 3, 4, 5]);
+  const [stake, setStake] = useState<string>(goal ? String(goal.stakeAmount) : '3000');
 
   const toggleWeekday = (d: number) => {
     setWeekdays((prev) =>
-      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)
     );
   };
+
+  // 曜日のクイック選択
+  const applyPreset = (preset: 'weekday' | 'weekend' | 'all') => {
+    setFrequency('weekdays');
+    if (preset === 'weekday') setWeekdays([1, 2, 3, 4, 5]);
+    else if (preset === 'weekend') setWeekdays([0, 6]);
+    else setWeekdays([0, 1, 2, 3, 4, 5, 6]);
+  };
+
+  const scheduledPerWeek = frequency === 'daily' ? 7 : weekdays.length;
 
   const onSave = async () => {
     const trimmed = name.trim();
@@ -66,7 +73,6 @@ export default function GoalSetupScreen() {
       router.back();
     };
 
-    // 既存の目標がある場合は記録がリセットされる旨を確認
     if (goal) {
       Alert.alert(
         '目標を作り直しますか？',
@@ -86,10 +92,7 @@ export default function GoalSetupScreen() {
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* 目標名 */}
         <Card>
           <Text style={styles.label}>目標名</Text>
@@ -105,40 +108,69 @@ export default function GoalSetupScreen() {
 
         {/* 頻度 */}
         <Card>
-          <Text style={styles.label}>頻度</Text>
+          <Text style={styles.label}>どのくらいの頻度で続ける？</Text>
+
           <View style={styles.segment}>
             <SegmentButton
               active={frequency === 'daily'}
-              label="毎日"
+              emoji="🔥"
+              title="毎日"
+              sub="毎日つづける"
               onPress={() => setFrequency('daily')}
             />
             <SegmentButton
               active={frequency === 'weekdays'}
-              label="特定の曜日"
+              emoji="📅"
+              title="特定の曜日"
+              sub="曜日を選ぶ"
               onPress={() => setFrequency('weekdays')}
             />
           </View>
 
           {frequency === 'weekdays' && (
-            <View style={styles.weekRow}>
-              {WEEKDAY_LABELS.map((w, i) => {
-                const active = weekdays.includes(i);
-                return (
-                  <Pressable
-                    key={i}
-                    onPress={() => toggleWeekday(i)}
-                    style={[styles.dayChip, active && styles.dayChipActive]}
-                  >
-                    <Text
-                      style={[styles.dayChipText, active && styles.dayChipTextActive]}
+            <>
+              {/* クイック選択 */}
+              <View style={styles.presetRow}>
+                <PresetChip label="平日" onPress={() => applyPreset('weekday')} />
+                <PresetChip label="週末" onPress={() => applyPreset('weekend')} />
+                <PresetChip label="毎日" onPress={() => applyPreset('all')} />
+              </View>
+
+              {/* 曜日 */}
+              <View style={styles.weekRow}>
+                {WEEKDAY_LABELS.map((w, i) => {
+                  const active = weekdays.includes(i);
+                  const isSun = i === 0;
+                  const isSat = i === 6;
+                  return (
+                    <Pressable
+                      key={i}
+                      onPress={() => toggleWeekday(i)}
+                      style={[styles.dayChip, active && styles.dayChipActive]}
                     >
-                      {w}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+                      <Text
+                        style={[
+                          styles.dayChipText,
+                          isSun && styles.sun,
+                          isSat && styles.sat,
+                          active && styles.dayChipTextActive,
+                        ]}
+                      >
+                        {w}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
           )}
+
+          <View style={styles.freqSummary}>
+            <Text style={styles.freqSummaryText}>
+              👉 1週間に <Text style={styles.freqCount}>{scheduledPerWeek}回</Text>
+              、4週間で <Text style={styles.freqCount}>{scheduledPerWeek * 4}回</Text> がんばります
+            </Text>
+          </View>
         </Card>
 
         {/* 期間 */}
@@ -163,9 +195,12 @@ export default function GoalSetupScreen() {
               maxLength={7}
             />
           </View>
-          <Text style={styles.helper}>
-            未達があると、この積立から「課金（ダミー）」が発生します。
-          </Text>
+          <View style={styles.presetRow}>
+            {STAKE_PRESETS.map((v) => (
+              <PresetChip key={v} label={`¥${v.toLocaleString()}`} onPress={() => setStake(String(v))} />
+            ))}
+          </View>
+          <Text style={styles.helper}>未達があると、この積立から「課金（ダミー）」が発生します。</Text>
         </Card>
 
         <PrimaryButton
@@ -181,21 +216,30 @@ export default function GoalSetupScreen() {
 
 function SegmentButton({
   active,
-  label,
+  emoji,
+  title,
+  sub,
   onPress,
 }: {
   active: boolean;
-  label: string;
+  emoji: string;
+  title: string;
+  sub: string;
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-    >
-      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-        {label}
-      </Text>
+    <Pressable onPress={onPress} style={[styles.segmentBtn, active && styles.segmentBtnActive]}>
+      <Text style={styles.segmentEmoji}>{emoji}</Text>
+      <Text style={[styles.segmentTitle, active && styles.segmentTitleActive]}>{title}</Text>
+      <Text style={[styles.segmentSub, active && styles.segmentSubActive]}>{sub}</Text>
+    </Pressable>
+  );
+}
+
+function PresetChip({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.presetChip}>
+      <Text style={styles.presetChipText}>{label}</Text>
     </Pressable>
   );
 }
@@ -204,7 +248,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, gap: spacing.lg },
 
-  label: { fontSize: font.sub, fontWeight: '700', color: colors.textSub },
+  label: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
   input: {
     marginTop: spacing.sm,
     fontSize: font.body,
@@ -213,36 +257,41 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  helper: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm },
-  fixedValue: {
-    marginTop: spacing.sm,
-    fontSize: font.heading,
-    fontWeight: '800',
-    color: colors.text,
-  },
+  helper: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 17 },
+  fixedValue: { marginTop: spacing.sm, fontSize: font.heading, fontWeight: '900', color: colors.text },
 
-  segment: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
+  segment: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   segmentBtn: {
     flex: 1,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
-  segmentBtnActive: { backgroundColor: colors.primary },
-  segmentText: { fontSize: font.body, fontWeight: '700', color: colors.textSub },
-  segmentTextActive: { color: '#fff' },
+  segmentBtnActive: { backgroundColor: 'rgba(240,71,46,0.14)', borderColor: colors.flame },
+  segmentEmoji: { fontSize: 24 },
+  segmentTitle: { fontSize: font.body, fontWeight: '800', color: colors.textSub, marginTop: 6 },
+  segmentTitleActive: { color: colors.text },
+  segmentSub: { fontSize: font.small, color: colors.textMuted, marginTop: 2 },
+  segmentSubActive: { color: colors.primary },
 
-  weekRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  presetChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
+  presetChipText: { fontSize: font.small, fontWeight: '700', color: colors.text },
+
+  weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
   dayChip: {
     width: 40,
     height: 40,
@@ -250,12 +299,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  dayChipActive: { backgroundColor: colors.primary },
-  dayChipText: { fontSize: font.body, fontWeight: '700', color: colors.textSub },
-  dayChipTextActive: { color: '#fff' },
+  dayChipActive: { backgroundColor: colors.flame, borderColor: colors.flame },
+  dayChipText: { fontSize: font.body, fontWeight: '800', color: colors.textSub },
+  dayChipTextActive: { color: colors.onFlame },
+  sun: { color: '#FF8A8A' },
+  sat: { color: '#8AB4FF' },
+
+  freqSummary: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  freqSummaryText: { fontSize: font.sub, color: colors.text, fontWeight: '600', lineHeight: 20 },
+  freqCount: { color: colors.primary, fontWeight: '900' },
 
   amountRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
-  yen: { fontSize: font.heading, fontWeight: '800', color: colors.text, marginRight: 4 },
+  yen: { fontSize: font.heading, fontWeight: '900', color: colors.text, marginRight: 4 },
   amountInput: { flex: 1, marginTop: 0 },
 });

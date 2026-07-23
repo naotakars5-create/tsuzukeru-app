@@ -17,7 +17,9 @@ export function StatTile({
   return (
     <View style={styles.tile}>
       {emoji ? <Text style={styles.emoji}>{emoji}</Text> : null}
-      <Text style={[styles.value, { color: accent }]}>{value}</Text>
+      <Text style={[styles.value, { color: accent }]} numberOfLines={1}>
+        {value}
+      </Text>
       <Text style={styles.label}>{label}</Text>
     </View>
   );
@@ -29,9 +31,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  emoji: { fontSize: 22, marginBottom: 2 },
-  value: { fontSize: font.title, fontWeight: '800' },
-  label: { fontSize: font.small, color: colors.textSub, marginTop: 2 },
+  emoji: { fontSize: 20, marginBottom: 2 },
+  value: { fontSize: font.title, fontWeight: '900' },
+  label: { fontSize: font.small, color: colors.textSub, marginTop: 2, fontWeight: '600' },
 });
