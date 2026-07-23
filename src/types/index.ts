@@ -49,11 +49,32 @@ export interface ReminderSettings {
   minute: number; // 0-59
 }
 
+/** シーズンをまたいで積み上がる通算スタッツ */
+export interface LifetimeStats {
+  /** 完了したシーズンの通算達成回数（現シーズンは含まない） */
+  totalDone: number;
+  /** 歴代最高連続日数 */
+  bestStreak: number;
+  /** 完走したシーズン数 */
+  seasonsCompleted: number;
+  /** 完全達成（未達ゼロ）で完走したシーズン数 */
+  perfectSeasons: number;
+  /** 通算返金額（モック） */
+  totalRefunded: number;
+  /** 通算課金額（モック） */
+  totalCharged: number;
+}
+
+/** バッジの解除状態: key -> 解除日 'YYYY-MM-DD' */
+export type BadgeMap = Record<string, string>;
+
 /** 保存されるアプリの状態のスナップショット */
 export interface PersistedState {
   goal: Goal | null;
   records: RecordMap;
   reminder: ReminderSettings;
+  lifetime: LifetimeStats;
+  badges: BadgeMap;
 }
 
 /** ランク（称号）の定義 */
@@ -68,15 +89,31 @@ export interface RankTier {
 
 /** 進捗の集計結果（recordsから計算して求める派生値） */
 export interface ProgressSummary {
-  points: number;
+  points: number; // 通算ポイント（シーズンをまたいで積み上がる）
   streak: number; // 現在の連続達成日数
-  bestStreak: number; // 最高連続達成日数
-  doneCount: number;
-  missedCount: number;
-  scheduledCount: number; // これまでに予定されていた日数（今日まで）
+  bestStreak: number; // 歴代最高連続達成日数
+  doneCount: number; // 現シーズンの達成日数
+  missedCount: number; // 現シーズンの未達日数
+  scheduledCount: number; // 現シーズンで今日までに予定されていた日数
+  totalDone: number; // 通算達成日数（全シーズン）
   rank: RankTier;
   nextRank: RankTier | null;
   pointsToNext: number; // 次ランクまでの残りポイント
+}
+
+/** バッジ（実績）の定義 */
+export interface BadgeDef {
+  key: string;
+  label: string;
+  description: string;
+  icon: IconName;
+  color: string;
+}
+
+/** UI表示用のバッジ状態 */
+export interface BadgeView extends BadgeDef {
+  unlockedAt: string | null;
+  isNew: boolean;
 }
 
 /** 1週間分の集計 */

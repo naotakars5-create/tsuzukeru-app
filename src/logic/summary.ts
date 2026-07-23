@@ -3,11 +3,21 @@
  * 画面はここが返す値を表示するだけにして、計算ロジックを一箇所に集約する。
  */
 
-import { Goal, RecordMap, ProgressSummary, WeekSummary } from '@/types';
+import { Goal, RecordMap, LifetimeStats, ProgressSummary, WeekSummary } from '@/types';
 import { addDays, compareDate, todayStr } from './date';
-import { scheduledDates, statusOf } from './schedule';
+import { scheduledDates, statusOf, goalEndDate } from './schedule';
 import { calcPoints, rankForPoints, nextRankAfter } from './rank';
 import { WEEKLY_STAKE } from './billing';
+
+/** 通算スタッツの初期値 */
+export const EMPTY_LIFETIME: LifetimeStats = {
+  totalDone: 0,
+  bestStreak: 0,
+  seasonsCompleted: 0,
+  perfectSeasons: 0,
+  totalRefunded: 0,
+  totalCharged: 0,
+};
 
 /**
  * 現在の連続達成日数と最高連続を計算。
@@ -39,20 +49,32 @@ function calcStreaks(goal: Goal, records: RecordMap): { streak: number; best: nu
   return { streak: currentRun, best };
 }
 
-/** 全体の進捗サマリー（ポイント・連続・ランクなど） */
-export function buildProgress(goal: Goal | null, records: RecordMap): ProgressSummary {
+/**
+ * 全体の進捗サマリー（ポイント・連続・ランクなど）。
+ * ポイント・最高連続・通算達成は lifetime（過去シーズン）を足し込み、
+ * シーズンをまたいでも積み上がり続けるようにする。
+ */
+export function buildProgress(
+  goal: Goal | null,
+  records: RecordMap,
+  lifetime: LifetimeStats
+): ProgressSummary {
   const emptyRank = rankForPoints(0);
   if (!goal) {
+    const points = calcPoints(lifetime.totalDone, lifetime.bestStreak);
+    const rank = rankForPoints(points);
+    const nextRank = nextRankAfter(rank);
     return {
-      points: 0,
+      points,
       streak: 0,
-      bestStreak: 0,
+      bestStreak: lifetime.bestStreak,
       doneCount: 0,
       missedCount: 0,
       scheduledCount: 0,
-      rank: emptyRank,
-      nextRank: nextRankAfter(emptyRank),
-      pointsToNext: nextRankAfter(emptyRank)?.minPoints ?? 0,
+      totalDone: lifetime.totalDone,
+      rank,
+      nextRank,
+      pointsToNext: nextRank ? Math.max(0, nextRank.minPoints - points) : 0,
     };
   }
 
@@ -69,7 +91,10 @@ export function buildProgress(goal: Goal | null, records: RecordMap): ProgressSu
   }
 
   const { streak, best } = calcStreaks(goal, records);
-  const points = calcPoints(doneCount, best);
+  // 通算値（過去シーズン + 現シーズン）
+  const totalDone = lifetime.totalDone + doneCount;
+  const bestStreak = Math.max(lifetime.bestStreak, best);
+  const points = calcPoints(totalDone, bestStreak);
   const rank = rankForPoints(points);
   const nextRank = nextRankAfter(rank);
   const pointsToNext = nextRank ? Math.max(0, nextRank.minPoints - points) : 0;
@@ -77,13 +102,58 @@ export function buildProgress(goal: Goal | null, records: RecordMap): ProgressSu
   return {
     points,
     streak,
-    bestStreak: best,
+    bestStreak,
     doneCount,
     missedCount,
     scheduledCount,
+    totalDone,
     rank,
     nextRank,
     pointsToNext,
+  };
+}
+
+/** シーズン（4週間）が終了しているか（最終日を過ぎたか） */
+export function isSeasonComplete(goal: Goal | null): boolean {
+  if (!goal) return false;
+  return compareDate(todayStr(), goalEndDate(goal)) > 0;
+}
+
+/** 現シーズンの成績サマリー（完了カードや次シーズンへの引き継ぎに使う） */
+export interface SeasonResult {
+  done: number;
+  missed: number;
+  scheduled: number;
+  perfectWeeks: number;
+  allPerfect: boolean;
+  refunded: number;
+  charged: number;
+}
+
+export function buildSeasonResult(goal: Goal | null, records: RecordMap): SeasonResult {
+  const weeks = buildWeeks(goal, records);
+  let done = 0;
+  let missed = 0;
+  let scheduled = 0;
+  let perfectWeeks = 0;
+  let refunded = 0;
+  let charged = 0;
+  for (const w of weeks) {
+    done += w.done;
+    missed += w.missed;
+    scheduled += w.scheduled;
+    refunded += w.refundedAmount;
+    charged += w.chargedAmount;
+    if (w.scheduled > 0 && w.missed === 0 && w.pending === 0) perfectWeeks += 1;
+  }
+  return {
+    done,
+    missed,
+    scheduled,
+    perfectWeeks,
+    allPerfect: scheduled > 0 && missed === 0,
+    refunded,
+    charged,
   };
 }
 

@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,6 +38,10 @@ export default function HomeScreen() {
     records,
     progress,
     weeks,
+    seasonResult,
+    seasonNumber,
+    seasonComplete,
+    startNextSeason,
     isTodayScheduled,
     todayStatus,
   } = useApp();
@@ -74,6 +79,95 @@ export default function HomeScreen() {
   }
 
   const category = categoryOf(goal.category);
+
+  // ─────────── シーズン完了 ───────────
+  if (seasonComplete) {
+    const donePct =
+      seasonResult.scheduled > 0
+        ? Math.round((seasonResult.done / seasonResult.scheduled) * 100)
+        : 0;
+
+    const onNext = () =>
+      Alert.alert(
+        '次のシーズンを始める',
+        `「${goal.name}」で新しい4週間を始めます。連続日数やポイント、実績はそのまま引き継がれます。`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          { text: '始める', onPress: () => startNextSeason() },
+        ]
+      );
+
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.completeHeadRow}>
+            <View>
+              <Text style={styles.sectionLabel}>シーズン {seasonNumber} 完了</Text>
+              <Text style={styles.completeTitle}>4週間、走りきった。</Text>
+            </View>
+            <View style={styles.completeTrophy}>
+              <Ionicons name="trophy" size={26} color={colors.primary} />
+            </View>
+          </View>
+
+          {/* 成績サマリー */}
+          <Card style={styles.heroCard}>
+            <View style={styles.completeRingRow}>
+              <ProgressRing
+                ratio={seasonResult.scheduled ? seasonResult.done / seasonResult.scheduled : 0}
+                size={132}
+              >
+                <View style={styles.ringCenterRow}>
+                  <Text style={styles.ringPct}>{donePct}</Text>
+                  <Text style={styles.ringPctUnit}>%</Text>
+                </View>
+                <Text style={styles.ringCount}>
+                  {seasonResult.done} / {seasonResult.scheduled} 達成
+                </Text>
+              </ProgressRing>
+              <View style={styles.chipCol}>
+                <StatChip
+                  icon="checkmark-done-circle"
+                  accent={colors.primary}
+                  label="完全達成の週"
+                  value={`${seasonResult.perfectWeeks}`}
+                  unit="/ 4"
+                />
+                <StatChip
+                  icon="arrow-undo"
+                  accent={colors.success}
+                  label="返金（モック）"
+                  value={`¥${seasonResult.refunded.toLocaleString()}`}
+                />
+              </View>
+            </View>
+          </Card>
+
+          {/* 積み上がりの最終盤面 */}
+          <Card style={styles.gridCard}>
+            <Text style={styles.sectionLabel}>このシーズンの積み上がり</Text>
+            <View style={{ height: spacing.md }} />
+            <AchievementGrid goal={goal} records={records} />
+          </Card>
+
+          <PrimaryButton
+            label="次のシーズンを始める"
+            icon="refresh"
+            onPress={onNext}
+            style={{ marginTop: spacing.xs }}
+          />
+          <PrimaryButton
+            label="目標を変えて始める"
+            variant="secondary"
+            onPress={() => router.push('/goal-setup')}
+          />
+          <View style={{ height: spacing.xl }} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ─────────── 通常（シーズン進行中） ───────────
   const currentWeek = weeks.find((w) => w.isCurrent) ?? weeks[0];
   const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
   const weekPct = Math.round(weekRatio * 100);
@@ -81,14 +175,13 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* 挨拶ヘッダー */}
         <View style={styles.greetRow}>
           <View>
-            <Text style={styles.greetSub}>{greeting()}</Text>
+            <Text style={styles.greetSub}>
+              {greeting()} ・ シーズン {seasonNumber}
+            </Text>
             <Text style={styles.greetMain}>今日の1歩、行こう。</Text>
           </View>
           <Pressable style={styles.bell} onPress={() => router.push('/settings')}>
@@ -195,7 +288,7 @@ export default function HomeScreen() {
   );
 }
 
-/** リング右の縦チップ（連続・ポイント） */
+/** リング右の縦チップ */
 function StatChip({
   icon,
   accent,
@@ -254,6 +347,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // シーズン完了
+  completeHeadRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  completeTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: 4 },
+  completeTrophy: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    backgroundColor: 'rgba(198,244,50,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completeRingRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: spacing.sm },
 
   sectionLabel: { ...labelStyle },
 

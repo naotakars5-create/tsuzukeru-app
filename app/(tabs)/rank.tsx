@@ -9,9 +9,9 @@ import { StatTile } from '@/components/StatTile';
 import { colors, font, radius, spacing } from '@/theme';
 import { RANK_TIERS } from '@/logic/rank';
 
-/** ランク / ポイント画面。称号・進捗表示のみ（換金機能はない）。 */
+/** ランク / ポイント画面。称号・実績バッジ・通算スタッツを表示（換金機能はない）。 */
 export default function RankScreen() {
-  const { goal, progress } = useApp();
+  const { goal, progress, lifetime, badges, unlockedBadgeCount, seasonNumber } = useApp();
 
   if (!goal) {
     return (
@@ -96,11 +96,106 @@ export default function RankScreen() {
         })}
       </Card>
 
+      {/* 実績バッジ（コレクション） */}
+      <Card>
+        <View style={styles.badgeHead}>
+          <Text style={styles.sectionLabel}>実績バッジ</Text>
+          <Text style={styles.badgeCount}>
+            {unlockedBadgeCount} / {badges.length} 獲得
+          </Text>
+        </View>
+        <View style={styles.badgeGrid}>
+          {badges.map((b) => {
+            const unlocked = !!b.unlockedAt;
+            return (
+              <View key={b.key} style={styles.badgeItem}>
+                <View
+                  style={[
+                    styles.badgeIcon,
+                    { backgroundColor: unlocked ? `${b.color}22` : colors.surfaceAlt },
+                    unlocked && { borderColor: b.color, borderWidth: 1 },
+                  ]}
+                >
+                  <Ionicons
+                    name={unlocked ? b.icon : 'lock-closed'}
+                    size={24}
+                    color={unlocked ? b.color : colors.textMuted}
+                  />
+                  {b.isNew && (
+                    <View style={styles.newTag}>
+                      <Text style={styles.newTagText}>NEW</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.badgeLabel, !unlocked && styles.dim]} numberOfLines={1}>
+                  {b.label}
+                </Text>
+                <Text style={styles.badgeDesc} numberOfLines={2}>
+                  {b.description}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </Card>
+
+      {/* 通算スタッツ（シーズンをまたいで積み上がる） */}
+      <Card>
+        <Text style={styles.sectionLabel}>通算スタッツ</Text>
+        <View style={styles.lifeRow}>
+          <LifeStat icon="albums" label="シーズン" value={seasonNumber} unit="季目" />
+          <LifeStat icon="layers" label="通算達成" value={progress.totalDone} unit="回" />
+        </View>
+        <View style={styles.lifeRow}>
+          <LifeStat
+            icon="arrow-undo"
+            label="通算返金"
+            value={`¥${lifetime.totalRefunded.toLocaleString()}`}
+            accent={colors.success}
+          />
+          <LifeStat
+            icon="ribbon"
+            label="完全達成シーズン"
+            value={lifetime.perfectSeasons}
+            unit="回"
+            accent={colors.warning}
+          />
+        </View>
+      </Card>
+
       <Text style={styles.note}>
         ※ ポイントはアプリ内の称号・進捗表示のみに使います。換金機能はありません。
       </Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
+  );
+}
+
+/** 通算スタッツの1マス */
+function LifeStat({
+  icon,
+  label,
+  value,
+  unit,
+  accent = colors.text,
+}: {
+  icon: import('@/types').IconName;
+  label: string;
+  value: string | number;
+  unit?: string;
+  accent?: string;
+}) {
+  return (
+    <View style={styles.lifeStat}>
+      <Ionicons name={icon} size={16} color={colors.textSub} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.lifeLabel}>{label}</Text>
+        <View style={styles.lifeValueRow}>
+          <Text style={[styles.lifeValue, { color: accent }]}>{value}</Text>
+          {unit ? <Text style={styles.lifeUnit}> {unit}</Text> : null}
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -164,6 +259,53 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   currentTagText: { color: colors.onAccent, fontSize: font.small, fontWeight: '800' },
+
+  // 実績バッジ
+  badgeHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  badgeCount: { fontSize: 12, color: colors.textSub, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  badgeItem: { width: '31%', alignItems: 'center', marginBottom: spacing.lg },
+  badgeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newTag: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    backgroundColor: colors.primary,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  newTagText: { fontSize: 8, fontWeight: '900', color: colors.onAccent, letterSpacing: 0.5 },
+  badgeLabel: { fontSize: 12, fontWeight: '800', color: colors.text, marginTop: 8, textAlign: 'center' },
+  badgeDesc: { fontSize: 10, color: colors.textMuted, marginTop: 2, textAlign: 'center', lineHeight: 13 },
+
+  // 通算スタッツ
+  lifeRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
+  lifeStat: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  lifeLabel: { fontSize: 11, color: colors.textSub, fontWeight: '600' },
+  lifeValueRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 1 },
+  lifeValue: { fontSize: 20, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+  lifeUnit: { fontSize: 11, color: colors.textSub, fontWeight: '600' },
 
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18 },
 });
