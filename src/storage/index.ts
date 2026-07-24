@@ -4,7 +4,16 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Goal, RecordMap, PersistedState, ReminderSettings, LifetimeStats, BadgeMap } from '@/types';
+import {
+  Goal,
+  RecordMap,
+  PersistedState,
+  ReminderSettings,
+  LifetimeStats,
+  BadgeMap,
+  Profile,
+  CustomGroup,
+} from '@/types';
 import { EMPTY_LIFETIME } from '@/logic/summary';
 
 const KEY_GOAL = 'tsuzukeru.goal.v1';
@@ -12,21 +21,37 @@ const KEY_RECORDS = 'tsuzukeru.records.v1';
 const KEY_REMINDER = 'tsuzukeru.reminder.v1';
 const KEY_LIFETIME = 'tsuzukeru.lifetime.v1';
 const KEY_BADGES = 'tsuzukeru.badges.v1';
+const KEY_PROFILE = 'tsuzukeru.profile.v1';
+const KEY_GROUP = 'tsuzukeru.group.v1';
 
 const DEFAULT_REMINDER: ReminderSettings = { enabled: false, hour: 20, minute: 0 };
 
+export const DEFAULT_PROFILE: Profile = {
+  name: 'あなた',
+  icon: 'person',
+  color: '#C6F432',
+  motivation: '継続で、なりたい自分になる。',
+};
+
 export async function loadState(): Promise<PersistedState> {
   try {
-    const [goalRaw, recordsRaw, reminderRaw, lifetimeRaw, badgesRaw] = await Promise.all([
-      AsyncStorage.getItem(KEY_GOAL),
-      AsyncStorage.getItem(KEY_RECORDS),
-      AsyncStorage.getItem(KEY_REMINDER),
-      AsyncStorage.getItem(KEY_LIFETIME),
-      AsyncStorage.getItem(KEY_BADGES),
-    ]);
+    const [goalRaw, recordsRaw, reminderRaw, lifetimeRaw, badgesRaw, profileRaw, groupRaw] =
+      await Promise.all([
+        AsyncStorage.getItem(KEY_GOAL),
+        AsyncStorage.getItem(KEY_RECORDS),
+        AsyncStorage.getItem(KEY_REMINDER),
+        AsyncStorage.getItem(KEY_LIFETIME),
+        AsyncStorage.getItem(KEY_BADGES),
+        AsyncStorage.getItem(KEY_PROFILE),
+        AsyncStorage.getItem(KEY_GROUP),
+      ]);
     const goal: Goal | null = goalRaw ? JSON.parse(goalRaw) : null;
-    // 旧バージョンで保存された目標にはカテゴリが無いことがある
-    if (goal && !goal.category) goal.category = 'other';
+    // 旧バージョン互換
+    if (goal) {
+      if (!goal.category) goal.category = 'other';
+      if (goal.weeklyTarget == null) goal.weeklyTarget = 3;
+      if (goal.startCharge == null) goal.startCharge = 0;
+    }
     const records: RecordMap = recordsRaw ? JSON.parse(recordsRaw) : {};
     const reminder: ReminderSettings = reminderRaw
       ? { ...DEFAULT_REMINDER, ...JSON.parse(reminderRaw) }
@@ -35,10 +60,22 @@ export async function loadState(): Promise<PersistedState> {
       ? { ...EMPTY_LIFETIME, ...JSON.parse(lifetimeRaw) }
       : EMPTY_LIFETIME;
     const badges: BadgeMap = badgesRaw ? JSON.parse(badgesRaw) : {};
-    return { goal, records, reminder, lifetime, badges };
+    const profile: Profile = profileRaw
+      ? { ...DEFAULT_PROFILE, ...JSON.parse(profileRaw) }
+      : DEFAULT_PROFILE;
+    const group: CustomGroup | null = groupRaw ? JSON.parse(groupRaw) : null;
+    return { goal, records, reminder, lifetime, badges, profile, group };
   } catch (e) {
     console.warn('loadState failed', e);
-    return { goal: null, records: {}, reminder: DEFAULT_REMINDER, lifetime: EMPTY_LIFETIME, badges: {} };
+    return {
+      goal: null,
+      records: {},
+      reminder: DEFAULT_REMINDER,
+      lifetime: EMPTY_LIFETIME,
+      badges: {},
+      profile: DEFAULT_PROFILE,
+      group: null,
+    };
   }
 }
 
@@ -63,6 +100,23 @@ export async function saveBadges(badges: BadgeMap): Promise<void> {
   await AsyncStorage.setItem(KEY_BADGES, JSON.stringify(badges));
 }
 
+export async function saveProfile(profile: Profile): Promise<void> {
+  await AsyncStorage.setItem(KEY_PROFILE, JSON.stringify(profile));
+}
+
+export async function saveGroup(group: CustomGroup | null): Promise<void> {
+  if (group) await AsyncStorage.setItem(KEY_GROUP, JSON.stringify(group));
+  else await AsyncStorage.removeItem(KEY_GROUP);
+}
+
 export async function clearAll(): Promise<void> {
-  await AsyncStorage.multiRemove([KEY_GOAL, KEY_RECORDS, KEY_REMINDER, KEY_LIFETIME, KEY_BADGES]);
+  await AsyncStorage.multiRemove([
+    KEY_GOAL,
+    KEY_RECORDS,
+    KEY_REMINDER,
+    KEY_LIFETIME,
+    KEY_BADGES,
+    KEY_PROFILE,
+    KEY_GROUP,
+  ]);
 }

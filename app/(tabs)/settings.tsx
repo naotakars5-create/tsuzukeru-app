@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  Switch,
-  Pressable,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -18,6 +9,7 @@ import { colors, font, radius, spacing } from '@/theme';
 import { formatDisplay } from '@/logic/date';
 import { frequencyLabel } from '@/logic/schedule';
 import { categoryOf } from '@/logic/category';
+import { confirmAsync, notifyAsync } from '@/logic/confirm';
 
 /** リマインドで選べる時刻（時） */
 const REMINDER_HOURS = [6, 7, 8, 9, 12, 17, 18, 19, 20, 21, 22, 23];
@@ -26,16 +18,16 @@ const REMINDER_MINUTES = [0, 15, 30, 45];
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { goal, reminder, updateReminder, resetAll } = useApp();
+  const { goal, reminder, updateReminder, resetAll, profile } = useApp();
 
   const category = categoryOf(goal?.category);
 
   const onToggleReminder = async (enabled: boolean) => {
     const ok = await updateReminder({ ...reminder, enabled });
     if (enabled && !ok) {
-      Alert.alert(
+      notifyAsync(
         '通知を許可してください',
-        '端末の設定でこのアプリの通知が許可されていないため、リマインドを設定できませんでした。設定アプリから通知を許可して、もう一度お試しください。'
+        'この端末で通知が許可されていないため、リマインドを設定できませんでした。（Web版では通知は使えません）'
       );
     }
   };
@@ -43,15 +35,13 @@ export default function SettingsScreen() {
   const onPickHour = (hour: number) => updateReminder({ ...reminder, hour });
   const onPickMinute = (minute: number) => updateReminder({ ...reminder, minute });
 
-  const onReset = () => {
-    Alert.alert(
+  const onReset = async () => {
+    const ok = await confirmAsync(
       'データをリセット',
-      '目標と達成記録をすべて削除します。この操作は取り消せません。',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        { text: '削除する', style: 'destructive', onPress: () => resetAll() },
-      ]
+      '目標と達成記録・実績・プロフィールをすべて削除します。この操作は取り消せません。',
+      '削除する'
     );
+    if (ok) resetAll();
   };
 
   const timeLabel = `${String(reminder.hour).padStart(2, '0')}:${String(
@@ -74,7 +64,7 @@ export default function SettingsScreen() {
               <Text style={styles.goalName}>{goal.name}</Text>
             </View>
             <Text style={styles.goalMeta}>
-              {category.label}・{frequencyLabel(goal)}・4週間・週¥100積立（モック）
+              {category.label}・{frequencyLabel(goal)}・4週間・月¥500積立（モック）
             </Text>
             <Text style={styles.goalMeta}>開始日: {formatDisplay(goal.startDate)}</Text>
             <PrimaryButton
@@ -94,6 +84,23 @@ export default function SettingsScreen() {
             />
           </>
         )}
+      </Card>
+
+      {/* プロフィール */}
+      <Card>
+        <Text style={styles.sectionLabel}>プロフィール</Text>
+        <Pressable style={styles.profileRow} onPress={() => router.push('/profile-edit')}>
+          <View style={[styles.profileIcon, { backgroundColor: `${profile.color}22`, borderColor: profile.color }]}>
+            <Ionicons name={profile.icon} size={22} color={profile.color} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.profileName}>{profile.name}</Text>
+            <Text style={styles.profileMotto} numberOfLines={1}>
+              {profile.motivation || '意気込みを設定しよう'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
       </Card>
 
       {/* リマインド通知 */}
@@ -217,6 +224,17 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
+  profileIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  profileName: { fontSize: font.body, fontWeight: '800', color: colors.text },
+  profileMotto: { fontSize: font.small, color: colors.textSub, marginTop: 2 },
   goalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },
   goalName: { fontSize: font.heading, fontWeight: '800', color: colors.text },
   goalMeta: { fontSize: font.sub, color: colors.textSub, marginTop: 4 },

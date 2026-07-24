@@ -7,7 +7,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { colors, font, spacing, radius } from '@/theme';
 import { formatHM, msUntilEndOfDay } from '@/logic/date';
-import { WEEKLY_STAKE } from '@/logic/billing';
+import { WEEKLY_PENALTY } from '@/logic/billing';
 import { POINTS_PER_DONE } from '@/logic/rank';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -78,8 +78,8 @@ export default function TodayScreen() {
           <Ionicons name="alert-circle" size={18} color={colors.danger} />
           <Text style={styles.bannerText}>
             {weekAlreadyCharged
-              ? `今週の ¥${WEEKLY_STAKE} は没収確定。連続記録は今日から守れる`
-              : `今日サボると、今週の積立 ¥${WEEKLY_STAKE} は返金されません`}
+              ? `今週は ¥${WEEKLY_PENALTY} 没収確定。連続記録は今日から守れる`
+              : `今日サボると、今週ぶんの ¥${WEEKLY_PENALTY} が積立から没収されます`}
           </Text>
         </View>
       )}

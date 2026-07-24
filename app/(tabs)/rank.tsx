@@ -148,17 +148,17 @@ export default function RankScreen() {
         </View>
         <View style={styles.lifeRow}>
           <LifeStat
-            icon="arrow-undo"
-            label="通算返金"
-            value={`¥${lifetime.totalRefunded.toLocaleString()}`}
-            accent={colors.success}
-          />
-          <LifeStat
             icon="ribbon"
             label="完全達成シーズン"
             value={lifetime.perfectSeasons}
             unit="回"
             accent={colors.warning}
+          />
+          <LifeStat
+            icon="remove-circle"
+            label="通算没収"
+            value={`¥${lifetime.totalCharged.toLocaleString()}`}
+            accent={colors.danger}
           />
         </View>
       </Card>

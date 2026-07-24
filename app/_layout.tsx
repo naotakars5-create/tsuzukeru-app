@@ -32,6 +32,11 @@ export default function RootLayout() {
             name="today"
             options={{ title: '今日の達成', presentation: 'card' }}
           />
+          <Stack.Screen
+            name="profile-edit"
+            options={{ title: 'プロフィール編集', presentation: 'modal' }}
+          />
+          <Stack.Screen name="rival/[id]" options={{ title: 'プロフィール' }} />
         </Stack>
       </AppProvider>
     </SafeAreaProvider>

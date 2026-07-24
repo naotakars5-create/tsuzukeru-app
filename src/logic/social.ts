@@ -1,12 +1,15 @@
 /**
- * 仲間・チーム・ランキングのモックデータ生成。
- * サーバーは無いため、カテゴリごとに固定の「ライバル」を用意し、
- * 日付から決まる擬似乱数でポイントを日々少しずつ変化させる。
- * （同じ日に何度見ても同じ結果 = ダミーだが安定して見える）
+ * 仲間・ランキングのモックデータ生成。サーバーは無いためダミー。
+ * - 月間ランキング（1ヶ月単位で競う）
+ * - マッチングは自分のランク前後（±1〜2）を混ぜて近しい相手を集める
+ * - 各行にランク称号を付与
+ * - 相手プロフィールもモックで生成
  */
 
-import { GoalCategory, LeaderboardEntry } from '@/types';
+import { GoalCategory, LeaderboardEntry, RivalProfile } from '@/types';
 import { todayStr } from './date';
+import { RANK_TIERS } from './rank';
+import { categoryOf } from './category';
 
 /** 文字列 -> 32bit ハッシュ（擬似乱数の種） */
 function hash(s: string): number {
@@ -18,84 +21,78 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-/** カテゴリごとのモックライバル（名前と実力ベース値） */
-const RIVALS: Record<GoalCategory, { name: string; base: number }[]> = {
-  exercise: [
-    { name: 'カズ', base: 420 },
-    { name: 'モモカ', base: 300 },
-    { name: 'テツ', base: 205 },
-    { name: 'リョウ', base: 150 },
-    { name: 'アユミ', base: 95 },
-    { name: 'ダイキ', base: 60 },
-    { name: 'ミサキ', base: 30 },
-  ],
-  study: [
-    { name: 'ユウタ', base: 390 },
-    { name: 'サクラ', base: 280 },
-    { name: 'ケンジ', base: 210 },
-    { name: 'ナナ', base: 140 },
-    { name: 'ハルト', base: 90 },
-    { name: 'アオイ', base: 55 },
-    { name: 'ソウタ', base: 25 },
-  ],
-  morning: [
-    { name: 'アサヒ', base: 410 },
-    { name: 'ヒカリ', base: 290 },
-    { name: 'マコト', base: 200 },
-    { name: 'スバル', base: 145 },
-    { name: 'ノゾミ', base: 85 },
-    { name: 'イブキ', base: 50 },
-    { name: 'レン', base: 20 },
-  ],
-  health: [
-    { name: 'ミドリ', base: 400 },
-    { name: 'タクミ', base: 285 },
-    { name: 'コハル', base: 215 },
-    { name: 'シュン', base: 135 },
-    { name: 'メイ', base: 100 },
-    { name: 'カナタ', base: 45 },
-    { name: 'ユズ', base: 15 },
-  ],
-  other: [
-    { name: 'ツバサ', base: 395 },
-    { name: 'リコ', base: 275 },
-    { name: 'ガク', base: 195 },
-    { name: 'ホノカ', base: 130 },
-    { name: 'イツキ', base: 80 },
-    { name: 'セナ', base: 40 },
-    { name: 'ニコ', base: 10 },
-  ],
+/** カテゴリごとの固定ライバル名 */
+const RIVAL_NAMES: Record<GoalCategory, string[]> = {
+  exercise: ['カズ', 'モモカ', 'テツ', 'リョウ', 'アユミ', 'ダイキ', 'ミサキ'],
+  study: ['ユウタ', 'サクラ', 'ケンジ', 'ナナ', 'ハルト', 'アオイ', 'ソウタ'],
+  morning: ['アサヒ', 'ヒカリ', 'マコト', 'スバル', 'ノゾミ', 'イブキ', 'レン'],
+  health: ['ミドリ', 'タクミ', 'コハル', 'シュン', 'メイ', 'カナタ', 'ユズ'],
+  other: ['ツバサ', 'リコ', 'ガク', 'ホノカ', 'イツキ', 'セナ', 'ニコ'],
 };
 
-/** モックライバルの今日時点のポイント（日ごとに少し変動） */
-function rivalPoints(name: string, base: number): number {
-  const wiggle = hash(name + todayStr()) % 30; // 0-29pt の日次変動
-  return base + wiggle;
+const MOTIVATIONS = [
+  '今度こそ、習慣にする。',
+  '未来の自分への投資。',
+  'なりたい自分に、毎日近づく。',
+  '言い訳をやめた日から。',
+  '積み重ねだけは裏切らない。',
+  '小さく、でも確実に。',
+  '燃え尽きるより、燃やし続ける。',
+];
+
+const AVATAR_COLORS = ['#FF9F43', '#6AA6FF', '#4ADE80', '#FF6B8A', '#A78BFA', '#FFC24B', '#4FD1C5'];
+const AVATAR_ICONS = ['walk', 'barbell', 'book', 'sunny', 'heart', 'bicycle', 'flash'] as const;
+
+/** ランク前後(±1〜2)を混ぜた相手のランクindexを決める */
+function rivalRankOffsets(): number[] {
+  // 同ランク多め、±1をそこそこ、±2を少し
+  return [0, 0, 1, -1, 1, -2, 2];
 }
 
-/** モックライバルの連続日数 */
-function rivalStreak(name: string): number {
-  return (hash('streak' + name + todayStr()) % 18) + 1;
+/** 自分のランクindexを求める */
+export function rankIndexOf(points: number): number {
+  let idx = 0;
+  for (let i = 0; i < RANK_TIERS.length; i++) if (points >= RANK_TIERS[i].minPoints) idx = i;
+  return idx;
+}
+
+/** 相手1人ぶんのランクindex（自分のindex＋オフセットをクランプ） */
+function rivalRankIndex(myIndex: number, i: number): number {
+  const offs = rivalRankOffsets();
+  const raw = myIndex + offs[i % offs.length];
+  return Math.max(0, Math.min(RANK_TIERS.length - 1, raw));
+}
+
+/** ランクindexに応じた今月ポイントの目安 */
+function monthPointsForRank(rankIndex: number, seed: number): number {
+  const base = rankIndex * 90 + 40;
+  const noise = seed % 70;
+  return base + noise;
 }
 
 /**
- * 同カテゴリのランキング（自分を含む・ポイント降順）。
- * ベース値が最小のライバル1人は「昨日連続が途切れた人」として演出する。
+ * 同カテゴリの月間ランキング（自分を含む・ポイント降順）。
+ * @param myRankIndex 自分の現在ランクのindex（マッチングの中心）
+ * @param myMonthPoints 自分の今月ポイント
  */
 export function buildLeaderboard(
   category: GoalCategory,
-  myPoints: number,
+  myRankIndex: number,
+  myMonthPoints: number,
   myStreak: number
 ): LeaderboardEntry[] {
-  const list = RIVALS[category];
-  const minBase = Math.min(...list.map((r) => r.base));
-  const rivals: LeaderboardEntry[] = list.map((r) => {
-    const broken = r.base === minBase;
+  const names = RIVAL_NAMES[category];
+  const minMonthOfRank = monthPointsForRank(0, 0);
+  const rivals: LeaderboardEntry[] = names.map((name, i) => {
+    const ri = rivalRankIndex(myRankIndex, i);
+    const mp = monthPointsForRank(ri, hash(name + todayStr()));
+    const broken = mp === Math.min(mp, minMonthOfRank) && ri === 0 && i === names.length - 1;
     return {
-      id: r.name,
-      name: r.name,
-      points: rivalPoints(r.name, r.base),
-      streak: broken ? 0 : rivalStreak(r.name),
+      id: name,
+      name,
+      points: mp,
+      streak: broken ? 0 : (hash('s' + name + todayStr()) % 18) + 1,
+      rank: RANK_TIERS[ri],
       isMe: false,
       broken,
     };
@@ -103,15 +100,55 @@ export function buildLeaderboard(
   const me: LeaderboardEntry = {
     id: 'me',
     name: 'あなた',
-    points: myPoints,
+    points: myMonthPoints,
     streak: myStreak,
+    rank: RANK_TIERS[myRankIndex],
     isMe: true,
   };
   return [...rivals, me].sort((a, b) => b.points - a.points);
 }
 
-/** 先週からの順位変動（モック: 日付から決まる 0〜2） */
-export function weeklyRankDelta(category: GoalCategory): number {
+/** 先月からの順位変動（モック: 日付から決まる 0〜2） */
+export function monthlyRankDelta(category: GoalCategory): number {
   return hash('delta' + category + todayStr()) % 3;
 }
 
+/** 相手プロフィール（モック） */
+export function buildRivalProfile(category: GoalCategory, id: string): RivalProfile {
+  const h = hash(id);
+  const rankIndex = rankIndexOf(monthPointsForRank(2, h) + 100);
+  const cat = categoryOf(category);
+  const totalDone = 20 + (h % 90);
+  const bestStreak = 3 + (h % 25);
+  return {
+    id,
+    name: id,
+    icon: AVATAR_ICONS[h % AVATAR_ICONS.length],
+    color: AVATAR_COLORS[h % AVATAR_COLORS.length],
+    motivation: MOTIVATIONS[h % MOTIVATIONS.length],
+    goalName: `${cat.label}を習慣にする`,
+    category,
+    points: totalDone * 10,
+    streak: (hash('s' + id + todayStr()) % 18) + 1,
+    bestStreak,
+    totalDone,
+    rank: RANK_TIERS[Math.min(RANK_TIERS.length - 1, rankIndex)],
+  };
+}
+
+/** アバターの背景色（名前から安定して決まる） */
+export function avatarColor(name: string): string {
+  return AVATAR_COLORS[hash(name) % AVATAR_COLORS.length];
+}
+
+/** グループ参加コードを生成（モック・6桁英数字） */
+export function generateGroupCode(seed: string): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let h = hash(seed);
+  let out = '';
+  for (let i = 0; i < 6; i++) {
+    out += chars[h % chars.length];
+    h = Math.floor(h / chars.length) + hash(out);
+  }
+  return out;
+}

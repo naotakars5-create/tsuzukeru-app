@@ -6,6 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { ProgressBar } from '@/components/ProgressBar';
 import { colors, font, labelStyle, spacing } from '@/theme';
 import { compareDate, todayStr } from '@/logic/date';
+import { MONTHLY_STAKE, WEEKLY_PENALTY } from '@/logic/billing';
 import { WeekSummary } from '@/types';
 
 type WeekState = 'done' | 'missed' | 'current' | 'future';
@@ -16,50 +17,9 @@ function stateOf(week: WeekSummary): WeekState {
   return week.missed > 0 ? 'missed' : 'done';
 }
 
-/** 週¥100の積立ステータスピル: 返金 / 課金 / 預かり中 / 預かり予定 */
-function StakePill({ week, state }: { week: WeekSummary; state: WeekState }) {
-  if (week.chargedAmount > 0) {
-    return (
-      <View style={[styles.stakePill, { backgroundColor: 'rgba(255,107,107,0.14)' }]}>
-        <Ionicons name="card" size={14} color={colors.danger} />
-        <Text style={[styles.stakePillText, { color: colors.danger }]}>
-          課金 ¥{week.chargedAmount.toLocaleString()}
-        </Text>
-      </View>
-    );
-  }
-  if (week.refundedAmount > 0) {
-    return (
-      <View style={[styles.stakePill, { backgroundColor: 'rgba(74,222,128,0.14)' }]}>
-        <Ionicons name="arrow-undo" size={14} color={colors.success} />
-        <Text style={[styles.stakePillText, { color: colors.success }]}>
-          返金 ¥{week.refundedAmount.toLocaleString()}
-        </Text>
-      </View>
-    );
-  }
-  if (state === 'current') {
-    return (
-      <View style={[styles.stakePill, { backgroundColor: 'rgba(255,194,75,0.14)' }]}>
-        <Ionicons name="lock-closed" size={13} color={colors.warning} />
-        <Text style={[styles.stakePillText, { color: colors.warning }]}>¥100 預かり中</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={[styles.stakePill, { backgroundColor: colors.surfaceAlt }]}>
-      <Ionicons name="lock-closed" size={13} color={colors.textMuted} />
-      <Text style={[styles.stakePillText, { color: colors.textMuted }]}>¥100 預かり予定</Text>
-    </View>
-  );
-}
-
-/**
- * 週次レポート: 4週の達成状況をひと目で。
- * 未達週のみ「請求書」トーンで課金（ダミー）を出し、達成週は静かなまま。
- */
+/** 週次レポート: 4週の達成状況と、月¥500プールの状態（モック課金）を表示。 */
 export default function WeeklyScreen() {
-  const { goal, weeks } = useApp();
+  const { goal, weeks, seasonResult } = useApp();
 
   if (!goal) {
     return (
@@ -69,8 +29,11 @@ export default function WeeklyScreen() {
     );
   }
 
-  const totalCharged = weeks.reduce((s, w) => s + w.chargedAmount, 0);
-  const totalRefunded = weeks.reduce((s, w) => s + w.refundedAmount, 0);
+  const startCharge = goal.startCharge; // 0=無料月, 500=通常
+  const forfeited = seasonResult.charged; // 没収済み
+  const poolRemaining = seasonResult.poolRemaining;
+  const anyMiss = weeks.some((w) => w.missed > 0 && !w.isCurrent);
+  const isFreeMonth = startCharge === 0;
 
   return (
     <ScrollView
@@ -78,55 +41,58 @@ export default function WeeklyScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.list}>
-        {weeks.map((w) => (
-          <WeekCard key={w.weekIndex} week={w} />
-        ))}
-      </View>
-
-      {/* 合計課金（最下部で一度だけ強調） */}
-      {totalCharged > 0 ? (
-        <LinearGradient
-          colors={['#241315', '#170F11']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0.6, y: 1 }}
-          style={styles.totalCard}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.totalLabel}>今月の合計課金（ダミー）</Text>
-            <Text style={styles.totalCopy}>
-              サボった週の¥100は返金されません。
-              {totalRefunded > 0 ? `（返金済み ¥${totalRefunded.toLocaleString()}）` : ''}
-            </Text>
+      {/* 今月の積立プール */}
+      {isFreeMonth ? (
+        <View style={[styles.poolCard, { borderColor: colors.success }]}>
+          <View style={styles.poolHead}>
+            <Ionicons name="gift" size={18} color={colors.success} />
+            <Text style={[styles.poolLabel, { color: colors.success }]}>今月は無料月</Text>
           </View>
-          <Text style={styles.totalValue}>¥{totalCharged.toLocaleString()}</Text>
-        </LinearGradient>
+          <Text style={styles.poolCopy}>前月パーフェクトの特典。今月の積立はありません。</Text>
+        </View>
       ) : (
-        <View style={styles.totalCardOk}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.totalLabel, { color: colors.success }]}>
-              今月の合計課金（ダミー）
-            </Text>
-            <Text style={styles.totalCopy}>
-              没収なし。
-              {totalRefunded > 0
-                ? `これまで ¥${totalRefunded.toLocaleString()} 返金されています。`
-                : '達成した週の¥100は返金されます。'}
-            </Text>
+        <View style={styles.poolCard}>
+          <View style={styles.poolHead}>
+            <Ionicons name="wallet" size={18} color={colors.primary} />
+            <Text style={styles.poolLabel}>今月の積立プール（モック）</Text>
           </View>
-          <Text style={[styles.totalValue, { color: colors.success }]}>¥0</Text>
+          <View style={styles.poolAmountRow}>
+            <Text style={styles.poolRemaining}>¥{poolRemaining.toLocaleString()}</Text>
+            <Text style={styles.poolTotal}>/ ¥{MONTHLY_STAKE} 中</Text>
+          </View>
+          <View style={styles.poolBar}>
+            <View
+              style={[
+                styles.poolBarFill,
+                { width: `${(poolRemaining / MONTHLY_STAKE) * 100}%` },
+              ]}
+            />
+          </View>
+          <Text style={styles.poolCopy}>
+            {forfeited > 0
+              ? `未達で ¥${forfeited.toLocaleString()} 没収。残りは死守しよう。`
+              : anyMiss
+              ? '未達あり。プールが削られていきます。'
+              : 'このまま1ヶ月パーフェクトなら、翌月が無料！'}
+          </Text>
         </View>
       )}
 
+      <View style={styles.list}>
+        {weeks.map((w) => (
+          <WeekCard key={w.weekIndex} week={w} freeMonth={isFreeMonth} />
+        ))}
+      </View>
+
       <Text style={styles.note}>
-        ※ 週¥100の積立はモックです。実際の決済は行いません。
+        ※ 月額 ¥{MONTHLY_STAKE} の積立と ¥{WEEKLY_PENALTY} 没収はすべてモックです。実際の決済は行いません。
       </Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
   );
 }
 
-function WeekCard({ week }: { week: WeekSummary }) {
+function WeekCard({ week, freeMonth }: { week: WeekSummary; freeMonth: boolean }) {
   const state = stateOf(week);
   const ratio = week.scheduled ? week.done / week.scheduled : 0;
   const isMissed = state === 'missed';
@@ -151,7 +117,7 @@ function WeekCard({ week }: { week: WeekSummary }) {
     <View style={[styles.weekCard, isMissed && styles.weekCardMissed]}>
       <View style={styles.weekHead}>
         <Text style={styles.weekTitle}>{week.label}</Text>
-        <View style={styles.badge}>
+        <View style={styles.badgeRow}>
           <Ionicons name={badge.icon} size={15} color={badge.color} />
           <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
         </View>
@@ -167,10 +133,15 @@ function WeekCard({ week }: { week: WeekSummary }) {
       <View style={styles.weekFoot}>
         <Text style={styles.weekStats}>
           {state === 'current'
-            ? `達成 ${week.done} ・ 残り ${week.pending} ・ 予定 ${week.scheduled}`
-            : `達成 ${week.done} ・ 未達 ${week.missed} ・ 予定 ${week.scheduled}`}
+            ? `達成 ${week.done} ・ 残り ${week.pending} ・ 目標 ${week.scheduled}`
+            : `達成 ${week.done} ・ 目標 ${week.scheduled}`}
         </Text>
-        <StakePill week={week} state={state} />
+        {isMissed && !freeMonth && (
+          <View style={styles.penaltyPill}>
+            <Ionicons name="remove-circle" size={14} color={colors.danger} />
+            <Text style={styles.penaltyText}>−¥{WEEKLY_PENALTY}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -178,7 +149,7 @@ function WeekCard({ week }: { week: WeekSummary }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 22, paddingTop: spacing.md },
+  content: { paddingHorizontal: 22, paddingTop: spacing.md, gap: spacing.lg },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -188,8 +159,35 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: font.body, color: colors.textSub },
 
-  list: { gap: 10 },
+  poolCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 20,
+    padding: 18,
+  },
+  poolHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  poolLabel: { ...labelStyle, color: colors.textSub },
+  poolAmountRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 8 },
+  poolRemaining: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: colors.primary,
+    letterSpacing: -1,
+    fontVariant: ['tabular-nums'],
+  },
+  poolTotal: { fontSize: 14, color: colors.textSub, fontWeight: '600' },
+  poolBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  poolBarFill: { height: '100%', borderRadius: 4, backgroundColor: colors.primary },
+  poolCopy: { fontSize: 12, color: colors.textSub, marginTop: 10, lineHeight: 17 },
 
+  list: { gap: 10 },
   weekCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -198,10 +196,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  weekCardMissed: {
-    backgroundColor: colors.surfaceDanger,
-    borderColor: colors.borderDanger,
-  },
+  weekCardMissed: { backgroundColor: colors.surfaceDanger, borderColor: colors.borderDanger },
   weekHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -209,64 +204,25 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   weekTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   badgeText: { fontSize: 12, fontWeight: '700' },
-
   weekFoot: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 8,
   },
-  weekStats: {
-    fontSize: 12,
-    color: colors.textSub,
-    fontVariant: ['tabular-nums'],
-  },
-  stakePill: {
+  weekStats: { fontSize: 12, color: colors.textSub, fontVariant: ['tabular-nums'] },
+  penaltyPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
+    backgroundColor: 'rgba(255,107,107,0.14)',
     borderRadius: 10,
     paddingVertical: 5,
     paddingHorizontal: 10,
   },
-  stakePillText: {
-    fontSize: 13,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
+  penaltyText: { fontSize: 13, fontWeight: '800', color: colors.danger, fontVariant: ['tabular-nums'] },
 
-  totalCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderDanger,
-    borderRadius: 20,
-    padding: 20,
-    marginTop: 16,
-  },
-  totalCardOk: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.success,
-    borderRadius: 20,
-    padding: 20,
-    marginTop: 16,
-  },
-  totalLabel: { ...labelStyle, color: '#FF9F9F', marginBottom: 6 },
-  totalCopy: { fontSize: 12, color: colors.textSub },
-  totalValue: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: colors.danger,
-    letterSpacing: -1,
-    fontVariant: ['tabular-nums'],
-  },
-
-  note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18, marginTop: 14 },
+  note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18 },
 });

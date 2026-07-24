@@ -9,8 +9,8 @@ import type { Ionicons } from '@expo/vector-icons';
 /** Ioniconsのアイコン名（ベクターアイコン） */
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
-/** 目標の頻度 */
-export type Frequency = 'daily' | 'weekdays';
+/** 目標の頻度: 毎日 / 特定曜日 / 週N回（曜日は自由） */
+export type Frequency = 'daily' | 'weekdays' | 'weekly_count';
 
 /** 目標のカテゴリ（仲間・ランキングのグループ分けに使う） */
 export type GoalCategory = 'exercise' | 'study' | 'morning' | 'health' | 'other';
@@ -25,12 +25,16 @@ export interface Goal {
   name: string;
   /** カテゴリ（同じカテゴリの仲間と競う） */
   category: GoalCategory;
-  /** 頻度: 毎日 or 特定曜日 */
+  /** 頻度: 毎日 / 特定曜日 / 週N回 */
   frequency: Frequency;
   /** frequency === 'weekdays' のとき対象曜日 (0=日, 1=月, ... 6=土) */
   weekdays: number[];
+  /** frequency === 'weekly_count' のとき週あたりの目標回数 */
+  weeklyTarget: number;
   /** 積立額（数値のみ。実決済はしない） */
   stakeAmount: number;
+  /** このシーズン開始時に実際に課金した額（0=無料月・モック） */
+  startCharge: number;
   /** 開始日 'YYYY-MM-DD' */
   startDate: string;
   /** 期間（週）: MVPは4週固定 */
@@ -59,14 +63,38 @@ export interface LifetimeStats {
   seasonsCompleted: number;
   /** 完全達成（未達ゼロ）で完走したシーズン数 */
   perfectSeasons: number;
-  /** 通算返金額（モック） */
-  totalRefunded: number;
-  /** 通算課金額（モック） */
+  /** 通算で没収された額（モック） */
   totalCharged: number;
+  /** 通算で支払った額（モック） */
+  totalPaid: number;
+  /** 次のシーズンを無料にする権利（前月パーフェクトで付与） */
+  nextSeasonFree: boolean;
+}
+
+/** 自分のプロフィール */
+export interface Profile {
+  /** 表示名 */
+  name: string;
+  /** アイコン（Ionicons名） */
+  icon: IconName;
+  /** アイコンの色 */
+  color: string;
+  /** 意気込み（ひとこと） */
+  motivation: string;
 }
 
 /** バッジの解除状態: key -> 解除日 'YYYY-MM-DD' */
 export type BadgeMap = Record<string, string>;
+
+/** 任意で作る/参加するグループ（モック） */
+export interface CustomGroup {
+  /** 参加コード（共有用・モック） */
+  code: string;
+  /** グループ名 */
+  name: string;
+  /** 自分が作成者か */
+  owner: boolean;
+}
 
 /** 保存されるアプリの状態のスナップショット */
 export interface PersistedState {
@@ -75,6 +103,8 @@ export interface PersistedState {
   reminder: ReminderSettings;
   lifetime: LifetimeStats;
   badges: BadgeMap;
+  profile: Profile;
+  group: CustomGroup | null;
 }
 
 /** ランク（称号）の定義 */
@@ -137,9 +167,28 @@ export interface WeekSummary {
 export interface LeaderboardEntry {
   id: string;
   name: string;
+  /** 今月のポイント（月間ランキング用） */
   points: number;
   streak: number;
+  /** ランク称号 */
+  rank: RankTier;
   isMe: boolean;
   /** 連続が昨日途切れた（モック演出用） */
   broken?: boolean;
+}
+
+/** 相手プロフィール（モック） */
+export interface RivalProfile {
+  id: string;
+  name: string;
+  icon: IconName;
+  color: string;
+  motivation: string;
+  goalName: string;
+  category: GoalCategory;
+  points: number;
+  streak: number;
+  bestStreak: number;
+  totalDone: number;
+  rank: RankTier;
 }

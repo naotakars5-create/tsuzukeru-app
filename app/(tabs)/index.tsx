@@ -6,9 +6,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { confirmAsync } from '@/logic/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -60,16 +60,17 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.emptyWrap}>
           <ProgressRing ratio={0} size={150} strokeWidth={16} glow={false}>
-            <Ionicons name="flame-outline" size={40} color={colors.textMuted} />
+            <Ionicons name="flame" size={44} color={colors.primary} />
           </ProgressRing>
-          <Text style={styles.emptyTitle}>ここが、点灯していく。</Text>
+          <Text style={styles.emptyTitle}>心を燃やせ。</Text>
           <Text style={styles.emptyText}>
-            サボると痛み、続けると報酬。{'\n'}
-            仕組みで習慣を変えるアプリです。
+            続けた分だけ、火は大きくなる。{'\n'}
+            意志じゃない、仕組みで続ける。{'\n'}
+            さあ、最初の火をつけよう。
           </Text>
           <PrimaryButton
-            label="最初の習慣をつくる"
-            icon="add"
+            label="最初の習慣に火をつける"
+            icon="flame"
             onPress={() => router.push('/goal-setup')}
             style={{ marginTop: spacing.xl, alignSelf: 'stretch' }}
           />
@@ -87,15 +88,17 @@ export default function HomeScreen() {
         ? Math.round((seasonResult.done / seasonResult.scheduled) * 100)
         : 0;
 
-    const onNext = () =>
-      Alert.alert(
+    const nextFree = seasonResult.allPerfect;
+    const onNext = async () => {
+      const ok = await confirmAsync(
         '次のシーズンを始める',
-        `「${goal.name}」で新しい4週間を始めます。連続日数やポイント、実績はそのまま引き継がれます。`,
-        [
-          { text: 'キャンセル', style: 'cancel' },
-          { text: '始める', onPress: () => startNextSeason() },
-        ]
+        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\n${
+          nextFree ? '今月パーフェクト達成！次の月は無料です。' : '次の月も月額¥500の積立です（モック）。'
+        }`,
+        '始める'
       );
+      if (ok) startNextSeason();
+    };
 
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -133,12 +136,16 @@ export default function HomeScreen() {
                   value={`${seasonResult.perfectWeeks}`}
                   unit="/ 4"
                 />
-                <StatChip
-                  icon="arrow-undo"
-                  accent={colors.success}
-                  label="返金（モック）"
-                  value={`¥${seasonResult.refunded.toLocaleString()}`}
-                />
+                {nextFree ? (
+                  <StatChip icon="gift" accent={colors.success} label="ごほうび" value="翌月無料" />
+                ) : (
+                  <StatChip
+                    icon="wallet"
+                    accent={colors.warning}
+                    label="積立の残り"
+                    value={`¥${seasonResult.poolRemaining.toLocaleString()}`}
+                  />
+                )}
               </View>
             </View>
           </Card>
