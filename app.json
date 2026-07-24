@@ -3,6 +3,7 @@
     "name": "継続 つづける",
     "slug": "tsuzukeru-app",
     "version": "1.0.0",
+    "owner": "naotaka0131",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "tsuzukeru",
@@ -10,6 +11,9 @@
     "newArchEnabled": true,
     "runtimeVersion": {
       "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e585da06-9e9e-4f8b-b987-c0a07a8d5603"
     },
     "splash": {
       "image": "./assets/splash.png",
@@ -34,6 +38,11 @@
     "plugins": ["expo-router", "expo-notifications"],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e585da06-9e9e-4f8b-b987-c0a07a8d5603"
+      }
     }
   }
 }
