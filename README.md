@@ -24,24 +24,32 @@
 1. ブラウザで **https://expo.dev** を開く
 2. 「Sign Up」で無料アカウント作成（STEP1と同じアカウントでOK）
 
-### STEP 3. コードをクラウドで動かして QRコードを出す（おすすめ = GitHub Codespaces）
+### STEP 3. コードをクラウドで動かす（おすすめ = GitHub Codespaces）
 PCに何もインストールせず、ブラウザだけで開発サーバーを動かせます。
 
 1. GitHub でこのリポジトリ `tsuzukeru-app` を開く
 2. 緑の **「Code」** ボタン → **「Codespaces」** タブ → **「Create codespace」**
 3. ブラウザ上にエディタ（VS Code）が開いたら、下の「ターミナル」に次を入力:
    ```bash
-   npm install
-   npx expo start --tunnel
+   bash start.sh
    ```
-4. しばらくすると **QRコード** が表示されます
-5. スマホの **Expo Go** アプリを開き、QRコードを読み取る
+4. **初回だけ Expo ログイン**を求められます。expo.dev で作ったユーザー名（またはメール）と
+   パスワードを入力してください（`start.sh` が自動で聞いてきます）
+5. しばらくすると **QRコード** が表示されます
+6. スマホの **Expo Go** アプリを開き、QRコードを読み取る（初回のみ）
    - iPhone: カメラアプリでQRを読む → Expo Goが開く
    - Android: Expo Go内の「Scan QR code」で読む
-6. アプリが起動します 🎉（`--tunnel` なのでスマホとPCが別ネットワークでも動きます）
+7. アプリが起動します 🎉（`--tunnel` なのでスマホとPCが別ネットワークでも動きます）
+
+### 🔁 2回目以降は QR 不要（タップで開く）
+**Expo Go にも同じ Expo アカウントでログイン**しておくのがコツです。
+- Expo Go アプリ右下の「プロフィール（Account）」からログイン
+- 一度ログインしておけば、`bash start.sh` で起動している間、Expo Go の **ホーム画面の
+  「Development servers」** にこのアプリが自動で出ます。**タップするだけ**で開けます
+- ログインするとトンネルURLも固定されるので、Expo Go の「Recently opened」からも開けます
 
 > 補足: 自分のPCに Node.js を入れられる場合は、リポジトリをダウンロードして
-> 同じコマンド（`npm install` → `npx expo start`）でもOKです。
+> `bash start.sh`（または `npm install` → `npx expo start`）でもOKです。
 
 ### STEP 4.（任意）本物のアプリファイルを作る = EAS Build
 ストア公開前の本番ビルドを試したいときに使います。Codespaces のターミナルで:
