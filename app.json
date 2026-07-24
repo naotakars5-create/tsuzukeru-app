@@ -8,6 +8,9 @@
     "scheme": "tsuzukeru",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",

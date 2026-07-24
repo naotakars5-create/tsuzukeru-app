@@ -51,16 +51,31 @@ PCに何もインストールせず、ブラウザだけで開発サーバーを
 > 補足: 自分のPCに Node.js を入れられる場合は、リポジトリをダウンロードして
 > `bash start.sh`（または `npm install` → `npx expo start`）でもOKです。
 
-### STEP 4.（任意）本物のアプリファイルを作る = EAS Build
-ストア公開前の本番ビルドを試したいときに使います。Codespaces のターミナルで:
+### STEP 4.（おすすめ）PCなしで開けるようにする = Android APKビルド
+一度アプリ（APK）を作ってスマホに入れれば、**Codespaceを起動していなくても
+ホーム画面のアイコンからいつでも単体で開けます**（Android・無料）。
+
+Codespaces のターミナルで、次を順に実行します（初回だけ）:
 ```bash
-npm install -g eas-cli
-eas login            # expo.dev のアカウントでログイン
-eas build:configure  # 初回のみ
-eas build --platform android --profile preview
+npm install -g eas-cli                          # ビルド用ツール
+eas login                                        # expo.dev のアカウントでログイン
+eas init                                          # プロジェクト作成（app.jsonにID記入）
+eas update:configure                              # 無線更新(EAS Update)を有効化
+eas build --platform android --profile preview    # APKビルド開始（クラウドで約10〜15分）
 ```
-ビルドはExpoのクラウドで実行され、完了するとダウンロードリンク（APK）が発行されます。
-スマホでそのリンクを開けばインストールできます。
+- ビルドはExpoのクラウドで実行されます。完了するとターミナルとメールに
+  **APKのダウンロードリンク**が出ます
+- Androidスマホでそのリンクを開き、ダウンロード → インストール
+  （初回は「提供元不明のアプリ」を許可する必要があります）
+- 以降は**ホーム画面のアイコンから、PCなしでいつでも起動**できます
+
+#### 変更を反映する（再ビルド不要・無線更新）
+コードを変更したあとは、Codespaces で1コマンド流すだけでインストール済みアプリに反映されます:
+```bash
+eas update --branch preview -m "変更点のメモ"     # 数十秒で配信
+```
+アプリを次に開いたとき、新しい内容が自動で読み込まれます。
+（※ ネイティブ機能を追加したとき＝新しいライブラリを入れたときだけ、再ビルドが必要です）
 
 ---
 
