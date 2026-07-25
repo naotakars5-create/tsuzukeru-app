@@ -64,12 +64,12 @@ export default function HomeScreen() {
           </ProgressRing>
           <Text style={styles.emptyTitle}>心を燃やせ。</Text>
           <Text style={styles.emptyText}>
-            続けた分だけ、火は大きくなる。{'\n'}
+            合格は、毎日机に向かった者に訪れる。{'\n'}
             意志じゃない、仕組みで続ける。{'\n'}
             さあ、最初の火をつけよう。
           </Text>
           <PrimaryButton
-            label="最初の習慣に火をつける"
+            label="勉強を始める"
             icon="flame"
             onPress={() => router.push('/goal-setup')}
             style={{ marginTop: spacing.xl, alignSelf: 'stretch' }}

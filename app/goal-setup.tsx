@@ -16,7 +16,7 @@ import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { Frequency, GoalCategory, IconName } from '@/types';
-import { CATEGORIES } from '@/logic/category';
+import { CATEGORIES, DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
 import { MONTHLY_STAKE, WEEKLY_PENALTY } from '@/logic/billing';
 import { quoteOfToday } from '@/logic/quotes';
 import { todayStr } from '@/logic/date';
@@ -31,7 +31,7 @@ export default function GoalSetupScreen() {
   const { goal, createGoal, nextStartCharge } = useApp();
 
   const [name, setName] = useState(goal?.name ?? '');
-  const [category, setCategory] = useState<GoalCategory>(goal?.category ?? 'exercise');
+  const [category, setCategory] = useState<GoalCategory>(goal?.category ?? DEFAULT_CATEGORY);
   const [frequency, setFrequency] = useState<Frequency>(goal?.frequency ?? 'daily');
   const [weekdays, setWeekdays] = useState<number[]>(goal?.weekdays ?? [1, 2, 3, 4, 5]);
   const [weeklyTarget, setWeeklyTarget] = useState<number>(goal?.weeklyTarget ?? 3);
@@ -88,7 +88,8 @@ export default function GoalSetupScreen() {
       weeklyTarget,
       durationWeeks: DURATION_WEEKS,
     });
-    router.back();
+    // 「火がつく」演出を挟んでホームへ
+    router.replace('/ignite');
   };
 
   return (
@@ -108,10 +109,10 @@ export default function GoalSetupScreen() {
 
         {/* 目標名 */}
         <Card>
-          <Text style={styles.label}>目標名</Text>
+          <Text style={styles.label}>今日やること（勉強タスク）</Text>
           <TextInput
             style={styles.input}
-            placeholder="例: 毎日10分ランニング"
+            placeholder={categoryOf(category).placeholder}
             placeholderTextColor={colors.textMuted}
             value={name}
             onChangeText={setName}
@@ -119,10 +120,10 @@ export default function GoalSetupScreen() {
           />
         </Card>
 
-        {/* カテゴリ */}
+        {/* コミュニティ（目指す資格） */}
         <Card>
-          <Text style={styles.label}>カテゴリ</Text>
-          <Text style={styles.helper}>同じカテゴリの仲間と月間ランキングで競えます。</Text>
+          <Text style={styles.label}>目指す資格・試験（コミュニティ）</Text>
+          <Text style={styles.helper}>同じ資格を目指す仲間と月間ランキングで競えます。</Text>
           <View style={styles.catRow}>
             {CATEGORIES.map((c) => {
               const active = category === c.key;

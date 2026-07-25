@@ -12,8 +12,19 @@ export type IconName = ComponentProps<typeof Ionicons>['name'];
 /** 目標の頻度: 毎日 / 特定曜日 / 週N回（曜日は自由） */
 export type Frequency = 'daily' | 'weekdays' | 'weekly_count';
 
-/** 目標のカテゴリ（仲間・ランキングのグループ分けに使う） */
-export type GoalCategory = 'exercise' | 'study' | 'morning' | 'health' | 'other';
+/** 資格・試験コミュニティ（仲間・ランキングのグループ分けに使う） */
+export type GoalCategory =
+  | 'univ'
+  | 'highschool'
+  | 'gyosei'
+  | 'takken'
+  | 'boki'
+  | 'shindanshi'
+  | 'sharoushi'
+  | 'fp'
+  | 'toeic'
+  | 'komuin'
+  | 'other';
 
 /** その日の達成状態 */
 export type DayStatus = 'done' | 'missed' | 'pending';

@@ -37,6 +37,14 @@ export default function RootLayout() {
             options={{ title: 'プロフィール編集', presentation: 'modal' }}
           />
           <Stack.Screen name="rival/[id]" options={{ title: 'プロフィール' }} />
+          <Stack.Screen
+            name="ignite"
+            options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="share-card"
+            options={{ title: '成果カード', presentation: 'modal' }}
+          />
         </Stack>
       </AppProvider>
     </SafeAreaProvider>

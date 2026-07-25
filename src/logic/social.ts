@@ -21,22 +21,28 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-/** カテゴリごとの固定ライバル名 */
-const RIVAL_NAMES: Record<GoalCategory, string[]> = {
-  exercise: ['カズ', 'モモカ', 'テツ', 'リョウ', 'アユミ', 'ダイキ', 'ミサキ'],
-  study: ['ユウタ', 'サクラ', 'ケンジ', 'ナナ', 'ハルト', 'アオイ', 'ソウタ'],
-  morning: ['アサヒ', 'ヒカリ', 'マコト', 'スバル', 'ノゾミ', 'イブキ', 'レン'],
-  health: ['ミドリ', 'タクミ', 'コハル', 'シュン', 'メイ', 'カナタ', 'ユズ'],
-  other: ['ツバサ', 'リコ', 'ガク', 'ホノカ', 'イツキ', 'セナ', 'ニコ'],
-};
+/** 共通の名前プール（コミュニティごとにずらして使う） */
+const NAME_POOL = [
+  'カズ', 'モモカ', 'テツ', 'リョウ', 'アユミ', 'ダイキ', 'ミサキ',
+  'ユウタ', 'サクラ', 'ケンジ', 'ナナ', 'ハルト', 'アオイ', 'ソウタ',
+  'アサヒ', 'ヒカリ', 'マコト', 'スバル', 'ノゾミ', 'イブキ', 'レン',
+];
+
+/** コミュニティごとに7人の固定ライバルを選ぶ（コミュニティごとに顔ぶれが変わる） */
+function rivalNames(category: GoalCategory): string[] {
+  const start = hash(category) % NAME_POOL.length;
+  const out: string[] = [];
+  for (let i = 0; i < 7; i++) out.push(NAME_POOL[(start + i) % NAME_POOL.length]);
+  return out;
+}
 
 const MOTIVATIONS = [
-  '今度こそ、習慣にする。',
+  '今度こそ、合格する。',
   '未来の自分への投資。',
-  'なりたい自分に、毎日近づく。',
+  '受かるまで、やめない。',
   '言い訳をやめた日から。',
   '積み重ねだけは裏切らない。',
-  '小さく、でも確実に。',
+  '毎日30分でも、必ず。',
   '燃え尽きるより、燃やし続ける。',
 ];
 
@@ -81,7 +87,7 @@ export function buildLeaderboard(
   myMonthPoints: number,
   myStreak: number
 ): LeaderboardEntry[] {
-  const names = RIVAL_NAMES[category];
+  const names = rivalNames(category);
   const minMonthOfRank = monthPointsForRank(0, 0);
   const rivals: LeaderboardEntry[] = names.map((name, i) => {
     const ri = rivalRankIndex(myRankIndex, i);
@@ -126,7 +132,7 @@ export function buildRivalProfile(category: GoalCategory, id: string): RivalProf
     icon: AVATAR_ICONS[h % AVATAR_ICONS.length],
     color: AVATAR_COLORS[h % AVATAR_COLORS.length],
     motivation: MOTIVATIONS[h % MOTIVATIONS.length],
-    goalName: `${cat.label}を習慣にする`,
+    goalName: `${cat.label}の勉強を続ける`,
     category,
     points: totalDone * 10,
     streak: (hash('s' + id + todayStr()) % 18) + 1,

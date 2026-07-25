@@ -30,7 +30,7 @@ export const DEFAULT_PROFILE: Profile = {
   name: 'あなた',
   icon: 'person',
   color: '#C6F432',
-  motivation: '継続で、なりたい自分になる。',
+  motivation: '合格まで、続ける。',
 };
 
 export async function loadState(): Promise<PersistedState> {

@@ -1,16 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { FlameHero } from '@/components/FlameHero';
 import { ProgressBar } from '@/components/ProgressBar';
 import { StatTile } from '@/components/StatTile';
+import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { RANK_TIERS } from '@/logic/rank';
 
 /** ランク / ポイント画面。称号・実績バッジ・通算スタッツを表示（換金機能はない）。 */
 export default function RankScreen() {
+  const router = useRouter();
   const { goal, progress, lifetime, badges, unlockedBadgeCount, seasonNumber } = useApp();
 
   if (!goal) {
@@ -47,6 +50,13 @@ export default function RankScreen() {
             : '最高ランクに到達しました！'}
         </Text>
       </FlameHero>
+
+      <PrimaryButton
+        label="成果をシェアする"
+        icon="share-social"
+        variant="secondary"
+        onPress={() => router.push('/share-card')}
+      />
 
       {/* サマリー数値 */}
       <View style={styles.tileRow}>
