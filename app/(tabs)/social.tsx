@@ -6,8 +6,15 @@ import { useRouter } from 'expo-router';
 import { useApp } from '@/context/AppContext';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
-import { buildLeaderboard, monthlyRankDelta, rankIndexOf, generateGroupCode } from '@/logic/social';
+import {
+  buildLeaderboard,
+  monthlyRankDelta,
+  rankIndexOf,
+  generateGroupCode,
+  communityCount,
+} from '@/logic/social';
 import { POINTS_PER_DONE } from '@/logic/rank';
+import { formatMinutesShort } from '@/logic/time';
 import { LeaderboardEntry } from '@/types';
 import { promptAsync, confirmAsync, notifyAsync } from '@/logic/confirm';
 
@@ -18,16 +25,26 @@ import { promptAsync, confirmAsync, notifyAsync } from '@/logic/confirm';
  */
 export default function SocialScreen() {
   const router = useRouter();
-  const { goal, progress, seasonResult, group, setGroup } = useApp();
+  const { goal, progress, seasonResult, group, setGroup, profile } = useApp();
 
   const category = categoryOf(goal?.category);
   const myRankIndex = rankIndexOf(progress.points);
   const myMonthPoints = seasonResult.done * POINTS_PER_DONE;
+  const myMonthMinutes = seasonResult.minutes;
 
   const leaderboard = useMemo(
-    () => buildLeaderboard(category.key, myRankIndex, myMonthPoints, progress.streak),
-    [category.key, myRankIndex, myMonthPoints, progress.streak]
+    () =>
+      buildLeaderboard(
+        category.key,
+        myRankIndex,
+        myMonthPoints,
+        progress.streak,
+        myMonthMinutes,
+        profile.motivation
+      ),
+    [category.key, myRankIndex, myMonthPoints, progress.streak, myMonthMinutes, profile.motivation]
   );
+  const commCount = communityCount(category.key, leaderboard.length);
 
   if (!goal) {
     return (
@@ -73,6 +90,22 @@ export default function SocialScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      {/* コミュニティ（同じ資格） */}
+      <View style={[styles.commCard, { borderColor: `${category.color}55` }]}>
+        <View style={[styles.commIcon, { backgroundColor: `${category.color}22` }]}>
+          <Ionicons name={category.icon} size={22} color={category.color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.commName}>{category.label} コミュニティ</Text>
+          <View style={styles.commMetaRow}>
+            <Ionicons name="people" size={13} color={colors.textSub} />
+            <Text style={styles.commMeta}>
+              <Text style={[styles.commCount, { color: category.color }]}>{commCount}</Text> 人が挑戦中
+            </Text>
+          </View>
+        </View>
+      </View>
+
       {/* 自分の順位ヒーロー */}
       <LinearGradient
         colors={['#1C232C', '#141920']}
@@ -210,22 +243,26 @@ function RankRow({
 
       <View style={{ flex: 1 }}>
         <Text style={[styles.name, entry.isMe && { fontWeight: '800' }]}>{entry.name}</Text>
-        {/* ランク称号 */}
+        {/* ランク称号 ＋ 勉強時間 */}
         <View style={styles.rankTagRow}>
           <Ionicons name={entry.rank.icon} size={11} color={entry.rank.color} />
           <Text style={[styles.rankTagText, { color: entry.rank.color }]}>{entry.rank.label}</Text>
-          {entry.broken ? (
-            <Text style={styles.brokenText}>・連続0日</Text>
-          ) : (
-            <Text style={styles.streakText}>・連続{entry.streak}日</Text>
-          )}
+          <Ionicons name="time" size={11} color={colors.textMuted} style={{ marginLeft: 4 }} />
+          <Text style={styles.streakText}>{formatMinutesShort(entry.studyMinutes)}</Text>
+          {entry.broken && <Text style={styles.brokenText}>・連続0日</Text>}
         </View>
+        {/* 意気込み */}
+        <Text style={styles.motto} numberOfLines={1}>
+          “{entry.motivation}”
+        </Text>
       </View>
 
-      <Text style={[styles.points, entry.isMe && { color: colors.primary }]}>
-        {entry.points.toLocaleString()}
-      </Text>
-      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      <View style={styles.rightCol}>
+        <Text style={[styles.points, entry.isMe && { color: colors.primary }]}>
+          {entry.points.toLocaleString()}
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </View>
     </Pressable>
   );
 }
@@ -242,6 +279,23 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   emptyText: { fontSize: font.body, color: colors.textSub, textAlign: 'center', lineHeight: 24 },
+
+  commCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+  },
+  commIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  commName: { fontSize: 15, fontWeight: '900', color: colors.text },
+  commMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  commMeta: { fontSize: 12, color: colors.textSub, fontWeight: '600' },
+  commCount: { fontWeight: '900', fontVariant: ['tabular-nums'] },
 
   hero: { borderRadius: 24, borderWidth: 1, borderColor: colors.border, padding: 22 },
   heroLabel: { ...labelStyle, color: colors.textSub, marginBottom: 8 },
@@ -350,6 +404,8 @@ const styles = StyleSheet.create({
   rankTagText: { fontSize: 11, fontWeight: '800' },
   streakText: { fontSize: 11, color: colors.textMuted, fontVariant: ['tabular-nums'] },
   brokenText: { fontSize: 11, color: colors.danger },
+  motto: { fontSize: 11, color: colors.textSub, marginTop: 2 },
+  rightCol: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   points: { fontSize: 16, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
 
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18, marginTop: 18 },

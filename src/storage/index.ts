@@ -6,7 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Goal,
-  RecordMap,
+  MinutesMap,
   PersistedState,
   ReminderSettings,
   LifetimeStats,
@@ -17,7 +17,7 @@ import {
 import { EMPTY_LIFETIME } from '@/logic/summary';
 
 const KEY_GOAL = 'tsuzukeru.goal.v1';
-const KEY_RECORDS = 'tsuzukeru.records.v1';
+const KEY_MINUTES = 'tsuzukeru.minutes.v1';
 const KEY_REMINDER = 'tsuzukeru.reminder.v1';
 const KEY_LIFETIME = 'tsuzukeru.lifetime.v1';
 const KEY_BADGES = 'tsuzukeru.badges.v1';
@@ -35,10 +35,10 @@ export const DEFAULT_PROFILE: Profile = {
 
 export async function loadState(): Promise<PersistedState> {
   try {
-    const [goalRaw, recordsRaw, reminderRaw, lifetimeRaw, badgesRaw, profileRaw, groupRaw] =
+    const [goalRaw, minutesRaw, reminderRaw, lifetimeRaw, badgesRaw, profileRaw, groupRaw] =
       await Promise.all([
         AsyncStorage.getItem(KEY_GOAL),
-        AsyncStorage.getItem(KEY_RECORDS),
+        AsyncStorage.getItem(KEY_MINUTES),
         AsyncStorage.getItem(KEY_REMINDER),
         AsyncStorage.getItem(KEY_LIFETIME),
         AsyncStorage.getItem(KEY_BADGES),
@@ -51,8 +51,9 @@ export async function loadState(): Promise<PersistedState> {
       if (!goal.category) goal.category = 'other';
       if (goal.weeklyTarget == null) goal.weeklyTarget = 3;
       if (goal.startCharge == null) goal.startCharge = 0;
+      if (goal.dailyTargetMin == null) goal.dailyTargetMin = 120;
     }
-    const records: RecordMap = recordsRaw ? JSON.parse(recordsRaw) : {};
+    const minutes: MinutesMap = minutesRaw ? JSON.parse(minutesRaw) : {};
     const reminder: ReminderSettings = reminderRaw
       ? { ...DEFAULT_REMINDER, ...JSON.parse(reminderRaw) }
       : DEFAULT_REMINDER;
@@ -64,12 +65,12 @@ export async function loadState(): Promise<PersistedState> {
       ? { ...DEFAULT_PROFILE, ...JSON.parse(profileRaw) }
       : DEFAULT_PROFILE;
     const group: CustomGroup | null = groupRaw ? JSON.parse(groupRaw) : null;
-    return { goal, records, reminder, lifetime, badges, profile, group };
+    return { goal, minutes, reminder, lifetime, badges, profile, group };
   } catch (e) {
     console.warn('loadState failed', e);
     return {
       goal: null,
-      records: {},
+      minutes: {},
       reminder: DEFAULT_REMINDER,
       lifetime: EMPTY_LIFETIME,
       badges: {},
@@ -84,8 +85,8 @@ export async function saveGoal(goal: Goal | null): Promise<void> {
   else await AsyncStorage.removeItem(KEY_GOAL);
 }
 
-export async function saveRecords(records: RecordMap): Promise<void> {
-  await AsyncStorage.setItem(KEY_RECORDS, JSON.stringify(records));
+export async function saveMinutes(minutes: MinutesMap): Promise<void> {
+  await AsyncStorage.setItem(KEY_MINUTES, JSON.stringify(minutes));
 }
 
 export async function saveReminder(reminder: ReminderSettings): Promise<void> {
@@ -112,7 +113,7 @@ export async function saveGroup(group: CustomGroup | null): Promise<void> {
 export async function clearAll(): Promise<void> {
   await AsyncStorage.multiRemove([
     KEY_GOAL,
-    KEY_RECORDS,
+    KEY_MINUTES,
     KEY_REMINDER,
     KEY_LIFETIME,
     KEY_BADGES,

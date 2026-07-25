@@ -78,14 +78,14 @@ function monthPointsForRank(rankIndex: number, seed: number): number {
 
 /**
  * 同カテゴリの月間ランキング（自分を含む・ポイント降順）。
- * @param myRankIndex 自分の現在ランクのindex（マッチングの中心）
- * @param myMonthPoints 自分の今月ポイント
  */
 export function buildLeaderboard(
   category: GoalCategory,
   myRankIndex: number,
   myMonthPoints: number,
-  myStreak: number
+  myStreak: number,
+  myMonthMinutes: number,
+  myMotivation: string
 ): LeaderboardEntry[] {
   const names = rivalNames(category);
   const minMonthOfRank = monthPointsForRank(0, 0);
@@ -98,6 +98,8 @@ export function buildLeaderboard(
       name,
       points: mp,
       streak: broken ? 0 : (hash('s' + name + todayStr()) % 18) + 1,
+      studyMinutes: mp * 6 + (hash('m' + name) % 120),
+      motivation: MOTIVATIONS[hash(name) % MOTIVATIONS.length],
       rank: RANK_TIERS[ri],
       isMe: false,
       broken,
@@ -108,10 +110,17 @@ export function buildLeaderboard(
     name: 'あなた',
     points: myMonthPoints,
     streak: myStreak,
+    studyMinutes: myMonthMinutes,
+    motivation: myMotivation || '合格まで、続ける。',
     rank: RANK_TIERS[myRankIndex],
     isMe: true,
   };
   return [...rivals, me].sort((a, b) => b.points - a.points);
+}
+
+/** そのコミュニティの挑戦者数（実人数＋ベース143人で「賑わい」を出す・モック） */
+export function communityCount(category: GoalCategory, boardLength: number): number {
+  return boardLength + 143 + (hash('cc' + category) % 60);
 }
 
 /** 先月からの順位変動（モック: 日付から決まる 0〜2） */
@@ -138,6 +147,7 @@ export function buildRivalProfile(category: GoalCategory, id: string): RivalProf
     streak: (hash('s' + id + todayStr()) % 18) + 1,
     bestStreak,
     totalDone,
+    totalMinutes: totalDone * 65 + (h % 400),
     rank: RANK_TIERS[Math.min(RANK_TIERS.length - 1, rankIndex)],
   };
 }

@@ -1,154 +1,160 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { colors, font, spacing, radius } from '@/theme';
-import { formatHM, msUntilEndOfDay } from '@/logic/date';
+import { formatStopwatch, formatMinutes } from '@/logic/time';
 import { WEEKLY_PENALTY } from '@/logic/billing';
-import { POINTS_PER_DONE } from '@/logic/rank';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * レベル1: ボタン+タイマー方式の達成判定画面。
- * 締切に向けたカウントダウン（警告色リング）と課金予告で緊張感を出し、
- * 脈動する達成ボタンで即実行を促す。
+ * 勉強タイマー画面。ストップウォッチで勉強時間を計測し、
+ * 今日の合計が1日の目標時間に届いたら「達成」になる。
  */
 export default function TodayScreen() {
   const router = useRouter();
-  const { goal, progress, weeks, isTodayScheduled, todayStatus, markTodayDone } = useApp();
+  const { goal, progress, weeks, isTodayScheduled, addStudyMinutes } = useApp();
 
-  const [remain, setRemain] = useState(() => msUntilEndOfDay());
-  const [celebrating, setCelebrating] = useState(false);
-  const scale = useRef(new Animated.Value(1)).current;
-  const pop = useRef(new Animated.Value(0)).current;
+  const [running, setRunning] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0); // 現在のセッションの経過秒
+  const startRef = useRef<number>(0);
+  const pulse = useRef(new Animated.Value(1)).current;
 
+  const targetMin = goal?.dailyTargetMin ?? 120;
+  const doneMin = progress.todayMinutes; // 既に記録済みの今日の分
+  const sessionMin = elapsedSec / 60;
+  const totalTodayMin = doneMin + sessionMin;
+  const reached = totalTodayMin >= targetMin;
+  const ratio = targetMin > 0 ? totalTodayMin / targetMin : 0;
+
+  // 1秒ごとに経過を更新
   useEffect(() => {
-    const t = setInterval(() => setRemain(msUntilEndOfDay()), 1000);
+    if (!running) return;
+    const t = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - startRef.current) / 1000));
+    }, 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [running]);
 
-  // 達成ボタンの脈動（1.8s ループ）
+  // 計測中はボタンを脈動
   useEffect(() => {
-    if (todayStatus === 'done') return;
+    if (!running) {
+      pulse.setValue(1);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(scale, {
-          toValue: 1.035,
-          duration: 900,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale, {
-          toValue: 1,
-          duration: 900,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulse, { toValue: 1.04, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [scale, todayStatus]);
+  }, [running]);
 
-  const onAchieve = async () => {
-    await markTodayDone();
-    setCelebrating(true);
-    pop.setValue(0);
-    Animated.spring(pop, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
-    setTimeout(() => router.back(), 1400);
+  const onStart = () => {
+    startRef.current = Date.now() - elapsedSec * 1000;
+    setRunning(true);
   };
 
-  const alreadyDone = todayStatus === 'done';
-  const remainRatio = remain / DAY_MS;
-  // 今週すでに未達があるか（あれば今週の¥100は没収確定済み）
+  const onStop = async () => {
+    setRunning(false);
+    const mins = elapsedSec / 60;
+    if (mins > 0) await addStudyMinutes(mins);
+    setElapsedSec(0);
+  };
+
+  // テスト/手動追加用
+  const quickAdd = async (m: number) => {
+    if (running) return;
+    await addStudyMinutes(m);
+  };
+
   const currentWeek = weeks.find((w) => w.isCurrent);
   const weekAlreadyCharged = (currentWeek?.missed ?? 0) > 0;
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: goal?.name ?? '今日の達成' }} />
+      <Stack.Screen options={{ title: goal?.name ?? '勉強タイマー' }} />
 
-      {/* 課金予告バナー（緊張感） */}
-      {isTodayScheduled && !alreadyDone && !celebrating && (
-        <View style={styles.banner}>
-          <Ionicons name="alert-circle" size={18} color={colors.danger} />
-          <Text style={styles.bannerText}>
-            {weekAlreadyCharged
-              ? `今週は ¥${WEEKLY_PENALTY} 没収確定。連続記録は今日から守れる`
-              : `今日サボると、今週ぶんの ¥${WEEKLY_PENALTY} が積立から没収されます`}
-          </Text>
+      {!isTodayScheduled ? (
+        <View style={styles.center}>
+          <Ionicons name="leaf" size={40} color={colors.textMuted} />
+          <Text style={styles.notSched}>今日は予定日ではありません</Text>
+          <PrimaryButton label="戻る" variant="ghost" onPress={() => router.back()} />
         </View>
-      )}
+      ) : (
+        <>
+          {/* 課金予告 */}
+          {!reached && (
+            <View style={styles.banner}>
+              <Ionicons name="alert-circle" size={18} color={colors.danger} />
+              <Text style={styles.bannerText}>
+                {weekAlreadyCharged
+                  ? `今週は ¥${WEEKLY_PENALTY} 没収確定。記録は今日から立て直せる`
+                  : `目標に届かない日が続くと、今週ぶんの ¥${WEEKLY_PENALTY} が没収されます`}
+              </Text>
+            </View>
+          )}
 
-      {/* カウントダウンリング（主役・警告色） */}
-      <View style={styles.heroArea}>
-        {!isTodayScheduled ? (
-          <View style={styles.notScheduled}>
-            <Ionicons name="leaf" size={40} color={colors.textMuted} />
-            <Text style={styles.notScheduledText}>今日は予定日ではありません</Text>
+          {/* リング＋ストップウォッチ */}
+          <View style={styles.heroArea}>
+            <ProgressRing
+              ratio={ratio}
+              size={260}
+              strokeWidth={12}
+              color={reached ? colors.success : colors.primary}
+            >
+              <Text style={styles.timerLabel}>{running ? '計測中' : '今日の勉強'}</Text>
+              <Text style={styles.timer}>{formatStopwatch(elapsedSec)}</Text>
+              <Text style={styles.todayTotal}>
+                合計 {formatMinutes(totalTodayMin)} / 目標 {formatMinutes(targetMin)}
+              </Text>
+            </ProgressRing>
+
+            {reached && (
+              <View style={styles.doneTag}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                <Text style={styles.doneTagText}>今日の目標を達成！</Text>
+              </View>
+            )}
           </View>
-        ) : alreadyDone || celebrating ? (
-          <Animated.View
-            style={[
-              styles.doneWrap,
-              {
-                transform: [
-                  { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
-                ],
-                opacity: celebrating ? pop : 1,
-              },
-            ]}
-          >
-            <Ionicons name="checkmark-circle" size={72} color={colors.success} />
-            <Text style={styles.doneTitle}>達成！</Text>
-            <Text style={styles.doneSub}>
-              +{POINTS_PER_DONE} pt ・ 連続{progress.streak}日
-            </Text>
-          </Animated.View>
-        ) : (
-          <ProgressRing
-            ratio={remainRatio}
-            size={264}
-            strokeWidth={10}
-            color={colors.warning}
-            track={colors.border}
-          >
-            <Text style={styles.timerLabel}>残り時間</Text>
-            <Text style={styles.timer}>{formatHM(remain)}</Text>
-            <Text style={styles.timerSub}>23:59 まで</Text>
-          </ProgressRing>
-        )}
-      </View>
 
-      {/* 達成ボタン（脈動） */}
-      <View style={styles.bottom}>
-        {isTodayScheduled && !alreadyDone && !celebrating && (
-          <>
-            <Animated.View style={{ transform: [{ scale }], alignSelf: 'stretch' }}>
-              <PrimaryButton
-                label="達成する"
-                icon="checkmark-circle"
-                onPress={onAchieve}
-                style={styles.bigButton}
-              />
+          {/* スタート/ストップ */}
+          <View style={styles.controls}>
+            <Animated.View style={{ transform: [{ scale: pulse }], alignSelf: 'stretch' }}>
+              {running ? (
+                <PrimaryButton label="ストップ（記録する）" icon="stop" onPress={onStop} style={styles.bigBtn} />
+              ) : (
+                <PrimaryButton label="スタート" icon="play" onPress={onStart} style={styles.bigBtn} />
+              )}
             </Animated.View>
-            <Text style={styles.caption}>
-              達成で +{POINTS_PER_DONE} pt ・ 連続{progress.streak + 1}日目へ
-            </Text>
-          </>
-        )}
-        <PrimaryButton label="戻る" variant="ghost" onPress={() => router.back()} />
-      </View>
+
+            {!running && (
+              <View style={styles.quickRow}>
+                <Text style={styles.quickLabel}>手動で追加：</Text>
+                {[15, 30, 60].map((m) => (
+                  <Pressable key={m} style={styles.quickChip} onPress={() => quickAdd(m)}>
+                    <Text style={styles.quickChipText}>+{m}分</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            <PrimaryButton label="戻る" variant="ghost" onPress={() => router.back()} />
+          </View>
+        </>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 22 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  notSched: { fontSize: font.body, color: colors.textSub, fontWeight: '700' },
 
   banner: {
     flexDirection: 'row',
@@ -162,59 +168,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginTop: spacing.md,
   },
-  bannerText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.danger,
-    fontVariant: ['tabular-nums'],
-  },
+  bannerText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.danger },
 
-  heroArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  heroArea: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
   timerLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.8, color: colors.textSub },
   timer: {
-    fontSize: 60,
+    fontSize: 52,
     fontWeight: '800',
     color: colors.text,
-    letterSpacing: -1,
-    lineHeight: 62,
+    letterSpacing: 1,
+    lineHeight: 56,
     marginTop: 4,
     fontVariant: ['tabular-nums'],
   },
-  timerSub: {
-    fontSize: 14,
-    color: colors.textSub,
-    marginTop: 6,
-    fontVariant: ['tabular-nums'],
-  },
-
-  notScheduled: { alignItems: 'center', gap: spacing.md },
-  notScheduledText: { fontSize: font.body, color: colors.textSub, fontWeight: '700' },
-
-  doneWrap: {
+  todayTotal: { fontSize: 13, color: colors.textSub, marginTop: 6, fontWeight: '600' },
+  doneTag: {
+    flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'stretch',
+    gap: 6,
     backgroundColor: colors.successBg,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.xxl,
-    borderWidth: 1,
-    borderColor: colors.success,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
-  doneTitle: { fontSize: font.title, fontWeight: '900', color: colors.success, marginTop: spacing.sm },
-  doneSub: {
-    fontSize: font.sub,
-    color: colors.success,
-    marginTop: 2,
-    fontVariant: ['tabular-nums'],
-  },
+  doneTagText: { fontSize: font.sub, fontWeight: '800', color: colors.success },
 
-  bottom: { paddingBottom: 34, gap: spacing.sm },
-  bigButton: { height: 66 },
-  caption: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: colors.textMuted,
-    marginTop: 4,
-    fontVariant: ['tabular-nums'],
+  controls: { paddingBottom: 34, gap: spacing.md },
+  bigBtn: { height: 64 },
+  quickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  quickLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
+  quickChip: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
   },
+  quickChipText: { fontSize: 12, fontWeight: '800', color: colors.text },
 });

@@ -1,10 +1,7 @@
 /**
  * アプリ全体の状態を保持する Context。
- * 目標・記録・リマインド・通算スタッツ・バッジ・プロフィール・グループを管理する。
- * - シーズン制: 4週間ごとに「シーズン完了」→通算に畳み込んで次へ
- * - 課金(モック): 開始時に月¥500をプール。未達週ごとに¥100没収。
- *   1ヶ月パーフェクトなら翌月無料
- * - 実績バッジ: 条件を満たすと自動解除
+ * 目標・勉強時間(分)・リマインド・通算スタッツ・バッジ・プロフィール・グループを管理する。
+ * 達成判定はストップウォッチで記録した勉強時間ベース（1日の目標時間に届けば達成）。
  */
 
 import React, {
@@ -17,7 +14,7 @@ import React, {
 } from 'react';
 import {
   Goal,
-  RecordMap,
+  MinutesMap,
   ReminderSettings,
   LifetimeStats,
   BadgeMap,
@@ -28,7 +25,7 @@ import {
 import {
   loadState,
   saveGoal,
-  saveRecords,
+  saveMinutes,
   saveReminder,
   saveLifetime,
   saveBadges,
@@ -37,7 +34,7 @@ import {
   clearAll,
   DEFAULT_PROFILE,
 } from '@/storage';
-import { applyAutoMiss, isScheduledDay } from '@/logic/schedule';
+import { isScheduledDay, statusOf } from '@/logic/schedule';
 import { todayStr } from '@/logic/date';
 import {
   buildProgress,
@@ -53,7 +50,7 @@ import { BADGES, satisfiedBadgeKeys } from '@/logic/badges';
 interface AppContextValue {
   ready: boolean;
   goal: Goal | null;
-  records: RecordMap;
+  minutes: MinutesMap;
   reminder: ReminderSettings;
   lifetime: LifetimeStats;
   profile: Profile;
@@ -63,14 +60,14 @@ interface AppContextValue {
   seasonResult: ReturnType<typeof buildSeasonResult>;
   seasonNumber: number;
   seasonComplete: boolean;
-  /** 次に目標開始したときに課金される額（0=無料月） */
   nextStartCharge: number;
   isTodayScheduled: boolean;
   todayStatus: 'done' | 'missed' | 'pending';
   badges: BadgeView[];
   unlockedBadgeCount: number;
   createGoal: (input: NewGoalInput) => Promise<void>;
-  markTodayDone: () => Promise<void>;
+  /** 勉強時間（分）を今日に加算 */
+  addStudyMinutes: (min: number) => Promise<void>;
   startNextSeason: () => Promise<void>;
   updateReminder: (settings: ReminderSettings) => Promise<boolean>;
   updateProfile: (p: Profile) => Promise<void>;
@@ -84,6 +81,7 @@ export interface NewGoalInput {
   frequency: Goal['frequency'];
   weekdays: number[];
   weeklyTarget: number;
+  dailyTargetMin: number;
   durationWeeks: number;
 }
 
@@ -92,7 +90,7 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [goal, setGoal] = useState<Goal | null>(null);
-  const [records, setRecords] = useState<RecordMap>({});
+  const [minutes, setMinutes] = useState<MinutesMap>({});
   const [reminder, setReminder] = useState<ReminderSettings>({ enabled: false, hour: 20, minute: 0 });
   const [lifetime, setLifetime] = useState<LifetimeStats>(EMPTY_LIFETIME);
   const [badgesMap, setBadgesMap] = useState<BadgeMap>({});
@@ -102,22 +100,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       const state = await loadState();
-      const corrected = applyAutoMiss(state.goal, state.records);
       setGoal(state.goal);
-      setRecords(corrected);
+      setMinutes(state.minutes);
       setReminder(state.reminder);
       setLifetime(state.lifetime);
       setBadgesMap(state.badges);
       setProfile(state.profile);
       setGroupState(state.group);
-      if (state.goal) await saveRecords(corrected);
       setReady(true);
     })();
   }, []);
 
-  const progress = useMemo(() => buildProgress(goal, records, lifetime), [goal, records, lifetime]);
-  const weeks = useMemo(() => buildWeeks(goal, records), [goal, records]);
-  const seasonResult = useMemo(() => buildSeasonResult(goal, records), [goal, records]);
+  const progress = useMemo(() => buildProgress(goal, minutes, lifetime), [goal, minutes, lifetime]);
+  const weeks = useMemo(() => buildWeeks(goal, minutes), [goal, minutes]);
+  const seasonResult = useMemo(() => buildSeasonResult(goal, minutes), [goal, minutes]);
   const seasonComplete = useMemo(() => isSeasonComplete(goal), [goal]);
 
   // バッジの自動解除
@@ -142,23 +138,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveBadges(next);
   }, [ready, progress, seasonResult, lifetime, badgesMap]);
 
-  /** 完了シーズンを通算へ畳み込む（nextSeasonFree はそのシーズンのパーフェクトで決まる） */
   const foldSeasonIntoLifetime = useCallback((): LifetimeStats => {
-    const r = buildSeasonResult(goal, records);
+    const r = buildSeasonResult(goal, minutes);
     return {
       totalDone: lifetime.totalDone + r.done,
       bestStreak: Math.max(lifetime.bestStreak, progress.bestStreak),
       seasonsCompleted: lifetime.seasonsCompleted + 1,
       perfectSeasons: lifetime.perfectSeasons + (r.allPerfect ? 1 : 0),
+      totalMinutes: lifetime.totalMinutes + r.minutes,
       totalCharged: lifetime.totalCharged + r.charged,
       totalPaid: lifetime.totalPaid,
       nextSeasonFree: r.allPerfect,
     };
-  }, [goal, records, lifetime, progress.bestStreak]);
+  }, [goal, minutes, lifetime, progress.bestStreak]);
 
-  /** 次シーズン開始時の課金額（0=無料月） */
   const nextStartCharge = useMemo(() => {
-    // 完了済みシーズンがパーフェクトなら、それを畳み込めば無料になる
     if (goal && isSeasonComplete(goal) && seasonResult.allPerfect) return 0;
     return lifetime.nextSeasonFree ? 0 : MONTHLY_STAKE;
   }, [goal, seasonResult.allPerfect, lifetime.nextSeasonFree]);
@@ -171,6 +165,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       frequency: input.frequency,
       weekdays: input.weekdays,
       weeklyTarget: input.weeklyTarget,
+      dailyTargetMin: input.dailyTargetMin,
       stakeAmount: MONTHLY_STAKE,
       startCharge,
       startDate: todayStr(),
@@ -179,27 +174,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  /** 課金を適用: プール開始時に月¥500を支払う（無料月なら0）。lifetimeを返す */
-  const applyStartCharge = useCallback((base: LifetimeStats): { lifetime: LifetimeStats; charge: number } => {
-    const free = base.nextSeasonFree;
-    const charge = free ? 0 : MONTHLY_STAKE;
-    return {
-      charge,
-      lifetime: { ...base, totalPaid: base.totalPaid + charge, nextSeasonFree: false },
-    };
-  }, []);
+  const applyStartCharge = useCallback(
+    (base: LifetimeStats): { lifetime: LifetimeStats; charge: number } => {
+      const charge = base.nextSeasonFree ? 0 : MONTHLY_STAKE;
+      return {
+        charge,
+        lifetime: { ...base, totalPaid: base.totalPaid + charge, nextSeasonFree: false },
+      };
+    },
+    []
+  );
 
   const createGoal = useCallback(
     async (input: NewGoalInput) => {
-      // 完了済みシーズンから作り直す場合は畳み込んでから
       let base = lifetime;
       if (goal && isSeasonComplete(goal)) base = foldSeasonIntoLifetime();
       const { lifetime: charged, charge } = applyStartCharge(base);
       const newGoal = makeGoal(input, charge);
       setLifetime(charged);
       setGoal(newGoal);
-      setRecords({});
-      await Promise.all([saveLifetime(charged), saveGoal(newGoal), saveRecords({})]);
+      setMinutes({});
+      await Promise.all([saveLifetime(charged), saveGoal(newGoal), saveMinutes({})]);
       if (reminder.enabled) {
         await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
       }
@@ -220,29 +215,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setLifetime(charged);
     setGoal(newGoal);
-    setRecords({});
-    await Promise.all([saveLifetime(charged), saveGoal(newGoal), saveRecords({})]);
+    setMinutes({});
+    await Promise.all([saveLifetime(charged), saveGoal(newGoal), saveMinutes({})]);
     if (reminder.enabled) {
       await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
     }
   }, [goal, foldSeasonIntoLifetime, applyStartCharge, reminder]);
 
-  const markTodayDone = useCallback(async () => {
-    if (!goal) return;
+  const addStudyMinutes = useCallback(async (min: number) => {
+    if (min <= 0) return;
     const today = todayStr();
-    if (!isScheduledDay(goal, today)) return;
-    setRecords((prev) => {
-      if (prev[today] === 'done') return prev;
-      const next = { ...prev, [today]: 'done' as const };
-      saveRecords(next);
+    setMinutes((prev) => {
+      const next = { ...prev, [today]: Math.round((prev[today] ?? 0) + min) };
+      saveMinutes(next);
       return next;
     });
-  }, [goal]);
+  }, []);
 
   const updateReminder = useCallback(
     async (settings: ReminderSettings): Promise<boolean> => {
       if (settings.enabled) {
-        const ok = await scheduleDailyReminder(settings.hour, settings.minute, goal?.name ?? '今日の習慣');
+        const ok = await scheduleDailyReminder(settings.hour, settings.minute, goal?.name ?? '今日の勉強');
         if (!ok) {
           const off = { ...settings, enabled: false };
           setReminder(off);
@@ -271,7 +264,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const resetAll = useCallback(async () => {
     setGoal(null);
-    setRecords({});
+    setMinutes({});
     setReminder({ enabled: false, hour: 20, minute: 0 });
     setLifetime(EMPTY_LIFETIME);
     setBadgesMap({});
@@ -286,9 +279,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [goal]
   );
   const todayStatus = useMemo<'done' | 'missed' | 'pending'>(() => {
-    const st = records[todayStr()];
-    return st === 'done' ? 'done' : st === 'missed' ? 'missed' : 'pending';
-  }, [records]);
+    if (!goal) return 'pending';
+    const st = statusOf(goal, minutes, todayStr());
+    return st;
+  }, [goal, minutes]);
 
   const badges = useMemo<BadgeView[]>(() => {
     const today = todayStr();
@@ -308,7 +302,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value: AppContextValue = {
     ready,
     goal,
-    records,
+    minutes,
     reminder,
     lifetime,
     profile,
@@ -324,7 +318,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     badges,
     unlockedBadgeCount,
     createGoal,
-    markTodayDone,
+    addStudyMinutes,
     startNextSeason,
     updateReminder,
     updateProfile,
