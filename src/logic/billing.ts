@@ -1,19 +1,15 @@
 /**
- * 課金（モック）の計算。
- * 実際の決済・カード登録は一切行わない。金額は表示用のダミー。
- * 「未達1回 = 1日ぶんの積立が課金される」という非対称ルールをモックで表現する。
+ * 課金（モック）のルール。実際の決済・カード登録は一切行わない。表示用のダミー。
+ *
+ * モデル（月額サブスク・プール制）:
+ *  - 目標を「この目標で始める」で開始した時に、月額 ¥500 を前払いでプール（預かり）する
+ *  - その週に未達があると、その週ぶんの ¥100 がプールから没収される（返らない＝痛み）
+ *  - 1ヶ月（4週）を完全達成（未達ゼロ）すると、次の月は無料（¥500がかからない）
+ *    → 「全部うまくいくと得する（次が無料）」という報酬設計
  */
 
-import { Goal } from '@/types';
-import { scheduledDates } from './schedule';
+/** 月額サブスク（1シーズン=1ヶ月ぶん） */
+export const MONTHLY_STAKE = 500;
 
-/** 予定日1日あたりの積立額（= 月額積立 / 予定日数） */
-export function dailyStake(goal: Goal): number {
-  const days = scheduledDates(goal).length || 1;
-  return goal.stakeAmount / days;
-}
-
-/** 未達日数に対する課金額（モック） */
-export function chargeForMisses(goal: Goal, missedCount: number): number {
-  return Math.round(dailyStake(goal) * missedCount);
-}
+/** 未達があった週ごとの没収額 */
+export const WEEKLY_PENALTY = 100;

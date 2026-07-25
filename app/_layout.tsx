@@ -13,13 +13,13 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: colors.bg },
             headerShadowVisible: false,
             headerTintColor: colors.text,
-            headerTitleStyle: { fontWeight: '800' },
+            headerTitleStyle: { fontWeight: '800', color: colors.text },
             contentStyle: { backgroundColor: colors.bg },
           }}
         >
@@ -31,6 +31,19 @@ export default function RootLayout() {
           <Stack.Screen
             name="today"
             options={{ title: '今日の達成', presentation: 'card' }}
+          />
+          <Stack.Screen
+            name="profile-edit"
+            options={{ title: 'プロフィール編集', presentation: 'modal' }}
+          />
+          <Stack.Screen name="rival/[id]" options={{ title: 'プロフィール' }} />
+          <Stack.Screen
+            name="ignite"
+            options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="share-card"
+            options={{ title: '成果カード', presentation: 'modal' }}
           />
         </Stack>
       </AppProvider>

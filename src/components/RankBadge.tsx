@@ -1,15 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { RankTier } from '@/types';
 import { colors, font, radius, spacing } from '@/theme';
 
-/** ランク（称号）を絵文字つきで表示するバッジ。 */
+/** ランク（称号）をベクターアイコンつきで表示するバッジ。 */
 export function RankBadge({ rank, size = 'md' }: { rank: RankTier; size?: 'sm' | 'md' | 'lg' }) {
-  const emojiSize = size === 'lg' ? 44 : size === 'sm' ? 20 : 28;
+  const iconSize = size === 'lg' ? 34 : size === 'sm' ? 16 : 22;
   const labelSize = size === 'lg' ? font.heading : size === 'sm' ? font.small : font.body;
   return (
     <View style={[styles.badge, { borderColor: rank.color }]}>
-      <Text style={{ fontSize: emojiSize }}>{rank.emoji}</Text>
+      <Ionicons name={rank.icon} size={iconSize} color={rank.color} />
       <Text style={[styles.label, { fontSize: labelSize, color: rank.color }]}>
         {rank.label}
       </Text>
@@ -26,7 +27,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radius.full,
     borderWidth: 2,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
     alignSelf: 'flex-start',
   },
   label: { fontWeight: '800' },

@@ -1,16 +1,34 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Pressable,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { confirmAsync } from '@/logic/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { ProgressBar } from '@/components/ProgressBar';
-import { StatTile } from '@/components/StatTile';
-import { RankBadge } from '@/components/RankBadge';
+import { ProgressRing } from '@/components/ProgressRing';
 import { AchievementGrid } from '@/components/AchievementGrid';
-import { colors, font, spacing } from '@/theme';
-import { formatDisplay, todayStr } from '@/logic/date';
+import { colors, font, labelStyle, radius, spacing } from '@/theme';
+import { categoryOf } from '@/logic/category';
+import { frequencyLabel } from '@/logic/schedule';
+import { formatHM, msUntilEndOfDay } from '@/logic/date';
+import { IconName } from '@/types';
+
+/** 時間帯に合わせた挨拶 */
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 11) return 'おはよう';
+  if (h >= 11 && h < 18) return 'こんにちは';
+  return 'こんばんは';
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -20,6 +38,10 @@ export default function HomeScreen() {
     records,
     progress,
     weeks,
+    seasonResult,
+    seasonNumber,
+    seasonComplete,
+    startNextSeason,
     isTodayScheduled,
     todayStatus,
   } = useApp();
@@ -32,20 +54,23 @@ export default function HomeScreen() {
     );
   }
 
-  // 目標が未設定 → 設定を促す
+  // 目標が未設定 → 消灯したリング＋点灯予告
   if (!goal) {
     return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyEmoji}>🔥</Text>
-          <Text style={styles.emptyTitle}>続ける第一歩</Text>
+          <ProgressRing ratio={0} size={150} strokeWidth={16} glow={false}>
+            <Ionicons name="flame" size={44} color={colors.primary} />
+          </ProgressRing>
+          <Text style={styles.emptyTitle}>心を燃やせ。</Text>
           <Text style={styles.emptyText}>
-            まずは目標を設定しましょう。{'\n'}
-            サボると痛み、続けると報酬。{'\n'}
-            仕組みで習慣を変えます。
+            合格は、毎日机に向かった者に訪れる。{'\n'}
+            意志じゃない、仕組みで続ける。{'\n'}
+            さあ、最初の火をつけよう。
           </Text>
           <PrimaryButton
-            label="目標を設定する"
+            label="勉強を始める"
+            icon="flame"
             onPress={() => router.push('/goal-setup')}
             style={{ marginTop: spacing.xl, alignSelf: 'stretch' }}
           />
@@ -54,132 +79,257 @@ export default function HomeScreen() {
     );
   }
 
+  const category = categoryOf(goal.category);
+
+  // ─────────── シーズン完了 ───────────
+  if (seasonComplete) {
+    const donePct =
+      seasonResult.scheduled > 0
+        ? Math.round((seasonResult.done / seasonResult.scheduled) * 100)
+        : 0;
+
+    const nextFree = seasonResult.allPerfect;
+    const onNext = async () => {
+      const ok = await confirmAsync(
+        '次のシーズンを始める',
+        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\n${
+          nextFree ? '今月パーフェクト達成！次の月は無料です。' : '次の月も月額¥500の積立です（モック）。'
+        }`,
+        '始める'
+      );
+      if (ok) startNextSeason();
+    };
+
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.completeHeadRow}>
+            <View>
+              <Text style={styles.sectionLabel}>シーズン {seasonNumber} 完了</Text>
+              <Text style={styles.completeTitle}>4週間、走りきった。</Text>
+            </View>
+            <View style={styles.completeTrophy}>
+              <Ionicons name="trophy" size={26} color={colors.primary} />
+            </View>
+          </View>
+
+          {/* 成績サマリー */}
+          <Card style={styles.heroCard}>
+            <View style={styles.completeRingRow}>
+              <ProgressRing
+                ratio={seasonResult.scheduled ? seasonResult.done / seasonResult.scheduled : 0}
+                size={132}
+              >
+                <View style={styles.ringCenterRow}>
+                  <Text style={styles.ringPct}>{donePct}</Text>
+                  <Text style={styles.ringPctUnit}>%</Text>
+                </View>
+                <Text style={styles.ringCount}>
+                  {seasonResult.done} / {seasonResult.scheduled} 達成
+                </Text>
+              </ProgressRing>
+              <View style={styles.chipCol}>
+                <StatChip
+                  icon="checkmark-done-circle"
+                  accent={colors.primary}
+                  label="完全達成の週"
+                  value={`${seasonResult.perfectWeeks}`}
+                  unit="/ 4"
+                />
+                {nextFree ? (
+                  <StatChip icon="gift" accent={colors.success} label="ごほうび" value="翌月無料" />
+                ) : (
+                  <StatChip
+                    icon="wallet"
+                    accent={colors.warning}
+                    label="積立の残り"
+                    value={`¥${seasonResult.poolRemaining.toLocaleString()}`}
+                  />
+                )}
+              </View>
+            </View>
+          </Card>
+
+          {/* 積み上がりの最終盤面 */}
+          <Card style={styles.gridCard}>
+            <Text style={styles.sectionLabel}>このシーズンの積み上がり</Text>
+            <View style={{ height: spacing.md }} />
+            <AchievementGrid goal={goal} records={records} />
+          </Card>
+
+          <PrimaryButton
+            label="次のシーズンを始める"
+            icon="refresh"
+            onPress={onNext}
+            style={{ marginTop: spacing.xs }}
+          />
+          <PrimaryButton
+            label="目標を変えて始める"
+            variant="secondary"
+            onPress={() => router.push('/goal-setup')}
+          />
+          <View style={{ height: spacing.xl }} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ─────────── 通常（シーズン進行中） ───────────
   const currentWeek = weeks.find((w) => w.isCurrent) ?? weeks[0];
-  const weekRatio = currentWeek.scheduled
-    ? currentWeek.done / currentWeek.scheduled
-    : 0;
+  const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
+  const weekPct = Math.round(weekRatio * 100);
+  const remainHM = formatHM(msUntilEndOfDay());
 
   return (
-    <ScrollView
-      style={styles.safe}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* 今日やること */}
-      <Card>
-        <Text style={styles.sectionLabel}>今日やること</Text>
-        <Text style={styles.goalName}>{goal.name}</Text>
-        <Text style={styles.dateText}>{formatDisplay(todayStr())}</Text>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* 挨拶ヘッダー */}
+        <View style={styles.greetRow}>
+          <View>
+            <Text style={styles.greetSub}>
+              {greeting()} ・ シーズン {seasonNumber}
+            </Text>
+            <Text style={styles.greetMain}>今日の1歩、行こう。</Text>
+          </View>
+          <Pressable style={styles.bell} onPress={() => router.push('/settings')}>
+            <Ionicons name="notifications-outline" size={20} color={colors.textSub} />
+          </Pressable>
+        </View>
 
-        {!isTodayScheduled ? (
-          <View style={[styles.statusPill, { backgroundColor: colors.surfaceAlt }]}>
-            <Text style={[styles.statusText, { color: colors.textSub }]}>
-              今日は予定日ではありません 🌿
+        {/* 進捗リングヒーロー（主役） */}
+        <Card style={styles.heroCard}>
+          <Text style={styles.sectionLabel}>今週の進捗</Text>
+          <View style={styles.heroRow}>
+            <ProgressRing ratio={weekRatio} size={150} strokeWidth={16}>
+              <View style={styles.ringCenterRow}>
+                <Text style={styles.ringPct}>{weekPct}</Text>
+                <Text style={styles.ringPctUnit}>%</Text>
+              </View>
+              <Text style={styles.ringCount}>
+                {currentWeek.done} / {currentWeek.scheduled} 日
+              </Text>
+            </ProgressRing>
+
+            <View style={styles.chipCol}>
+              <StatChip icon="flame" accent={colors.orange} label="連続" value={progress.streak} unit="日" />
+              <StatChip
+                icon="diamond"
+                accent={colors.purple}
+                label="ポイント"
+                value={progress.points.toLocaleString()}
+              />
+            </View>
+          </View>
+        </Card>
+
+        {/* 今日の習慣 */}
+        <Card style={styles.todayCard}>
+          <View style={styles.todayRow}>
+            <View style={styles.todayIcon}>
+              <Ionicons name={category.icon} size={22} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.todayName}>{goal.name}</Text>
+              <Text style={styles.todayMeta}>
+                {frequencyLabel(goal)} ・ 残り {remainHM}
+              </Text>
+            </View>
+          </View>
+
+          {!isTodayScheduled ? (
+            <View style={[styles.pill, { backgroundColor: colors.surfaceAlt }]}>
+              <Ionicons name="leaf" size={16} color={colors.textSub} />
+              <Text style={[styles.pillText, { color: colors.textSub }]}>
+                今日は予定日ではありません
+              </Text>
+            </View>
+          ) : todayStatus === 'done' ? (
+            <View style={[styles.pill, { backgroundColor: colors.successBg }]}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={[styles.pillText, { color: colors.success }]}>
+                今日は達成済み！お見事です
+              </Text>
+            </View>
+          ) : (
+            <PrimaryButton
+              label="達成する"
+              icon="checkmark-circle"
+              onPress={() => router.push('/today')}
+              style={{ marginTop: spacing.md, height: 52 }}
+            />
+          )}
+        </Card>
+
+        {/* 達成グリッド（ヒートマップ） */}
+        <Card style={styles.gridCard}>
+          <View style={styles.gridHead}>
+            <Text style={styles.sectionLabel}>この1ヶ月の積み上がり</Text>
+            <Text style={styles.gridCount}>
+              {progress.doneCount} / {progress.scheduledCount} 達成
             </Text>
           </View>
-        ) : todayStatus === 'done' ? (
-          <View style={[styles.statusPill, { backgroundColor: colors.successBg }]}>
-            <Text style={[styles.statusText, { color: colors.success }]}>
-              今日は達成済み！お見事です 🎉
-            </Text>
+          <AchievementGrid goal={goal} records={records} />
+          <View style={styles.legend}>
+            <View style={styles.legendItem}>
+              <View style={styles.heatRow}>
+                <View style={[styles.legendDot, { backgroundColor: colors.heat1 }]} />
+                <View style={[styles.legendDot, { backgroundColor: colors.heat2 }]} />
+                <View style={[styles.legendDot, { backgroundColor: colors.heat3 }]} />
+              </View>
+              <Text style={styles.legendText}>連続するほど濃く</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: colors.gridMiss }]} />
+              <Text style={styles.legendText}>未達</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: colors.gridEmpty }]} />
+              <Text style={styles.legendText}>これから</Text>
+            </View>
           </View>
-        ) : (
-          <PrimaryButton
-            label="達成する（タイマー画面へ）"
-            onPress={() => router.push('/today')}
-            style={{ marginTop: spacing.md }}
-          />
-        )}
-      </Card>
+        </Card>
 
-      {/* 数値サマリー */}
-      <View style={styles.tileRow}>
-        <StatTile value={progress.streak} label="連続達成" emoji="🔥" />
-        <View style={{ width: spacing.md }} />
-        <StatTile
-          value={progress.points}
-          label="ポイント"
-          emoji="⭐"
-          accent={colors.warning}
-        />
-      </View>
-
-      {/* 今週の進捗 */}
-      <Card>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionLabel}>今週の進捗（{currentWeek.label}）</Text>
-          <Text style={styles.weekCount}>
-            {currentWeek.done}/{currentWeek.scheduled}
-          </Text>
-        </View>
-        <View style={{ height: spacing.sm }} />
-        <ProgressBar ratio={weekRatio} height={14} />
-      </Card>
-
-      {/* 現在のランク */}
-      <Card>
-        <Text style={styles.sectionLabel}>現在のランク</Text>
-        <View style={{ height: spacing.sm }} />
-        <RankBadge rank={progress.rank} size="lg" />
-        {progress.nextRank ? (
-          <Text style={styles.nextRankText}>
-            次の {progress.nextRank.emoji}
-            {progress.nextRank.label} まであと {progress.pointsToNext}pt
-          </Text>
-        ) : (
-          <Text style={styles.nextRankText}>最高ランクに到達！🏆</Text>
-        )}
-      </Card>
-
-      {/* 積み上がりの可視化 */}
-      <Card>
-        <Text style={styles.sectionLabel}>この1ヶ月の積み上がり</Text>
-        <View style={{ height: spacing.md }} />
-        <AchievementGrid goal={goal} records={records} />
-        <View style={styles.legend}>
-          <Legend color={colors.primary} label="達成" />
-          <Legend color={colors.dangerBg} label="未達" textColor={colors.danger} />
-          <Legend color={colors.surfaceAlt} label="これから" />
-        </View>
-      </Card>
-
-      <View style={{ height: spacing.xl }} />
-    </ScrollView>
+        <View style={{ height: spacing.xl }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-function Legend({
-  color,
+/** リング右の縦チップ */
+function StatChip({
+  icon,
+  accent,
   label,
-  textColor,
+  value,
+  unit,
 }: {
-  color: string;
+  icon: IconName;
+  accent: string;
   label: string;
-  textColor?: string;
+  value: string | number;
+  unit?: string;
 }) {
   return (
-    <View style={styles.legendItem}>
-      <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <Text style={[styles.legendText, textColor ? { color: textColor } : null]}>
-        {label}
-      </Text>
+    <View style={styles.chip}>
+      <View style={styles.chipHead}>
+        <Ionicons name={icon} size={14} color={accent} />
+        <Text style={[styles.chipLabel, { color: accent }]}>{label}</Text>
+      </View>
+      <View style={styles.chipValueRow}>
+        <Text style={styles.chipValue}>{value}</Text>
+        {unit ? <Text style={styles.chipUnit}> {unit}</Text> : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, gap: spacing.lg },
+  content: { paddingHorizontal: 22, paddingTop: spacing.sm, gap: spacing.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
-  emptyWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  emptyEmoji: { fontSize: 64, marginBottom: spacing.lg },
-  emptyTitle: { fontSize: font.title, fontWeight: '800', color: colors.text },
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.xl },
   emptyText: {
     fontSize: font.body,
     color: colors.textSub,
@@ -188,44 +338,118 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  sectionLabel: { fontSize: font.sub, fontWeight: '700', color: colors.textSub },
-  goalName: {
-    fontSize: font.heading,
+  greetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  greetSub: { fontSize: 14, color: colors.textSub },
+  greetMain: { fontSize: 19, fontWeight: '700', color: colors.text, marginTop: 2 },
+  bell: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // シーズン完了
+  completeHeadRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  completeTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: 4 },
+  completeTrophy: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    backgroundColor: 'rgba(198,244,50,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completeRingRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: spacing.sm },
+
+  sectionLabel: { ...labelStyle },
+
+  heroCard: { borderRadius: radius.xl, padding: 22 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: spacing.md },
+  ringCenterRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  ringPct: {
+    fontSize: 46,
     fontWeight: '800',
     color: colors.text,
-    marginTop: spacing.xs,
+    lineHeight: 48,
+    letterSpacing: -1,
+    fontVariant: ['tabular-nums'],
   },
-  dateText: { fontSize: font.sub, color: colors.textMuted, marginTop: 2 },
-
-  statusPill: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  statusText: { fontSize: font.body, fontWeight: '700' },
-
-  tileRow: { flexDirection: 'row' },
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  weekCount: { fontSize: font.body, fontWeight: '800', color: colors.primary },
-
-  nextRankText: {
-    marginTop: spacing.md,
-    fontSize: font.sub,
+  ringPctUnit: { fontSize: 20, fontWeight: '700', color: colors.textSub, marginTop: 6 },
+  ringCount: {
+    fontSize: 13,
     color: colors.textSub,
     fontWeight: '600',
+    marginTop: 3,
+    fontVariant: ['tabular-nums'],
   },
 
-  legend: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    marginTop: spacing.lg,
+  chipCol: { flex: 1, gap: 12 },
+  chip: { backgroundColor: colors.surfaceAlt, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14 },
+  chipHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  chipLabel: { fontSize: 12, fontWeight: '600' },
+  chipValueRow: { flexDirection: 'row', alignItems: 'baseline' },
+  chipValue: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.text,
+    lineHeight: 28,
+    fontVariant: ['tabular-nums'],
   },
+  chipUnit: { fontSize: 13, color: colors.textSub, fontWeight: '600' },
+
+  todayCard: { borderRadius: radius.xl, padding: 18 },
+  todayRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  todayIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todayName: { fontSize: 16, fontWeight: '700', color: colors.text },
+  todayMeta: {
+    fontSize: 12,
+    color: colors.textSub,
+    marginTop: 1,
+    fontVariant: ['tabular-nums'],
+  },
+
+  pill: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  pillText: { fontSize: font.sub, fontWeight: '700' },
+
+  gridCard: { borderRadius: radius.xl, padding: 18 },
+  gridHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: spacing.md,
+  },
+  gridCount: { fontSize: 12, color: colors.textSub, fontWeight: '600', fontVariant: ['tabular-nums'] },
+
+  legend: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.lg, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 14, height: 14, borderRadius: 4 },
-  legendText: { fontSize: font.small, color: colors.textSub },
+  heatRow: { flexDirection: 'row', gap: 3 },
+  legendDot: { width: 12, height: 12, borderRadius: 3 },
+  legendText: { fontSize: font.small, color: colors.textSub, fontWeight: '600' },
 });

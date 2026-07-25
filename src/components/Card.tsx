@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { colors, radius, spacing, shadow } from '@/theme';
 
-/** 白い角丸カード。画面のセクション区切りに使う。 */
+/** 暗い面の角丸カード。画面のセクション区切りに使う。 */
 export function Card({
   children,
   style,

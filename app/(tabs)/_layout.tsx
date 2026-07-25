@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 
-/** 下部タブ: ホーム / 週次 / ランク / 設定 */
+/** 下部タブ: ホーム / 週次 / 仲間 / ランク / 設定 */
 export default function TabsLayout() {
   return (
     <Tabs
@@ -11,25 +11,26 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: colors.bg },
         headerShadowVisible: false,
         headerTitleStyle: { fontWeight: '800', color: colors.text },
+        headerTintColor: colors.text,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: 'rgba(10,13,18,0.96)',
           borderTopColor: colors.border,
-          height: 62,
-          paddingBottom: 8,
-          paddingTop: 6,
+          height: 68,
+          paddingBottom: 10,
+          paddingTop: 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'ホーム',
-          headerTitle: '継続 つづける',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flame" size={size} color={color} />
+          headerShown: false,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
           ),
         }}
       />
@@ -37,9 +38,19 @@ export default function TabsLayout() {
         name="weekly"
         options={{
           title: '週次',
-          headerTitle: '週次チェックポイント',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar" size={size} color={color} />
+          headerTitle: '週次レポート',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="social"
+        options={{
+          title: '仲間',
+          headerTitle: '仲間',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'people' : 'people-outline'} size={size} color={color} />
           ),
         }}
       />
@@ -48,8 +59,8 @@ export default function TabsLayout() {
         options={{
           title: 'ランク',
           headerTitle: 'ランク / ポイント',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trophy" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'trophy' : 'trophy-outline'} size={size} color={color} />
           ),
         }}
       />
@@ -58,8 +69,12 @@ export default function TabsLayout() {
         options={{
           title: '設定',
           headerTitle: '設定',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-sharp" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'settings-sharp' : 'settings-outline'}
+              size={size}
+              color={color}
+            />
           ),
         }}
       />

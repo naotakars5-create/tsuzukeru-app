@@ -1,20 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
-import { colors, radius } from '@/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients } from '@/theme';
 
 /**
  * 進捗バー。値が変わると滑らかに伸びて「積み上がる」気持ちよさを演出。
- * ratio は 0..1。
+ * ratio は 0..1。塗りは炎のグラデーション。
  */
 export function ProgressBar({
   ratio,
-  height = 12,
-  color = colors.primary,
-  track = colors.track,
+  height = 10,
+  solidColor,
+  track = colors.surfaceAlt,
 }: {
   ratio: number;
   height?: number;
-  color?: string;
+  /** 指定すると単色。未指定なら炎グラデ */
+  solidColor?: string;
   track?: string;
 }) {
   const clamped = Math.max(0, Math.min(1, ratio));
@@ -35,9 +37,18 @@ export function ProgressBar({
 
   return (
     <View style={[styles.track, { height, backgroundColor: track, borderRadius: height }]}>
-      <Animated.View
-        style={[styles.fill, { width, backgroundColor: color, borderRadius: height }]}
-      />
+      <Animated.View style={[styles.fill, { width, borderRadius: height }]}>
+        {solidColor ? (
+          <View style={[styles.solid, { backgroundColor: solidColor, borderRadius: height }]} />
+        ) : (
+          <LinearGradient
+            colors={gradients.flameSoft}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.solid, { borderRadius: height }]}
+          />
+        )}
+      </Animated.View>
     </View>
   );
 }
@@ -45,4 +56,5 @@ export function ProgressBar({
 const styles = StyleSheet.create({
   track: { width: '100%', overflow: 'hidden' },
   fill: { height: '100%' },
+  solid: { flex: 1 },
 });
