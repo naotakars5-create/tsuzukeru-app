@@ -8,6 +8,7 @@ import { colors, font, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import { buildLeaderboard, rankIndexOf } from '@/logic/social';
 import { POINTS_PER_DONE } from '@/logic/rank';
+import { formatMinutes, formatMinutesShort } from '@/logic/time';
 import { notifyAsync } from '@/logic/confirm';
 
 const APP_URL = 'https://tsuzukeru-app.expo.app';
@@ -24,17 +25,19 @@ export default function ShareCardScreen() {
       category.key,
       myRankIndex,
       seasonResult.done * POINTS_PER_DONE,
-      progress.streak
+      progress.streak,
+      seasonResult.minutes,
+      profile.motivation
     );
     const pos = board.findIndex((e) => e.isMe) + 1;
     return Math.max(1, Math.round((pos / board.length) * 100));
-  }, [category.key, progress.points, progress.streak, seasonResult.done]);
+  }, [category.key, progress.points, progress.streak, seasonResult.done, seasonResult.minutes, profile.motivation]);
 
   const onShare = async () => {
     const message =
       `【継続】${category.label}を勉強中！\n` +
-      `🔥 ${progress.streak}日連続 ・ ${progress.rank.label} ・ ${category.label}で上位${topPct}%\n` +
-      `通算${progress.totalDone}回達成。サボると課金、続けると報酬で継続する勉強アプリ。\n` +
+      `🔥 ${progress.streak}日連続 ・ 総勉強 ${formatMinutes(progress.totalMinutes)} ・ ${category.label}で上位${topPct}%\n` +
+      `サボると課金、続けると報酬で継続する勉強アプリ。\n` +
       `#継続 #${category.label} #勉強垢\n${APP_URL}`;
     try {
       await Share.share(Platform.OS === 'ios' ? { message, url: APP_URL } : { message });
@@ -88,7 +91,7 @@ export default function ShareCardScreen() {
         <View style={styles.statsRow}>
           <Stat icon={progress.rank.icon} color={progress.rank.color} value={progress.rank.label} label="ランク" />
           <Stat icon="podium" color={colors.orange} value={`上位${topPct}%`} label={category.label} />
-          <Stat icon="layers" color={colors.purple} value={`${progress.totalDone}`} label="通算達成" />
+          <Stat icon="time" color={colors.purple} value={formatMinutesShort(progress.totalMinutes)} label="総勉強" />
         </View>
 
         <Text style={styles.tagline}>サボると課金、続けると報酬。</Text>

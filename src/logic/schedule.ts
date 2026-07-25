@@ -1,9 +1,10 @@
 /**
- * 「予定日」の計算と、期限切れの自動「未達」判定。
- * MVPの達成判定（レベル1: ボタン方式）の中核。
+ * 「予定日」の計算と、勉強時間からの達成/未達判定。
+ * 達成判定はストップウォッチで記録した勉強時間ベース：
+ * その日の勉強時間が「1日の目標時間」に届いたら達成。
  */
 
-import { Goal, RecordMap, DayStatus } from '@/types';
+import { Goal, MinutesMap, DayStatus } from '@/types';
 import { addDays, compareDate, todayStr, weekdayOf } from './date';
 
 /** 週N回モードか */
@@ -37,31 +38,25 @@ export function goalEndDate(goal: Goal): string {
   return addDays(goal.startDate, goal.durationWeeks * 7 - 1);
 }
 
-/**
- * 期限切れの予定日を自動的に 'missed' にして返す（元のrecordsは変更しない）。
- * ルール:
- *  - 「今日」より前の予定日で done でないもの -> missed
- *  - 「今日」は押していなければ pending（まだ未達ではない）
- */
-export function applyAutoMiss(goal: Goal | null, records: RecordMap): RecordMap {
-  if (!goal) return records;
-  // 週N回モードは「どの日でも自由」なので、個別の日を未達にしない
-  // （週の合計が目標に届いたかは summary 側で週単位に判定する）
-  if (goal.frequency === 'weekly_count') return records;
-  const today = todayStr();
-  const next: RecordMap = { ...records };
-  for (const date of scheduledDates(goal)) {
-    if (compareDate(date, today) < 0) {
-      // 過去の予定日
-      if (next[date] !== 'done') next[date] = 'missed';
-    }
-  }
-  return next;
+/** その日の勉強時間（分） */
+export function minutesOf(minutes: MinutesMap, date: string): number {
+  return minutes[date] ?? 0;
 }
 
-/** 指定日の状態を返す（未記録は pending 扱い） */
-export function statusOf(records: RecordMap, date: string): DayStatus {
-  return records[date] ?? 'pending';
+/** その日が「達成」か（勉強時間が1日の目標に届いたか） */
+export function isDayDone(goal: Goal, minutes: MinutesMap, date: string): boolean {
+  return minutesOf(minutes, date) >= goal.dailyTargetMin;
+}
+
+/**
+ * 指定日の状態（daily / weekdays 用）。
+ * 達成=目標時間到達 / 未達=過去の予定日で未到達 / pending=今日以降。
+ * 週N回モードでは日単位のmissedは使わず、週単位で判定する（summary側）。
+ */
+export function statusOf(goal: Goal, minutes: MinutesMap, date: string): DayStatus {
+  if (isDayDone(goal, minutes, date)) return 'done';
+  if (goal.frequency !== 'weekly_count' && compareDate(date, todayStr()) < 0) return 'missed';
+  return 'pending';
 }
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];

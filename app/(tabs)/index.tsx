@@ -19,7 +19,7 @@ import { AchievementGrid } from '@/components/AchievementGrid';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import { frequencyLabel } from '@/logic/schedule';
-import { formatHM, msUntilEndOfDay } from '@/logic/date';
+import { formatMinutes, formatMinutesShort } from '@/logic/time';
 import { IconName } from '@/types';
 
 /** 時間帯に合わせた挨拶 */
@@ -35,7 +35,7 @@ export default function HomeScreen() {
   const {
     ready,
     goal,
-    records,
+    minutes,
     progress,
     weeks,
     seasonResult,
@@ -154,7 +154,7 @@ export default function HomeScreen() {
           <Card style={styles.gridCard}>
             <Text style={styles.sectionLabel}>このシーズンの積み上がり</Text>
             <View style={{ height: spacing.md }} />
-            <AchievementGrid goal={goal} records={records} />
+            <AchievementGrid goal={goal} minutes={minutes} />
           </Card>
 
           <PrimaryButton
@@ -178,7 +178,6 @@ export default function HomeScreen() {
   const currentWeek = weeks.find((w) => w.isCurrent) ?? weeks[0];
   const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
   const weekPct = Math.round(weekRatio * 100);
-  const remainHM = formatHM(msUntilEndOfDay());
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -213,16 +212,16 @@ export default function HomeScreen() {
             <View style={styles.chipCol}>
               <StatChip icon="flame" accent={colors.orange} label="連続" value={progress.streak} unit="日" />
               <StatChip
-                icon="diamond"
+                icon="time"
                 accent={colors.purple}
-                label="ポイント"
-                value={progress.points.toLocaleString()}
+                label="今月の勉強"
+                value={formatMinutesShort(progress.studyMinutes)}
               />
             </View>
           </View>
         </Card>
 
-        {/* 今日の習慣 */}
+        {/* 今日の勉強 */}
         <Card style={styles.todayCard}>
           <View style={styles.todayRow}>
             <View style={styles.todayIcon}>
@@ -231,10 +230,26 @@ export default function HomeScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.todayName}>{goal.name}</Text>
               <Text style={styles.todayMeta}>
-                {frequencyLabel(goal)} ・ 残り {remainHM}
+                {frequencyLabel(goal)} ・ 今日 {formatMinutes(progress.todayMinutes)} / 目標{' '}
+                {formatMinutes(goal.dailyTargetMin)}
               </Text>
             </View>
           </View>
+
+          {/* 今日の勉強時間バー */}
+          {isTodayScheduled && (
+            <View style={styles.todayBar}>
+              <View
+                style={[
+                  styles.todayBarFill,
+                  {
+                    width: `${Math.min(100, (progress.todayMinutes / goal.dailyTargetMin) * 100)}%`,
+                    backgroundColor: todayStatus === 'done' ? colors.success : colors.primary,
+                  },
+                ]}
+              />
+            </View>
+          )}
 
           {!isTodayScheduled ? (
             <View style={[styles.pill, { backgroundColor: colors.surfaceAlt }]}>
@@ -244,16 +259,17 @@ export default function HomeScreen() {
               </Text>
             </View>
           ) : todayStatus === 'done' ? (
-            <View style={[styles.pill, { backgroundColor: colors.successBg }]}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-              <Text style={[styles.pillText, { color: colors.success }]}>
-                今日は達成済み！お見事です
-              </Text>
-            </View>
+            <PrimaryButton
+              label="勉強を続ける（達成済み）"
+              icon="checkmark-circle"
+              variant="secondary"
+              onPress={() => router.push('/today')}
+              style={{ marginTop: spacing.md, height: 52 }}
+            />
           ) : (
             <PrimaryButton
-              label="達成する"
-              icon="checkmark-circle"
+              label="勉強をはじめる"
+              icon="play"
               onPress={() => router.push('/today')}
               style={{ marginTop: spacing.md, height: 52 }}
             />
@@ -268,7 +284,7 @@ export default function HomeScreen() {
               {progress.doneCount} / {progress.scheduledCount} 達成
             </Text>
           </View>
-          <AchievementGrid goal={goal} records={records} />
+          <AchievementGrid goal={goal} minutes={minutes} />
           <View style={styles.legend}>
             <View style={styles.legendItem}>
               <View style={styles.heatRow}>
@@ -426,6 +442,14 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontVariant: ['tabular-nums'],
   },
+  todayBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  todayBarFill: { height: '100%', borderRadius: 4 },
 
   pill: {
     marginTop: spacing.md,

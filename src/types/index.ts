@@ -42,6 +42,8 @@ export interface Goal {
   weekdays: number[];
   /** frequency === 'weekly_count' のとき週あたりの目標回数 */
   weeklyTarget: number;
+  /** 1日の目標勉強時間（分）。この時間に届いた日が「達成」 */
+  dailyTargetMin: number;
   /** 積立額（数値のみ。実決済はしない） */
   stakeAmount: number;
   /** このシーズン開始時に実際に課金した額（0=無料月・モック） */
@@ -56,6 +58,9 @@ export interface Goal {
 
 /** 日付をキーにした達成記録 { '2026-07-21': 'done' } */
 export type RecordMap = Record<string, DayStatus>;
+
+/** 日付をキーにした勉強時間（分） { '2026-07-21': 125 } */
+export type MinutesMap = Record<string, number>;
 
 /** リマインド通知の設定（端末内のローカル通知） */
 export interface ReminderSettings {
@@ -74,6 +79,8 @@ export interface LifetimeStats {
   seasonsCompleted: number;
   /** 完全達成（未達ゼロ）で完走したシーズン数 */
   perfectSeasons: number;
+  /** 通算勉強時間（分・全シーズン） */
+  totalMinutes: number;
   /** 通算で没収された額（モック） */
   totalCharged: number;
   /** 通算で支払った額（モック） */
@@ -110,7 +117,8 @@ export interface CustomGroup {
 /** 保存されるアプリの状態のスナップショット */
 export interface PersistedState {
   goal: Goal | null;
-  records: RecordMap;
+  /** 日ごとの勉強時間（分） */
+  minutes: MinutesMap;
   reminder: ReminderSettings;
   lifetime: LifetimeStats;
   badges: BadgeMap;
@@ -137,6 +145,9 @@ export interface ProgressSummary {
   missedCount: number; // 現シーズンの未達日数
   scheduledCount: number; // 現シーズンで今日までに予定されていた日数
   totalDone: number; // 通算達成日数（全シーズン）
+  studyMinutes: number; // 現シーズンの合計勉強時間（分）
+  totalMinutes: number; // 通算の合計勉強時間（分）
+  todayMinutes: number; // 今日の勉強時間（分）
   rank: RankTier;
   nextRank: RankTier | null;
   pointsToNext: number; // 次ランクまでの残りポイント
@@ -181,6 +192,10 @@ export interface LeaderboardEntry {
   /** 今月のポイント（月間ランキング用） */
   points: number;
   streak: number;
+  /** 今月の合計勉強時間（分） */
+  studyMinutes: number;
+  /** 意気込み */
+  motivation: string;
   /** ランク称号 */
   rank: RankTier;
   isMe: boolean;
@@ -201,5 +216,7 @@ export interface RivalProfile {
   streak: number;
   bestStreak: number;
   totalDone: number;
+  /** 通算勉強時間（分） */
+  totalMinutes: number;
   rank: RankTier;
 }

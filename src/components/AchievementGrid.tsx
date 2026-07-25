@@ -1,25 +1,24 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Goal, RecordMap } from '@/types';
-import { scheduledDates, statusOf } from '@/logic/schedule';
+import { Goal, MinutesMap } from '@/types';
+import { scheduledDates, statusOf, isDayDone } from '@/logic/schedule';
 import { todayStr, compareDate } from '@/logic/date';
 import { colors } from '@/theme';
 
 /**
  * 4週間の予定日をヒートマップで可視化するグリッド。
- * - 達成マスは「連続の長さ」で濃淡（1日=弱 / 2日=中 / 3日以上=ライム満点）
- * - 未達は静かな暗色（赤で騒がない）、未来は空マス
- * - 今日のマスは二重リングで点灯
+ * - 達成マス（目標時間到達）は連続の長さで濃淡
+ * - 未達は静かな暗色、未来は空マス、今日は二重リング
  */
-export function AchievementGrid({ goal, records }: { goal: Goal; records: RecordMap }) {
+export function AchievementGrid({ goal, minutes }: { goal: Goal; minutes: MinutesMap }) {
   const today = todayStr();
   const dates = scheduledDates(goal);
 
-  // 各日の「その時点での連続日数」を計算して濃淡を決める
+  // 各日の「その時点での連続日数」で濃淡を決める
   const heat: Record<string, number> = {};
   let run = 0;
   for (const date of dates) {
-    if (statusOf(records, date) === 'done') {
+    if (isDayDone(goal, minutes, date)) {
       run += 1;
       heat[date] = Math.min(run, 3);
     } else {
@@ -30,7 +29,7 @@ export function AchievementGrid({ goal, records }: { goal: Goal; records: Record
   return (
     <View style={styles.grid}>
       {dates.map((date) => {
-        const st = statusOf(records, date);
+        const st = statusOf(goal, minutes, date);
         const isFuture = compareDate(date, today) > 0;
         const isToday = date === today;
 
@@ -42,19 +41,16 @@ export function AchievementGrid({ goal, records }: { goal: Goal; records: Record
         } else if (st === 'missed') {
           bg = colors.gridMiss;
         } else {
-          // 今日まだ未達成
           bg = colors.gridEmpty;
         }
 
         if (isToday) {
-          // 二重リング: 外枠ライム + 地の色の隙間 + 中のマス
           return (
             <View key={date} style={styles.todayOuter}>
               <View style={[styles.todayInner, { backgroundColor: bg }]} />
             </View>
           );
         }
-
         return <View key={date} style={[styles.cell, { backgroundColor: bg }]} />;
       })}
     </View>
@@ -75,9 +71,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  todayInner: {
-    width: CELL - 10,
-    height: CELL - 10,
-    borderRadius: 5,
-  },
+  todayInner: { width: CELL - 10, height: CELL - 10, borderRadius: 5 },
 });

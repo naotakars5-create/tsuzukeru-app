@@ -21,6 +21,7 @@ import { MONTHLY_STAKE, WEEKLY_PENALTY } from '@/logic/billing';
 import { quoteOfToday } from '@/logic/quotes';
 import { todayStr } from '@/logic/date';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
+import { DAILY_TARGET_OPTIONS, formatMinutes } from '@/logic/time';
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const DURATION_WEEKS = 4;
@@ -35,6 +36,7 @@ export default function GoalSetupScreen() {
   const [frequency, setFrequency] = useState<Frequency>(goal?.frequency ?? 'daily');
   const [weekdays, setWeekdays] = useState<number[]>(goal?.weekdays ?? [1, 2, 3, 4, 5]);
   const [weeklyTarget, setWeeklyTarget] = useState<number>(goal?.weeklyTarget ?? 3);
+  const [dailyTargetMin, setDailyTargetMin] = useState<number>(goal?.dailyTargetMin ?? 120);
 
   const quote = quoteOfToday(todayStr());
   const isFree = nextStartCharge === 0;
@@ -86,6 +88,7 @@ export default function GoalSetupScreen() {
       frequency,
       weekdays: frequency === 'weekdays' ? weekdays : [],
       weeklyTarget,
+      dailyTargetMin,
       durationWeeks: DURATION_WEEKS,
     });
     // 「火がつく」演出を挟んでホームへ
@@ -109,7 +112,7 @@ export default function GoalSetupScreen() {
 
         {/* 目標名 */}
         <Card>
-          <Text style={styles.label}>今日やること（勉強タスク）</Text>
+          <Text style={styles.label}>今週やること（勉強内容）</Text>
           <TextInput
             style={styles.input}
             placeholder={categoryOf(category).placeholder}
@@ -118,6 +121,31 @@ export default function GoalSetupScreen() {
             onChangeText={setName}
             maxLength={40}
           />
+        </Card>
+
+        {/* 1日の目標勉強時間 */}
+        <Card>
+          <Text style={styles.label}>1日の目標勉強時間</Text>
+          <Text style={styles.helper}>ストップウォッチで計測し、この時間に届いた日が「達成」です。</Text>
+          <View style={styles.countRow}>
+            {DAILY_TARGET_OPTIONS.map((m) => {
+              const active = dailyTargetMin === m;
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => setDailyTargetMin(m)}
+                  style={[styles.timeChip, active && styles.countChipActive]}
+                >
+                  <Text style={[styles.countValue, active && styles.countValueActive]}>
+                    {m >= 60 ? m / 60 : m}
+                  </Text>
+                  <Text style={[styles.countUnit, active && styles.countValueActive]}>
+                    {m >= 60 ? '時間' : '分'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </Card>
 
         {/* コミュニティ（目指す資格） */}
@@ -410,6 +438,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   countChipActive: { backgroundColor: 'rgba(198,244,50,0.12)', borderColor: colors.primary },
+  timeChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
   countValue: { fontSize: 22, fontWeight: '900', color: colors.textSub },
   countValueActive: { color: colors.text },
   countUnit: { fontSize: 10, fontWeight: '700', color: colors.textMuted },

@@ -6,6 +6,7 @@ import { Card } from '@/components/Card';
 import { colors, font, radius, spacing } from '@/theme';
 import { buildRivalProfile } from '@/logic/social';
 import { categoryOf } from '@/logic/category';
+import { formatMinutes } from '@/logic/time';
 import { GoalCategory } from '@/types';
 
 /** 相手のプロフィール（モック） */
@@ -60,7 +61,12 @@ export default function RivalProfileScreen() {
           <Stat value={profile.streak} label="連続達成" icon="flame" color={colors.orange} />
           <Stat value={profile.bestStreak} label="最高連続" icon="medal" color={colors.warning} />
           <Stat value={profile.totalDone} label="通算達成" icon="layers" color={colors.purple} />
-          <Stat value={profile.points} label="ポイント" icon="diamond" color={colors.primary} />
+        </View>
+        <View style={styles.totalMinRow}>
+          <Ionicons name="time" size={16} color={colors.primary} />
+          <Text style={styles.totalMinText}>
+            総勉強時間 <Text style={styles.totalMinValue}>{formatMinutes(profile.totalMinutes)}</Text>
+          </Text>
         </View>
       </Card>
 
@@ -128,6 +134,18 @@ const styles = StyleSheet.create({
   goalMeta: { fontSize: font.small, color: colors.textSub, marginTop: 2 },
 
   statsRow: { flexDirection: 'row', marginTop: spacing.md },
+  totalMinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  totalMinText: { fontSize: font.sub, color: colors.textSub, fontWeight: '600' },
+  totalMinValue: { color: colors.primary, fontWeight: '900' },
   stat: { flex: 1, alignItems: 'center', gap: 3 },
   statValue: { fontSize: font.heading, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
   statLabel: { fontSize: 10, color: colors.textSub, fontWeight: '600' },
