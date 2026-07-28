@@ -26,6 +26,7 @@ import {
   loadState,
   saveGoal,
   saveMinutes,
+  saveTimer,
   saveReminder,
   saveLifetime,
   saveBadges,
@@ -65,6 +66,12 @@ interface AppContextValue {
   todayStatus: 'done' | 'missed' | 'pending';
   badges: BadgeView[];
   unlockedBadgeCount: number;
+  /** ストップウォッチ計測開始時刻(ms)。null=停止中 */
+  timerStartedAt: number | null;
+  /** 計測を開始 */
+  startTimer: () => void;
+  /** 計測を停止し、経過ぶんを今日に記録（返り値=記録した分） */
+  stopTimer: () => Promise<number>;
   createGoal: (input: NewGoalInput) => Promise<void>;
   /** 勉強時間（分）を今日に加算 */
   addStudyMinutes: (min: number) => Promise<void>;
@@ -96,6 +103,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [badgesMap, setBadgesMap] = useState<BadgeMap>({});
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [group, setGroupState] = useState<CustomGroup | null>(null);
+  const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -107,6 +115,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setBadgesMap(state.badges);
       setProfile(state.profile);
       setGroupState(state.group);
+      setTimerStartedAt(state.timerStartedAt);
       setReady(true);
     })();
   }, []);
@@ -232,6 +241,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const startTimer = useCallback(() => {
+    const now = Date.now();
+    setTimerStartedAt(now);
+    saveTimer(now);
+  }, []);
+
+  const stopTimer = useCallback(async (): Promise<number> => {
+    if (!timerStartedAt) return 0;
+    // 1セッション最大6時間でキャップ（止め忘れ対策）
+    const elapsedMin = Math.min(360, (Date.now() - timerStartedAt) / 60000);
+    setTimerStartedAt(null);
+    await saveTimer(null);
+    if (elapsedMin > 0) await addStudyMinutes(elapsedMin);
+    return elapsedMin;
+  }, [timerStartedAt, addStudyMinutes]);
+
   const updateReminder = useCallback(
     async (settings: ReminderSettings): Promise<boolean> => {
       if (settings.enabled) {
@@ -265,6 +290,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const resetAll = useCallback(async () => {
     setGoal(null);
     setMinutes({});
+    setTimerStartedAt(null);
+    await saveTimer(null);
     setReminder({ enabled: false, hour: 20, minute: 0 });
     setLifetime(EMPTY_LIFETIME);
     setBadgesMap({});
@@ -317,6 +344,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     todayStatus,
     badges,
     unlockedBadgeCount,
+    timerStartedAt,
+    startTimer,
+    stopTimer,
     createGoal,
     addStudyMinutes,
     startNextSeason,

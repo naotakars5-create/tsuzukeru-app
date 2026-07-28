@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider } from '@/context/AppContext';
+import { TimerBar } from '@/components/TimerBar';
 import { colors } from '@/theme';
 
 /**
@@ -46,6 +47,7 @@ export default function RootLayout() {
             options={{ title: '成果カード', presentation: 'modal' }}
           />
         </Stack>
+        <TimerBar />
       </AppProvider>
     </SafeAreaProvider>
   );
