@@ -1,20 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { MatchIgnite } from '@/components/MatchIgnite';
 import { colors, font, spacing } from '@/theme';
 
 const { width } = Dimensions.get('window');
 
 /**
  * 目標作成直後の「火がつく」演出（最初の60秒の体験を強くする）。
- * 炎が大きく燃え上がり、火の粉が舞い、コピーが浮かび上がる。数秒後にホームへ。
+ * マッチが現れ、先端に炎が灯り、火の粉が舞い、コピーが浮かび上がる。数秒後にホームへ。
  */
 export default function IgniteScreen() {
   const router = useRouter();
   const { goal } = useApp();
 
+  const matchOp = useRef(new Animated.Value(0)).current;
+  const matchY = useRef(new Animated.Value(24)).current;
   const flameScale = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0)).current;
   const textOp = useRef(new Animated.Value(0)).current;
@@ -29,6 +31,10 @@ export default function IgniteScreen() {
 
   useEffect(() => {
     Animated.sequence([
+      Animated.parallel([
+        Animated.timing(matchOp, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(matchY, { toValue: 0, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]),
       Animated.spring(flameScale, { toValue: 1, friction: 4, tension: 80, useNativeDriver: true }),
       Animated.parallel([
         Animated.timing(textOp, { toValue: 1, duration: 500, useNativeDriver: true }),
@@ -90,9 +96,9 @@ export default function IgniteScreen() {
       {/* 光 */}
       <Animated.View style={[styles.glow, glowStyle]} />
 
-      {/* 炎 */}
-      <Animated.View style={{ transform: [{ scale: flameScale }] }}>
-        <Ionicons name="flame" size={140} color={colors.primary} />
+      {/* マッチ点火 */}
+      <Animated.View style={{ opacity: matchOp, transform: [{ translateY: matchY }] }}>
+        <MatchIgnite flameScale={flameScale} />
       </Animated.View>
 
       {/* コピー */}
