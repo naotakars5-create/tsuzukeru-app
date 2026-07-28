@@ -119,6 +119,8 @@ export interface PersistedState {
   goal: Goal | null;
   /** 日ごとの勉強時間（分） */
   minutes: MinutesMap;
+  /** ストップウォッチ計測開始時刻(ms)。null=計測していない */
+  timerStartedAt: number | null;
   reminder: ReminderSettings;
   lifetime: LifetimeStats;
   badges: BadgeMap;

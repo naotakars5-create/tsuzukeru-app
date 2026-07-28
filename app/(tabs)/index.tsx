@@ -54,27 +54,34 @@ export default function HomeScreen() {
     );
   }
 
-  // 目標が未設定 → 消灯したリング＋点灯予告
+  // 目標が未設定 → 世界観を伝える歓迎（オンボーディング）
   if (!goal) {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <View style={styles.emptyWrap}>
-          <ProgressRing ratio={0} size={150} strokeWidth={16} glow={false}>
-            <Ionicons name="flame" size={44} color={colors.primary} />
+        <ScrollView contentContainerStyle={styles.welcomeWrap} showsVerticalScrollIndicator={false}>
+          <ProgressRing ratio={0} size={128} strokeWidth={14} glow={false}>
+            <Ionicons name="flame" size={40} color={colors.primary} />
           </ProgressRing>
           <Text style={styles.emptyTitle}>心を燃やせ。</Text>
-          <Text style={styles.emptyText}>
-            合格は、毎日机に向かった者に訪れる。{'\n'}
-            意志じゃない、仕組みで続ける。{'\n'}
-            さあ、最初の火をつけよう。
+          <Text style={styles.welcomeLead}>
+            意志じゃなく、仕組みで勉強を続ける。{'\n'}資格合格を、続く人のものにする。
           </Text>
+
+          <View style={styles.pillars}>
+            <Pillar icon="alert-circle" color={colors.danger} title="サボると、痛み" desc="未達の週は¥100没収（モック）。だから続く。" />
+            <Pillar icon="gift" color={colors.success} title="続けると、報酬" desc="1ヶ月やり切れば翌月無料。ランクも上がる。" />
+            <Pillar icon="people" color={colors.primary} title="仲間と、競う" desc="同じ資格を目指す人と月間ランキングで競争。" />
+            <Pillar icon="timer" color={colors.purple} title="時間で、記録" desc="ストップウォッチで勉強時間を計測して積み上げ。" />
+          </View>
+
           <PrimaryButton
             label="勉強を始める"
             icon="flame"
             onPress={() => router.push('/goal-setup')}
             style={{ marginTop: spacing.xl, alignSelf: 'stretch' }}
           />
-        </View>
+          <Text style={styles.welcomeNote}>目標設定は1分。いつでも変えられます。</Text>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -194,6 +201,21 @@ export default function HomeScreen() {
             <Ionicons name="notifications-outline" size={20} color={colors.textSub} />
           </Pressable>
         </View>
+
+        {/* 連続が途切れる危機のナッジ */}
+        {isTodayScheduled && todayStatus !== 'done' && progress.streak > 0 && (
+          <Pressable style={styles.riskCard} onPress={() => router.push('/today')}>
+            <Ionicons name="flame" size={20} color={colors.danger} />
+            <Text style={styles.riskText}>
+              連続{progress.streak}日が今日で途切れます。あと{' '}
+              <Text style={styles.riskStrong}>
+                {formatMinutes(Math.max(0, goal.dailyTargetMin - progress.todayMinutes))}
+              </Text>{' '}
+              で今日達成。
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.danger} />
+          </Pressable>
+        )}
 
         {/* 進捗リングヒーロー（主役） */}
         <Card style={styles.heroCard}>
@@ -339,13 +361,38 @@ function StatChip({
   );
 }
 
+/** オンボーディングの価値提案カード */
+function Pillar({
+  icon,
+  color,
+  title,
+  desc,
+}: {
+  icon: IconName;
+  color: string;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <View style={styles.pillar}>
+      <View style={[styles.pillarIcon, { backgroundColor: `${color}22` }]}>
+        <Ionicons name={icon} size={20} color={color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.pillarTitle}>{title}</Text>
+        <Text style={styles.pillarDesc}>{desc}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 22, paddingTop: spacing.sm, gap: spacing.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.xl },
+  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.lg },
   emptyText: {
     fontSize: font.body,
     color: colors.textSub,
@@ -353,6 +400,44 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     lineHeight: 24,
   },
+
+  welcomeWrap: { alignItems: 'center', padding: 22, paddingTop: spacing.xxl, paddingBottom: spacing.xl },
+  welcomeLead: {
+    fontSize: font.sub,
+    color: colors.textSub,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    lineHeight: 22,
+  },
+  pillars: { alignSelf: 'stretch', gap: spacing.md, marginTop: spacing.xl },
+  pillar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+  },
+  pillarIcon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  pillarTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
+  pillarDesc: { fontSize: font.small, color: colors.textSub, marginTop: 2, lineHeight: 16 },
+  welcomeNote: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.md },
+
+  riskCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceDanger,
+    borderWidth: 1,
+    borderColor: colors.borderDanger,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  riskText: { flex: 1, fontSize: font.sub, color: colors.text, fontWeight: '600', lineHeight: 19 },
+  riskStrong: { color: colors.danger, fontWeight: '900' },
 
   greetRow: {
     flexDirection: 'row',

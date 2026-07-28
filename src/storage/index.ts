@@ -18,6 +18,7 @@ import { EMPTY_LIFETIME } from '@/logic/summary';
 
 const KEY_GOAL = 'tsuzukeru.goal.v1';
 const KEY_MINUTES = 'tsuzukeru.minutes.v1';
+const KEY_TIMER = 'tsuzukeru.timer.v1';
 const KEY_REMINDER = 'tsuzukeru.reminder.v1';
 const KEY_LIFETIME = 'tsuzukeru.lifetime.v1';
 const KEY_BADGES = 'tsuzukeru.badges.v1';
@@ -35,10 +36,11 @@ export const DEFAULT_PROFILE: Profile = {
 
 export async function loadState(): Promise<PersistedState> {
   try {
-    const [goalRaw, minutesRaw, reminderRaw, lifetimeRaw, badgesRaw, profileRaw, groupRaw] =
+    const [goalRaw, minutesRaw, timerRaw, reminderRaw, lifetimeRaw, badgesRaw, profileRaw, groupRaw] =
       await Promise.all([
         AsyncStorage.getItem(KEY_GOAL),
         AsyncStorage.getItem(KEY_MINUTES),
+        AsyncStorage.getItem(KEY_TIMER),
         AsyncStorage.getItem(KEY_REMINDER),
         AsyncStorage.getItem(KEY_LIFETIME),
         AsyncStorage.getItem(KEY_BADGES),
@@ -54,6 +56,7 @@ export async function loadState(): Promise<PersistedState> {
       if (goal.dailyTargetMin == null) goal.dailyTargetMin = 120;
     }
     const minutes: MinutesMap = minutesRaw ? JSON.parse(minutesRaw) : {};
+    const timerStartedAt: number | null = timerRaw ? JSON.parse(timerRaw) : null;
     const reminder: ReminderSettings = reminderRaw
       ? { ...DEFAULT_REMINDER, ...JSON.parse(reminderRaw) }
       : DEFAULT_REMINDER;
@@ -65,12 +68,13 @@ export async function loadState(): Promise<PersistedState> {
       ? { ...DEFAULT_PROFILE, ...JSON.parse(profileRaw) }
       : DEFAULT_PROFILE;
     const group: CustomGroup | null = groupRaw ? JSON.parse(groupRaw) : null;
-    return { goal, minutes, reminder, lifetime, badges, profile, group };
+    return { goal, minutes, timerStartedAt, reminder, lifetime, badges, profile, group };
   } catch (e) {
     console.warn('loadState failed', e);
     return {
       goal: null,
       minutes: {},
+      timerStartedAt: null,
       reminder: DEFAULT_REMINDER,
       lifetime: EMPTY_LIFETIME,
       badges: {},
@@ -87,6 +91,11 @@ export async function saveGoal(goal: Goal | null): Promise<void> {
 
 export async function saveMinutes(minutes: MinutesMap): Promise<void> {
   await AsyncStorage.setItem(KEY_MINUTES, JSON.stringify(minutes));
+}
+
+export async function saveTimer(startedAt: number | null): Promise<void> {
+  if (startedAt) await AsyncStorage.setItem(KEY_TIMER, JSON.stringify(startedAt));
+  else await AsyncStorage.removeItem(KEY_TIMER);
 }
 
 export async function saveReminder(reminder: ReminderSettings): Promise<void> {
@@ -114,6 +123,7 @@ export async function clearAll(): Promise<void> {
   await AsyncStorage.multiRemove([
     KEY_GOAL,
     KEY_MINUTES,
+    KEY_TIMER,
     KEY_REMINDER,
     KEY_LIFETIME,
     KEY_BADGES,

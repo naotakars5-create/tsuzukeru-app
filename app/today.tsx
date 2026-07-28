@@ -10,35 +10,32 @@ import { formatStopwatch, formatMinutes } from '@/logic/time';
 import { WEEKLY_PENALTY } from '@/logic/billing';
 
 /**
- * 勉強タイマー画面。ストップウォッチで勉強時間を計測し、
+ * 勉強タイマー画面。グローバルなストップウォッチで勉強時間を計測し、
  * 今日の合計が1日の目標時間に届いたら「達成」になる。
+ * 計測はアプリ全体で継続する（他画面へ移動しても止まらない）。
  */
 export default function TodayScreen() {
   const router = useRouter();
-  const { goal, progress, weeks, isTodayScheduled, addStudyMinutes } = useApp();
+  const { goal, progress, weeks, isTodayScheduled, addStudyMinutes, timerStartedAt, startTimer, stopTimer } =
+    useApp();
 
-  const [running, setRunning] = useState(false);
-  const [elapsedSec, setElapsedSec] = useState(0); // 現在のセッションの経過秒
-  const startRef = useRef<number>(0);
+  const running = timerStartedAt != null;
+  const [now, setNow] = useState(Date.now());
   const pulse = useRef(new Animated.Value(1)).current;
 
   const targetMin = goal?.dailyTargetMin ?? 120;
-  const doneMin = progress.todayMinutes; // 既に記録済みの今日の分
-  const sessionMin = elapsedSec / 60;
-  const totalTodayMin = doneMin + sessionMin;
+  const doneMin = progress.todayMinutes;
+  const sessionSec = running ? Math.floor((now - (timerStartedAt as number)) / 1000) : 0;
+  const totalTodayMin = doneMin + sessionSec / 60;
   const reached = totalTodayMin >= targetMin;
   const ratio = targetMin > 0 ? totalTodayMin / targetMin : 0;
 
-  // 1秒ごとに経過を更新
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(() => {
-      setElapsedSec(Math.floor((Date.now() - startRef.current) / 1000));
-    }, 1000);
+    const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [running]);
 
-  // 計測中はボタンを脈動
   useEffect(() => {
     if (!running) {
       pulse.setValue(1);
@@ -54,19 +51,6 @@ export default function TodayScreen() {
     return () => loop.stop();
   }, [running]);
 
-  const onStart = () => {
-    startRef.current = Date.now() - elapsedSec * 1000;
-    setRunning(true);
-  };
-
-  const onStop = async () => {
-    setRunning(false);
-    const mins = elapsedSec / 60;
-    if (mins > 0) await addStudyMinutes(mins);
-    setElapsedSec(0);
-  };
-
-  // テスト/手動追加用
   const quickAdd = async (m: number) => {
     if (running) return;
     await addStudyMinutes(m);
@@ -87,7 +71,6 @@ export default function TodayScreen() {
         </View>
       ) : (
         <>
-          {/* 課金予告 */}
           {!reached && (
             <View style={styles.banner}>
               <Ionicons name="alert-circle" size={18} color={colors.danger} />
@@ -99,7 +82,6 @@ export default function TodayScreen() {
             </View>
           )}
 
-          {/* リング＋ストップウォッチ */}
           <View style={styles.heroArea}>
             <ProgressRing
               ratio={ratio}
@@ -108,7 +90,7 @@ export default function TodayScreen() {
               color={reached ? colors.success : colors.primary}
             >
               <Text style={styles.timerLabel}>{running ? '計測中' : '今日の勉強'}</Text>
-              <Text style={styles.timer}>{formatStopwatch(elapsedSec)}</Text>
+              <Text style={styles.timer}>{formatStopwatch(sessionSec)}</Text>
               <Text style={styles.todayTotal}>
                 合計 {formatMinutes(totalTodayMin)} / 目標 {formatMinutes(targetMin)}
               </Text>
@@ -122,13 +104,17 @@ export default function TodayScreen() {
             )}
           </View>
 
-          {/* スタート/ストップ */}
           <View style={styles.controls}>
             <Animated.View style={{ transform: [{ scale: pulse }], alignSelf: 'stretch' }}>
               {running ? (
-                <PrimaryButton label="ストップ（記録する）" icon="stop" onPress={onStop} style={styles.bigBtn} />
+                <PrimaryButton
+                  label="ストップ（記録する）"
+                  icon="stop"
+                  onPress={() => stopTimer()}
+                  style={styles.bigBtn}
+                />
               ) : (
-                <PrimaryButton label="スタート" icon="play" onPress={onStart} style={styles.bigBtn} />
+                <PrimaryButton label="スタート" icon="play" onPress={startTimer} style={styles.bigBtn} />
               )}
             </Animated.View>
 
@@ -141,6 +127,12 @@ export default function TodayScreen() {
                   </Pressable>
                 ))}
               </View>
+            )}
+
+            {running && (
+              <Text style={styles.runningHint}>
+                計測中も、他の画面（ランキング等）を見に行けます。下のバーからいつでも停止できます。
+              </Text>
             )}
 
             <PrimaryButton label="戻る" variant="ghost" onPress={() => router.back()} />
@@ -206,4 +198,5 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   quickChipText: { fontSize: 12, fontWeight: '800', color: colors.text },
+  runningHint: { fontSize: 11, color: colors.textMuted, textAlign: 'center', lineHeight: 16 },
 });
