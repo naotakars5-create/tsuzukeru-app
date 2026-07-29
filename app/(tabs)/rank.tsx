@@ -8,6 +8,7 @@ import { FlameHero } from '@/components/FlameHero';
 import { ProgressBar } from '@/components/ProgressBar';
 import { StatTile } from '@/components/StatTile';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { RankMedal } from '@/components/RankMedal';
 import { colors, font, radius, spacing } from '@/theme';
 import { RANK_TIERS } from '@/logic/rank';
 
@@ -36,10 +37,8 @@ export default function RankScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* 現在ランクのヒーロー */}
-      <FlameHero icon={progress.rank.icon} iconSize={130} style={styles.hero}>
-        <View style={[styles.heroIconWrap, { backgroundColor: `${progress.rank.color}1F` }]}>
-          <Ionicons name={progress.rank.icon} size={40} color={progress.rank.color} />
-        </View>
+      <FlameHero icon={null} style={styles.hero}>
+        <RankMedal rank={progress.rank} size={112} />
         <Text style={styles.heroLabel}>{progress.rank.label}</Text>
         <Text style={styles.heroPoints}>{progress.points} pt</Text>
         <View style={{ height: spacing.lg, alignSelf: 'stretch' }} />
@@ -81,13 +80,7 @@ export default function RankScreen() {
           const isCurrent = tier.key === progress.rank.key;
           return (
             <View key={tier.key} style={[styles.tierRow, isCurrent && styles.tierRowCurrent]}>
-              <View style={[styles.tierIcon, { backgroundColor: reached ? `${tier.color}22` : colors.surfaceAlt }]}>
-                <Ionicons
-                  name={tier.icon}
-                  size={22}
-                  color={reached ? tier.color : colors.textMuted}
-                />
-              </View>
+              <RankMedal rank={tier} size={46} locked={!reached} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.tierLabel, !reached && styles.dim]}>{tier.label}</Text>
                 <Text style={styles.tierReq}>{tier.minPoints}pt〜</Text>

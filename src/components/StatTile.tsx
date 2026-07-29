@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { IconName } from '@/types';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, radius, spacing, shadow } from '@/theme';
 
 /**
  * 数値タイル。色付きの角丸スクエアにアイコンを載せる
@@ -38,20 +38,27 @@ const styles = StyleSheet.create({
   tile: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadow.soft,
   },
   iconSquare: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  value: { fontSize: font.heading, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
-  label: { fontSize: font.small, color: colors.textSub, marginTop: 2, fontWeight: '600' },
+  value: {
+    fontSize: font.heading,
+    fontWeight: '900',
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.3,
+  },
+  label: { fontSize: font.small, color: colors.textSub, marginTop: 3, fontWeight: '700' },
 });

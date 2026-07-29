@@ -84,6 +84,7 @@ export const radius = {
   sm: 8,
   md: 14,
   lg: 18,
+  card: 22, // コンテンツカードの標準（少し大きめの角丸で上質に）
   xl: 24,
   full: 999,
 } as const;
@@ -97,19 +98,36 @@ export const font = {
   small: 12,
 } as const;
 
+/** 文字組みのトラッキング（見出しは詰め気味、ラベルは開き気味） */
+export const tracking = {
+  tight: -0.6,
+  snug: -0.3,
+  normal: 0,
+  label: 1.4,
+} as const;
+
 export const shadow = {
+  // カード: 大きめのぼかし＋低い不透明度で“浮いて見える”上質な影
   card: {
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.32,
+    shadowRadius: 28,
+    elevation: 8,
+  },
+  // 小さめ要素の軽い影
+  soft: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 4,
   },
   glow: {
     shadowColor: '#C6F432',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
   },
 } as const;
