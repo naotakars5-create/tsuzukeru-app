@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -90,9 +90,13 @@ export default function SettingsScreen() {
       <Card>
         <Text style={styles.sectionLabel}>プロフィール</Text>
         <Pressable style={styles.profileRow} onPress={() => router.push('/profile-edit')}>
-          <View style={[styles.profileIcon, { backgroundColor: `${profile.color}22`, borderColor: profile.color }]}>
-            <Ionicons name={profile.icon} size={22} color={profile.color} />
-          </View>
+          {profile.photo ? (
+            <Image source={{ uri: profile.photo }} style={[styles.profilePhoto, { borderColor: profile.color }]} />
+          ) : (
+            <View style={[styles.profileIcon, { backgroundColor: `${profile.color}22`, borderColor: profile.color }]}>
+              <Ionicons name={profile.icon} size={22} color={profile.color} />
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={styles.profileName}>{profile.name}</Text>
             <Text style={styles.profileMotto} numberOfLines={1}>
@@ -233,6 +237,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
   },
+  profilePhoto: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, backgroundColor: colors.surfaceAlt },
   profileName: { fontSize: font.body, fontWeight: '800', color: colors.text },
   profileMotto: { fontSize: font.small, color: colors.textSub, marginTop: 2 },
   goalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },

@@ -87,6 +87,8 @@ export interface Profile {
   color: string;
   /** 意気込み（ひとこと） */
   motivation: string;
+  /** プロフィール写真（切り抜き済みのdata URI）。未設定ならアイコンを使う */
+  photo?: string | null;
 }
 
 /** バッジの解除状態: key -> 解除日 'YYYY-MM-DD' */

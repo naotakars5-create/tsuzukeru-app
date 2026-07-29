@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -64,6 +64,8 @@ export default function SocialScreen() {
     if (e.isMe) router.push('/profile-edit');
     else router.push({ pathname: '/rival/[id]', params: { id: e.id, category: category.key } });
   };
+
+  const myPhoto = profile.photo ?? null;
 
   return (
     <ScrollView
@@ -174,7 +176,13 @@ export default function SocialScreen() {
 
       <View style={styles.list}>
         {leaderboard.map((e, i) => (
-          <RankRow key={e.id} entry={e} position={i + 1} onPress={() => openProfile(e)} />
+          <RankRow
+            key={e.id}
+            entry={e}
+            position={i + 1}
+            photo={e.isMe ? myPhoto : null}
+            onPress={() => openProfile(e)}
+          />
         ))}
       </View>
 
@@ -191,10 +199,12 @@ const MEDAL_COLORS = [colors.gold, colors.silver, colors.bronze];
 function RankRow({
   entry,
   position,
+  photo,
   onPress,
 }: {
   entry: LeaderboardEntry;
   position: number;
+  photo?: string | null;
   onPress: () => void;
 }) {
   const isTop3 = position <= 3;
@@ -216,7 +226,9 @@ function RankRow({
         )}
       </View>
 
-      {entry.isMe ? (
+      {entry.isMe && photo ? (
+        <Image source={{ uri: photo }} style={styles.avatar} />
+      ) : entry.isMe ? (
         <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
           <Ionicons name="person" size={20} color={colors.onAccent} />
         </View>
