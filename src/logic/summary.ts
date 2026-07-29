@@ -14,7 +14,7 @@ import {
   minutesOf,
 } from './schedule';
 import { calcPoints, rankForPoints, nextRankAfter } from './rank';
-import { WEEKLY_PENALTY } from './billing';
+import { weekStake } from './billing';
 
 /** 通算スタッツの初期値 */
 export const EMPTY_LIFETIME: LifetimeStats = {
@@ -23,9 +23,9 @@ export const EMPTY_LIFETIME: LifetimeStats = {
   seasonsCompleted: 0,
   perfectSeasons: 0,
   totalMinutes: 0,
-  totalCharged: 0,
-  totalPaid: 0,
-  nextSeasonFree: false,
+  totalDeposited: 0,
+  totalReturned: 0,
+  totalForfeited: 0,
 };
 
 /**
@@ -191,8 +191,12 @@ export function buildWeeks(goal: Goal | null, minutes: MinutesMap): WeekSummary[
       }
     }
 
+    // デポジット方式: 週ぶんの掛け金を、達成なら返還・未達なら没収
+    const stake = weekStake(goal.deposit, goal.durationWeeks);
     const failed = missed > 0;
-    const chargedAmount = isPast && failed ? WEEKLY_PENALTY : 0;
+    const perfect = scheduled > 0 && missed === 0 && pending === 0;
+    const chargedAmount = isPast && failed ? stake : 0; // 没収
+    const refundedAmount = isPast && perfect ? stake : 0; // 返還
 
     weeks.push({
       weekIndex: w,
@@ -204,7 +208,7 @@ export function buildWeeks(goal: Goal | null, minutes: MinutesMap): WeekSummary[
       missed,
       pending,
       chargedAmount,
-      refundedAmount: 0,
+      refundedAmount,
       isCurrent,
     });
   }
@@ -217,15 +221,19 @@ export function isSeasonComplete(goal: Goal | null): boolean {
   return compareDate(todayStr(), goalEndDate(goal)) > 0;
 }
 
-/** 現シーズンの成績サマリー */
+/** 現シーズンの成績サマリー（デポジット） */
 export interface SeasonResult {
   done: number;
   missed: number;
   scheduled: number;
   perfectWeeks: number;
   allPerfect: boolean;
-  charged: number;
-  poolRemaining: number;
+  /** 没収された額（未達分） */
+  forfeited: number;
+  /** 返還された額（達成分） */
+  returned: number;
+  /** まだ結果が出ていない預かり中の額 */
+  held: number;
   minutes: number;
 }
 
@@ -235,23 +243,26 @@ export function buildSeasonResult(goal: Goal | null, minutes: MinutesMap): Seaso
   let missed = 0;
   let scheduled = 0;
   let perfectWeeks = 0;
-  let charged = 0;
+  let forfeited = 0;
+  let returned = 0;
   for (const w of weeks) {
     done += w.done;
     missed += w.missed;
     scheduled += w.scheduled;
-    charged += w.chargedAmount;
+    forfeited += w.chargedAmount;
+    returned += w.refundedAmount;
     if (w.scheduled > 0 && w.missed === 0 && w.pending === 0) perfectWeeks += 1;
   }
-  const startCharge = goal?.startCharge ?? 0;
+  const deposit = goal?.deposit ?? 0;
   return {
     done,
     missed,
     scheduled,
     perfectWeeks,
     allPerfect: scheduled > 0 && missed === 0,
-    charged,
-    poolRemaining: Math.max(0, startCharge - charged),
+    forfeited,
+    returned,
+    held: Math.max(0, deposit - forfeited - returned),
     minutes: goal ? seasonMinutes(goal, minutes) : 0,
   };
 }

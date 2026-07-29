@@ -6,7 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { ProgressBar } from '@/components/ProgressBar';
 import { colors, font, labelStyle, spacing } from '@/theme';
 import { compareDate, todayStr } from '@/logic/date';
-import { MONTHLY_STAKE, WEEKLY_PENALTY } from '@/logic/billing';
+import { PLATFORM_FEE_RATE, platformFee } from '@/logic/billing';
 import { WeekSummary } from '@/types';
 
 type WeekState = 'done' | 'missed' | 'current' | 'future';
@@ -17,7 +17,7 @@ function stateOf(week: WeekSummary): WeekState {
   return week.missed > 0 ? 'missed' : 'done';
 }
 
-/** 週次レポート: 4週の達成状況と、月¥500プールの状態（モック課金）を表示。 */
+/** 週次レポート: 4週の達成状況と、預けた掛け金（デポジット）の返還/没収を表示。 */
 export default function WeeklyScreen() {
   const { goal, weeks, seasonResult } = useApp();
 
@@ -29,11 +29,9 @@ export default function WeeklyScreen() {
     );
   }
 
-  const startCharge = goal.startCharge; // 0=無料月, 500=通常
-  const forfeited = seasonResult.charged; // 没収済み
-  const poolRemaining = seasonResult.poolRemaining;
-  const anyMiss = weeks.some((w) => w.missed > 0 && !w.isCurrent);
-  const isFreeMonth = startCharge === 0;
+  const { returned, forfeited, held } = seasonResult;
+  const deposit = goal.deposit;
+  const fee = platformFee(forfeited);
 
   return (
     <ScrollView
@@ -41,58 +39,51 @@ export default function WeeklyScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* 今月の積立プール */}
-      {isFreeMonth ? (
-        <View style={[styles.poolCard, { borderColor: colors.success }]}>
-          <View style={styles.poolHead}>
-            <Ionicons name="gift" size={18} color={colors.success} />
-            <Text style={[styles.poolLabel, { color: colors.success }]}>今月は無料月</Text>
-          </View>
-          <Text style={styles.poolCopy}>前月パーフェクトの特典。今月の積立はありません。</Text>
+      {/* 掛け金デポジット */}
+      <View style={styles.poolCard}>
+        <View style={styles.poolHead}>
+          <Ionicons name="wallet" size={18} color={colors.primary} />
+          <Text style={styles.poolLabel}>預けた掛け金（モック）</Text>
         </View>
-      ) : (
-        <View style={styles.poolCard}>
-          <View style={styles.poolHead}>
-            <Ionicons name="wallet" size={18} color={colors.primary} />
-            <Text style={styles.poolLabel}>今月の積立プール（モック）</Text>
-          </View>
-          <View style={styles.poolAmountRow}>
-            <Text style={styles.poolRemaining}>¥{poolRemaining.toLocaleString()}</Text>
-            <Text style={styles.poolTotal}>/ ¥{MONTHLY_STAKE} 中</Text>
-          </View>
-          <View style={styles.poolBar}>
-            <View
-              style={[
-                styles.poolBarFill,
-                { width: `${(poolRemaining / MONTHLY_STAKE) * 100}%` },
-              ]}
-            />
-          </View>
-          <Text style={styles.poolCopy}>
-            {forfeited > 0
-              ? `未達で ¥${forfeited.toLocaleString()} 没収。残りは死守しよう。`
-              : anyMiss
-              ? '未達あり。プールが削られていきます。'
-              : 'このまま1ヶ月パーフェクトなら、翌月が無料！'}
-          </Text>
+        <View style={styles.poolAmountRow}>
+          <Text style={styles.poolRemaining}>¥{deposit.toLocaleString()}</Text>
         </View>
-      )}
+        <View style={styles.poolBreak}>
+          <Break label="返還" value={returned} color={colors.success} />
+          <Break label="預かり中" value={held} color={colors.textSub} />
+          <Break label="没収" value={forfeited} color={colors.danger} />
+        </View>
+        <Text style={styles.poolCopy}>
+          {forfeited > 0
+            ? `未達で ¥${forfeited.toLocaleString()} 没収（うち手数料 ¥${fee.toLocaleString()} が運営）。残りは死守しよう。`
+            : '完全達成すれば、掛け金は全額戻ってきます。'}
+        </Text>
+      </View>
 
       <View style={styles.list}>
         {weeks.map((w) => (
-          <WeekCard key={w.weekIndex} week={w} freeMonth={isFreeMonth} />
+          <WeekCard key={w.weekIndex} week={w} />
         ))}
       </View>
 
       <Text style={styles.note}>
-        ※ 月額 ¥{MONTHLY_STAKE} の積立と ¥{WEEKLY_PENALTY} 没収はすべてモックです。実際の決済は行いません。
+        ※ 掛け金・返還・没収・手数料（{Math.round(PLATFORM_FEE_RATE * 100)}%）はすべてモックです。実際の決済は行いません。
       </Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
   );
 }
 
-function WeekCard({ week, freeMonth }: { week: WeekSummary; freeMonth: boolean }) {
+function Break({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <View style={styles.breakItem}>
+      <Text style={[styles.breakValue, { color }]}>¥{value.toLocaleString()}</Text>
+      <Text style={styles.breakLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function WeekCard({ week }: { week: WeekSummary }) {
   const state = stateOf(week);
   const ratio = week.scheduled ? week.done / week.scheduled : 0;
   const isMissed = state === 'missed';
@@ -136,12 +127,17 @@ function WeekCard({ week, freeMonth }: { week: WeekSummary; freeMonth: boolean }
             ? `達成 ${week.done} ・ 残り ${week.pending} ・ 目標 ${week.scheduled}`
             : `達成 ${week.done} ・ 目標 ${week.scheduled}`}
         </Text>
-        {isMissed && !freeMonth && (
+        {week.chargedAmount > 0 ? (
           <View style={styles.penaltyPill}>
             <Ionicons name="remove-circle" size={14} color={colors.danger} />
-            <Text style={styles.penaltyText}>−¥{WEEKLY_PENALTY}</Text>
+            <Text style={styles.penaltyText}>没収 −¥{week.chargedAmount.toLocaleString()}</Text>
           </View>
-        )}
+        ) : week.refundedAmount > 0 ? (
+          <View style={styles.returnPill}>
+            <Ionicons name="arrow-undo" size={14} color={colors.success} />
+            <Text style={styles.returnText}>返還 +¥{week.refundedAmount.toLocaleString()}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -223,6 +219,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   penaltyText: { fontSize: 13, fontWeight: '800', color: colors.danger, fontVariant: ['tabular-nums'] },
+  returnPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(74,222,128,0.14)',
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  returnText: { fontSize: 13, fontWeight: '800', color: colors.success, fontVariant: ['tabular-nums'] },
+  poolBreak: { flexDirection: 'row', marginTop: 12, marginBottom: 4 },
+  breakItem: { flex: 1, alignItems: 'center' },
+  breakValue: { fontSize: 16, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  breakLabel: { fontSize: 10, color: colors.textSub, fontWeight: '600', marginTop: 2 },
 
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18 },
 });

@@ -165,10 +165,10 @@ export default function RankScreen() {
             accent={colors.warning}
           />
           <LifeStat
-            icon="remove-circle"
-            label="通算没収"
-            value={`¥${lifetime.totalCharged.toLocaleString()}`}
-            accent={colors.danger}
+            icon="arrow-undo"
+            label="通算返還"
+            value={`¥${lifetime.totalReturned.toLocaleString()}`}
+            accent={colors.success}
           />
         </View>
       </Card>

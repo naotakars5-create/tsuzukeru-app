@@ -44,10 +44,8 @@ export interface Goal {
   weeklyTarget: number;
   /** 1日の目標勉強時間（分）。この時間に届いた日が「達成」 */
   dailyTargetMin: number;
-  /** 積立額（数値のみ。実決済はしない） */
-  stakeAmount: number;
-  /** このシーズン開始時に実際に課金した額（0=無料月・モック） */
-  startCharge: number;
+  /** 掛け金（デポジット・自分で預けるお金。達成で全額返還・モック） */
+  deposit: number;
   /** 開始日 'YYYY-MM-DD' */
   startDate: string;
   /** 期間（週）: MVPは4週固定 */
@@ -81,12 +79,12 @@ export interface LifetimeStats {
   perfectSeasons: number;
   /** 通算勉強時間（分・全シーズン） */
   totalMinutes: number;
-  /** 通算で没収された額（モック） */
-  totalCharged: number;
-  /** 通算で支払った額（モック） */
-  totalPaid: number;
-  /** 次のシーズンを無料にする権利（前月パーフェクトで付与） */
-  nextSeasonFree: boolean;
+  /** 通算で預けた掛け金（モック） */
+  totalDeposited: number;
+  /** 通算で返還された額（達成分・モック） */
+  totalReturned: number;
+  /** 通算で没収された額（未達分・モック） */
+  totalForfeited: number;
 }
 
 /** 自分のプロフィール */

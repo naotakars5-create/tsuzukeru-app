@@ -7,7 +7,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { colors, font, spacing, radius } from '@/theme';
 import { formatStopwatch, formatMinutes } from '@/logic/time';
-import { WEEKLY_PENALTY } from '@/logic/billing';
+import { weekStake } from '@/logic/billing';
 
 /**
  * 勉強タイマー画面。グローバルなストップウォッチで勉強時間を計測し、
@@ -58,6 +58,7 @@ export default function TodayScreen() {
 
   const currentWeek = weeks.find((w) => w.isCurrent);
   const weekAlreadyCharged = (currentWeek?.missed ?? 0) > 0;
+  const stake = goal ? weekStake(goal.deposit, goal.durationWeeks) : 0;
 
   return (
     <View style={styles.screen}>
@@ -76,8 +77,8 @@ export default function TodayScreen() {
               <Ionicons name="alert-circle" size={18} color={colors.danger} />
               <Text style={styles.bannerText}>
                 {weekAlreadyCharged
-                  ? `今週は ¥${WEEKLY_PENALTY} 没収確定。記録は今日から立て直せる`
-                  : `目標に届かない日が続くと、今週ぶんの ¥${WEEKLY_PENALTY} が没収されます`}
+                  ? `今週ぶんの掛け金 ¥${stake.toLocaleString()} は没収確定。記録は今日から立て直せる`
+                  : `未達だと、今週ぶんの掛け金 ¥${stake.toLocaleString()} が戻ってきません`}
               </Text>
             </View>
           )}

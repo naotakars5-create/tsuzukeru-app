@@ -44,7 +44,6 @@ import {
   isSeasonComplete,
   EMPTY_LIFETIME,
 } from '@/logic/summary';
-import { MONTHLY_STAKE } from '@/logic/billing';
 import { scheduleDailyReminder, cancelReminders } from '@/logic/reminder';
 import { BADGES, satisfiedBadgeKeys } from '@/logic/badges';
 
@@ -61,7 +60,6 @@ interface AppContextValue {
   seasonResult: ReturnType<typeof buildSeasonResult>;
   seasonNumber: number;
   seasonComplete: boolean;
-  nextStartCharge: number;
   isTodayScheduled: boolean;
   todayStatus: 'done' | 'missed' | 'pending';
   badges: BadgeView[];
@@ -89,6 +87,7 @@ export interface NewGoalInput {
   weekdays: number[];
   weeklyTarget: number;
   dailyTargetMin: number;
+  deposit: number;
   durationWeeks: number;
 }
 
@@ -136,7 +135,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       perfectWeeks: seasonResult.perfectWeeks,
       seasonsCompleted: lifetime.seasonsCompleted,
       perfectSeasons: lifetime.perfectSeasons,
-      totalPaid: lifetime.totalPaid,
+      totalReturned: lifetime.totalReturned,
     });
     const additions = satisfied.filter((k) => !(k in badgesMap));
     if (additions.length === 0) return;
@@ -147,6 +146,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveBadges(next);
   }, [ready, progress, seasonResult, lifetime, badgesMap]);
 
+  /** 完了シーズンを通算へ畳み込む（返還/没収/預けを反映） */
   const foldSeasonIntoLifetime = useCallback((): LifetimeStats => {
     const r = buildSeasonResult(goal, minutes);
     return {
@@ -155,18 +155,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       seasonsCompleted: lifetime.seasonsCompleted + 1,
       perfectSeasons: lifetime.perfectSeasons + (r.allPerfect ? 1 : 0),
       totalMinutes: lifetime.totalMinutes + r.minutes,
-      totalCharged: lifetime.totalCharged + r.charged,
-      totalPaid: lifetime.totalPaid,
-      nextSeasonFree: r.allPerfect,
+      totalDeposited: lifetime.totalDeposited,
+      totalReturned: lifetime.totalReturned + r.returned,
+      totalForfeited: lifetime.totalForfeited + r.forfeited,
     };
   }, [goal, minutes, lifetime, progress.bestStreak]);
 
-  const nextStartCharge = useMemo(() => {
-    if (goal && isSeasonComplete(goal) && seasonResult.allPerfect) return 0;
-    return lifetime.nextSeasonFree ? 0 : MONTHLY_STAKE;
-  }, [goal, seasonResult.allPerfect, lifetime.nextSeasonFree]);
-
-  const makeGoal = useCallback((input: NewGoalInput, startCharge: number): Goal => {
+  const makeGoal = useCallback((input: NewGoalInput): Goal => {
     return {
       id: `${Date.now()}`,
       name: input.name.trim(),
@@ -175,61 +170,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       weekdays: input.weekdays,
       weeklyTarget: input.weeklyTarget,
       dailyTargetMin: input.dailyTargetMin,
-      stakeAmount: MONTHLY_STAKE,
-      startCharge,
+      deposit: input.deposit,
       startDate: todayStr(),
       durationWeeks: input.durationWeeks,
       createdAt: new Date().toISOString(),
     };
   }, []);
 
-  const applyStartCharge = useCallback(
-    (base: LifetimeStats): { lifetime: LifetimeStats; charge: number } => {
-      const charge = base.nextSeasonFree ? 0 : MONTHLY_STAKE;
-      return {
-        charge,
-        lifetime: { ...base, totalPaid: base.totalPaid + charge, nextSeasonFree: false },
-      };
-    },
-    []
-  );
-
   const createGoal = useCallback(
     async (input: NewGoalInput) => {
       let base = lifetime;
       if (goal && isSeasonComplete(goal)) base = foldSeasonIntoLifetime();
-      const { lifetime: charged, charge } = applyStartCharge(base);
-      const newGoal = makeGoal(input, charge);
-      setLifetime(charged);
+      // 掛け金を預ける（通算預けに加算・モック）
+      const nextLifetime = { ...base, totalDeposited: base.totalDeposited + input.deposit };
+      const newGoal = makeGoal(input);
+      setLifetime(nextLifetime);
       setGoal(newGoal);
       setMinutes({});
-      await Promise.all([saveLifetime(charged), saveGoal(newGoal), saveMinutes({})]);
+      await Promise.all([saveLifetime(nextLifetime), saveGoal(newGoal), saveMinutes({})]);
       if (reminder.enabled) {
         await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
       }
     },
-    [goal, lifetime, foldSeasonIntoLifetime, applyStartCharge, makeGoal, reminder]
+    [goal, lifetime, foldSeasonIntoLifetime, makeGoal, reminder]
   );
 
   const startNextSeason = useCallback(async () => {
     if (!goal) return;
     const folded = foldSeasonIntoLifetime();
-    const { lifetime: charged, charge } = applyStartCharge(folded);
+    const nextLifetime = { ...folded, totalDeposited: folded.totalDeposited + goal.deposit };
     const newGoal: Goal = {
       ...goal,
       id: `${Date.now()}`,
-      startCharge: charge,
       startDate: todayStr(),
       createdAt: new Date().toISOString(),
     };
-    setLifetime(charged);
+    setLifetime(nextLifetime);
     setGoal(newGoal);
     setMinutes({});
-    await Promise.all([saveLifetime(charged), saveGoal(newGoal), saveMinutes({})]);
+    await Promise.all([saveLifetime(nextLifetime), saveGoal(newGoal), saveMinutes({})]);
     if (reminder.enabled) {
       await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
     }
-  }, [goal, foldSeasonIntoLifetime, applyStartCharge, reminder]);
+  }, [goal, foldSeasonIntoLifetime, reminder]);
 
   const addStudyMinutes = useCallback(async (min: number) => {
     if (min <= 0) return;
@@ -339,7 +322,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     seasonResult,
     seasonNumber: lifetime.seasonsCompleted + 1,
     seasonComplete,
-    nextStartCharge,
     isTodayScheduled,
     todayStatus,
     badges,

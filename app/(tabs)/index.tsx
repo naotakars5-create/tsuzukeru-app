@@ -95,13 +95,11 @@ export default function HomeScreen() {
         ? Math.round((seasonResult.done / seasonResult.scheduled) * 100)
         : 0;
 
-    const nextFree = seasonResult.allPerfect;
+    const allPerfect = seasonResult.allPerfect;
     const onNext = async () => {
       const ok = await confirmAsync(
         '次のシーズンを始める',
-        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\n${
-          nextFree ? '今月パーフェクト達成！次の月は無料です。' : '次の月も月額¥500の積立です（モック）。'
-        }`,
+        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\n再び ¥${goal.deposit.toLocaleString()} を預けます（モック）。`,
         '始める'
       );
       if (ok) startNextSeason();
@@ -143,14 +141,19 @@ export default function HomeScreen() {
                   value={`${seasonResult.perfectWeeks}`}
                   unit="/ 4"
                 />
-                {nextFree ? (
-                  <StatChip icon="gift" accent={colors.success} label="ごほうび" value="翌月無料" />
+                {allPerfect ? (
+                  <StatChip
+                    icon="arrow-undo"
+                    accent={colors.success}
+                    label="全額返還"
+                    value={`¥${seasonResult.returned.toLocaleString()}`}
+                  />
                 ) : (
                   <StatChip
                     icon="wallet"
-                    accent={colors.warning}
-                    label="積立の残り"
-                    value={`¥${seasonResult.poolRemaining.toLocaleString()}`}
+                    accent={colors.success}
+                    label="返還"
+                    value={`¥${seasonResult.returned.toLocaleString()}`}
                   />
                 )}
               </View>

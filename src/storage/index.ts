@@ -52,8 +52,8 @@ export async function loadState(): Promise<PersistedState> {
     if (goal) {
       if (!goal.category) goal.category = 'other';
       if (goal.weeklyTarget == null) goal.weeklyTarget = 3;
-      if (goal.startCharge == null) goal.startCharge = 0;
       if (goal.dailyTargetMin == null) goal.dailyTargetMin = 120;
+      if (goal.deposit == null) goal.deposit = 3000;
     }
     const minutes: MinutesMap = minutesRaw ? JSON.parse(minutesRaw) : {};
     const timerStartedAt: number | null = timerRaw ? JSON.parse(timerRaw) : null;
