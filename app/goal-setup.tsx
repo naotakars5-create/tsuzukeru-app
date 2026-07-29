@@ -17,7 +17,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { Frequency, GoalCategory, IconName } from '@/types';
 import { CATEGORIES, DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
-import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, PLATFORM_FEE_RATE, weekStake } from '@/logic/billing';
+import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
 import { quoteOfToday } from '@/logic/quotes';
 import { todayStr } from '@/logic/date';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
@@ -70,16 +70,16 @@ export default function GoalSetupScreen() {
     }
 
     const depositMsg =
-      `¥${deposit.toLocaleString()} を預けて始めます（モック・実際の決済はしません）。\n` +
-      `達成すれば全額返還。サボった週ぶん（¥${perWeekStake.toLocaleString()}/週）だけ戻りません。`;
+      `コミット額 ¥${deposit.toLocaleString()} で始めます（モック・実際の決済はしません）。\n` +
+      `お金は預かりません。達成すれば¥0、サボった週ぶん（¥${perWeekStake.toLocaleString()}/週）だけ後から課金されます。`;
     const confirmMsg = goal
       ? `これまでの記録はリセットされ、新しい4週間が始まります。\n${depositMsg}`
       : depositMsg;
 
     const ok = await confirmAsync(
-      goal ? '目標を作り直しますか？' : `¥${deposit.toLocaleString()} を預けて始めますか？`,
+      goal ? '目標を作り直しますか？' : `コミット ¥${deposit.toLocaleString()} で始めますか？`,
       confirmMsg,
-      goal ? '作り直す' : '預けて始める'
+      goal ? '作り直す' : 'この覚悟で始める'
     );
     if (!ok) return;
 
@@ -268,11 +268,11 @@ export default function GoalSetupScreen() {
           <Text style={styles.helper}>1ヶ月ごとにシーズンが区切られ、仲間と競います。</Text>
         </Card>
 
-        {/* 掛け金（デポジット・モック） */}
+        {/* コミット額（案C・モック。お金は預からない） */}
         <Card>
-          <Text style={styles.label}>掛け金を預ける（モック・実際の決済はしません）</Text>
+          <Text style={styles.label}>コミット額を決める（モック・実際の決済はしません）</Text>
           <Text style={styles.helper}>
-            自分のお金を預けて、自分を追い込む方式。達成すれば全額戻ります。
+            お金は預かりません。達成すれば¥0、サボった週ぶんだけ後からカードに課金される方式です。
           </Text>
           <View style={styles.countRow}>
             {DEPOSIT_OPTIONS.map((d) => {
@@ -297,26 +297,25 @@ export default function GoalSetupScreen() {
             <View style={styles.stakeRule}>
               <Ionicons name="checkmark-circle" size={15} color={colors.success} />
               <Text style={styles.stakeRuleText}>
-                その週を達成 → ¥{perWeekStake.toLocaleString()}/週 が返還
+                その週を達成 → ¥0（課金なし・免除）
               </Text>
             </View>
             <View style={styles.stakeRule}>
-              <Ionicons name="close-circle" size={15} color={colors.danger} />
+              <Ionicons name="card" size={15} color={colors.danger} />
               <Text style={styles.stakeRuleText}>
-                未達の週 → ¥{perWeekStake.toLocaleString()} 没収（手数料
-                {Math.round(PLATFORM_FEE_RATE * 100)}%が運営）
+                未達の週 → ¥{perWeekStake.toLocaleString()}/週 だけ後から課金
               </Text>
             </View>
             <View style={styles.stakeRule}>
               <Ionicons name="trophy" size={15} color={colors.warning} />
-              <Text style={styles.stakeRuleText}>完全達成なら ¥{deposit.toLocaleString()} 全額返還</Text>
+              <Text style={styles.stakeRuleText}>完全達成なら ¥0（続けた人は無料）</Text>
             </View>
           </View>
         </Card>
 
         <PrimaryButton
-          label={goal ? '目標を作り直す' : `¥${deposit.toLocaleString()} を預けて始める`}
-          icon="wallet"
+          label={goal ? '目標を作り直す' : `コミット ¥${deposit.toLocaleString()} で始める`}
+          icon="flame"
           onPress={onSave}
           style={{ marginTop: spacing.sm }}
         />

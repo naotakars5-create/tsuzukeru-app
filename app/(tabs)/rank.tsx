@@ -165,9 +165,9 @@ export default function RankScreen() {
             accent={colors.warning}
           />
           <LifeStat
-            icon="arrow-undo"
-            label="通算返還"
-            value={`¥${lifetime.totalReturned.toLocaleString()}`}
+            icon="checkmark-circle"
+            label="通算免除"
+            value={`¥${lifetime.totalWaived.toLocaleString()}`}
             accent={colors.success}
           />
         </View>

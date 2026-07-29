@@ -68,7 +68,7 @@ export default function HomeScreen() {
           </Text>
 
           <View style={styles.pillars}>
-            <Pillar icon="alert-circle" color={colors.danger} title="サボると、痛み" desc="未達の週は¥100没収（モック）。だから続く。" />
+            <Pillar icon="alert-circle" color={colors.danger} title="サボると、痛み" desc="未達の週だけ後から課金（モック）。だから続く。" />
             <Pillar icon="gift" color={colors.success} title="続けると、報酬" desc="1ヶ月やり切れば翌月無料。ランクも上がる。" />
             <Pillar icon="people" color={colors.primary} title="仲間と、競う" desc="同じ資格を目指す人と月間ランキングで競争。" />
             <Pillar icon="timer" color={colors.purple} title="時間で、記録" desc="ストップウォッチで勉強時間を計測して積み上げ。" />
@@ -99,7 +99,7 @@ export default function HomeScreen() {
     const onNext = async () => {
       const ok = await confirmAsync(
         '次のシーズンを始める',
-        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\n再び ¥${goal.deposit.toLocaleString()} を預けます（モック）。`,
+        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\nコミット額は ¥${goal.deposit.toLocaleString()}（お金は預かりません。未達の週だけ課金・モック）。`,
         '始める'
       );
       if (ok) startNextSeason();
@@ -143,17 +143,17 @@ export default function HomeScreen() {
                 />
                 {allPerfect ? (
                   <StatChip
-                    icon="arrow-undo"
+                    icon="checkmark-circle"
                     accent={colors.success}
-                    label="全額返還"
-                    value={`¥${seasonResult.returned.toLocaleString()}`}
+                    label="課金ゼロ"
+                    value="¥0"
                   />
                 ) : (
                   <StatChip
-                    icon="wallet"
-                    accent={colors.success}
-                    label="返還"
-                    value={`¥${seasonResult.returned.toLocaleString()}`}
+                    icon="card"
+                    accent={seasonResult.charged > 0 ? colors.danger : colors.success}
+                    label="課金"
+                    value={`¥${seasonResult.charged.toLocaleString()}`}
                   />
                 )}
               </View>

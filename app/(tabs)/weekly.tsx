@@ -6,7 +6,6 @@ import { useApp } from '@/context/AppContext';
 import { ProgressBar } from '@/components/ProgressBar';
 import { colors, font, labelStyle, spacing } from '@/theme';
 import { compareDate, todayStr } from '@/logic/date';
-import { PLATFORM_FEE_RATE, platformFee } from '@/logic/billing';
 import { WeekSummary } from '@/types';
 
 type WeekState = 'done' | 'missed' | 'current' | 'future';
@@ -17,7 +16,7 @@ function stateOf(week: WeekSummary): WeekState {
   return week.missed > 0 ? 'missed' : 'done';
 }
 
-/** 週次レポート: 4週の達成状況と、預けた掛け金（デポジット）の返還/没収を表示。 */
+/** 週次レポート: 4週の達成状況と、コミット額の課金/免除（案C）を表示。 */
 export default function WeeklyScreen() {
   const { goal, weeks, seasonResult } = useApp();
 
@@ -29,9 +28,8 @@ export default function WeeklyScreen() {
     );
   }
 
-  const { returned, forfeited, held } = seasonResult;
-  const deposit = goal.deposit;
-  const fee = platformFee(forfeited);
+  const { charged, waived, pending } = seasonResult;
+  const commit = goal.deposit;
 
   return (
     <ScrollView
@@ -39,24 +37,25 @@ export default function WeeklyScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* 掛け金デポジット */}
+      {/* コミット額（案C: お金は預からない） */}
       <View style={styles.poolCard}>
         <View style={styles.poolHead}>
-          <Ionicons name="wallet" size={18} color={colors.primary} />
-          <Text style={styles.poolLabel}>預けた掛け金（モック）</Text>
+          <Ionicons name="flag" size={18} color={colors.primary} />
+          <Text style={styles.poolLabel}>コミット額（お金は預かりません）</Text>
         </View>
         <View style={styles.poolAmountRow}>
-          <Text style={styles.poolRemaining}>¥{deposit.toLocaleString()}</Text>
+          <Text style={styles.poolRemaining}>¥{commit.toLocaleString()}</Text>
+          <Text style={styles.poolTotal}>達成すれば ¥0</Text>
         </View>
         <View style={styles.poolBreak}>
-          <Break label="返還" value={returned} color={colors.success} />
-          <Break label="預かり中" value={held} color={colors.textSub} />
-          <Break label="没収" value={forfeited} color={colors.danger} />
+          <Break label="免除 (¥0)" value={waived} color={colors.success} />
+          <Break label="進行中" value={pending} color={colors.textSub} />
+          <Break label="課金予定" value={charged} color={colors.danger} />
         </View>
         <Text style={styles.poolCopy}>
-          {forfeited > 0
-            ? `未達で ¥${forfeited.toLocaleString()} 没収（うち手数料 ¥${fee.toLocaleString()} が運営）。残りは死守しよう。`
-            : '完全達成すれば、掛け金は全額戻ってきます。'}
+          {charged > 0
+            ? `未達の週ぶん ¥${charged.toLocaleString()} が課金予定（登録カードへ）。残りは達成して¥0で乗り切ろう。`
+            : 'このまま完全達成すれば、1円も課金されません（続けた人は無料）。'}
         </Text>
       </View>
 
@@ -67,7 +66,7 @@ export default function WeeklyScreen() {
       </View>
 
       <Text style={styles.note}>
-        ※ 掛け金・返還・没収・手数料（{Math.round(PLATFORM_FEE_RATE * 100)}%）はすべてモックです。実際の決済は行いません。
+        ※ コミット額・課金・免除はすべてモックです。実際の決済は行いません。開始時に預り金はなく、未達の週ぶんだけ後から課金される設計です。
       </Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
@@ -129,13 +128,13 @@ function WeekCard({ week }: { week: WeekSummary }) {
         </Text>
         {week.chargedAmount > 0 ? (
           <View style={styles.penaltyPill}>
-            <Ionicons name="remove-circle" size={14} color={colors.danger} />
-            <Text style={styles.penaltyText}>没収 −¥{week.chargedAmount.toLocaleString()}</Text>
+            <Ionicons name="card" size={14} color={colors.danger} />
+            <Text style={styles.penaltyText}>課金 ¥{week.chargedAmount.toLocaleString()}</Text>
           </View>
         ) : week.refundedAmount > 0 ? (
           <View style={styles.returnPill}>
-            <Ionicons name="arrow-undo" size={14} color={colors.success} />
-            <Text style={styles.returnText}>返還 +¥{week.refundedAmount.toLocaleString()}</Text>
+            <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+            <Text style={styles.returnText}>免除 ¥0</Text>
           </View>
         ) : null}
       </View>

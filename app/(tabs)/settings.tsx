@@ -64,7 +64,7 @@ export default function SettingsScreen() {
               <Text style={styles.goalName}>{goal.name}</Text>
             </View>
             <Text style={styles.goalMeta}>
-              {category.label}・{frequencyLabel(goal)}・4週間・掛け金¥{goal.deposit.toLocaleString()}（モック）
+              {category.label}・{frequencyLabel(goal)}・4週間・コミット¥{goal.deposit.toLocaleString()}（モック）
             </Text>
             <Text style={styles.goalMeta}>開始日: {formatDisplay(goal.startDate)}</Text>
             <PrimaryButton
@@ -169,7 +169,7 @@ export default function SettingsScreen() {
       {/* 将来の機能 — 実決済のみ残す */}
       <Card>
         <Text style={styles.sectionLabel}>これからの機能</Text>
-        <FutureRow icon="card" title="実際の積立・返還" desc="本番の決済連携（今後追加予定）" />
+        <FutureRow icon="card" title="実際のカード登録・課金" desc="本番の決済連携（達成すれば¥0・今後追加予定）" />
         <FutureRow icon="share-social" title="友だち招待" desc="本物の仲間との連携（今後追加予定）" />
       </Card>
 

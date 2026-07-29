@@ -135,7 +135,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       perfectWeeks: seasonResult.perfectWeeks,
       seasonsCompleted: lifetime.seasonsCompleted,
       perfectSeasons: lifetime.perfectSeasons,
-      totalReturned: lifetime.totalReturned,
+      totalWaived: lifetime.totalWaived,
     });
     const additions = satisfied.filter((k) => !(k in badgesMap));
     if (additions.length === 0) return;
@@ -146,7 +146,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveBadges(next);
   }, [ready, progress, seasonResult, lifetime, badgesMap]);
 
-  /** 完了シーズンを通算へ畳み込む（返還/没収/預けを反映） */
+  /** 完了シーズンを通算へ畳み込む（課金/免除を反映・案C。お金は預からない） */
   const foldSeasonIntoLifetime = useCallback((): LifetimeStats => {
     const r = buildSeasonResult(goal, minutes);
     return {
@@ -155,9 +155,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       seasonsCompleted: lifetime.seasonsCompleted + 1,
       perfectSeasons: lifetime.perfectSeasons + (r.allPerfect ? 1 : 0),
       totalMinutes: lifetime.totalMinutes + r.minutes,
-      totalDeposited: lifetime.totalDeposited,
-      totalReturned: lifetime.totalReturned + r.returned,
-      totalForfeited: lifetime.totalForfeited + r.forfeited,
+      totalCharged: lifetime.totalCharged + r.charged,
+      totalWaived: lifetime.totalWaived + r.waived,
     };
   }, [goal, minutes, lifetime, progress.bestStreak]);
 
@@ -181,8 +180,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async (input: NewGoalInput) => {
       let base = lifetime;
       if (goal && isSeasonComplete(goal)) base = foldSeasonIntoLifetime();
-      // 掛け金を預ける（通算預けに加算・モック）
-      const nextLifetime = { ...base, totalDeposited: base.totalDeposited + input.deposit };
+      // 案C: 開始時は課金しない（カード登録＋コミットのみ）。お金は預からない
+      const nextLifetime = base;
       const newGoal = makeGoal(input);
       setLifetime(nextLifetime);
       setGoal(newGoal);
@@ -197,8 +196,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const startNextSeason = useCallback(async () => {
     if (!goal) return;
-    const folded = foldSeasonIntoLifetime();
-    const nextLifetime = { ...folded, totalDeposited: folded.totalDeposited + goal.deposit };
+    // 案C: 次シーズン開始時も課金しない（お金は預からない）
+    const nextLifetime = foldSeasonIntoLifetime();
     const newGoal: Goal = {
       ...goal,
       id: `${Date.now()}`,

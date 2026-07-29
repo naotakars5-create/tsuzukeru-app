@@ -23,9 +23,8 @@ export const EMPTY_LIFETIME: LifetimeStats = {
   seasonsCompleted: 0,
   perfectSeasons: 0,
   totalMinutes: 0,
-  totalDeposited: 0,
-  totalReturned: 0,
-  totalForfeited: 0,
+  totalCharged: 0,
+  totalWaived: 0,
 };
 
 /**
@@ -191,12 +190,12 @@ export function buildWeeks(goal: Goal | null, minutes: MinutesMap): WeekSummary[
       }
     }
 
-    // デポジット方式: 週ぶんの掛け金を、達成なら返還・未達なら没収
+    // 案C: 週ぶんのコミット額を、達成なら免除(¥0)・未達なら課金（お金は預からない）
     const stake = weekStake(goal.deposit, goal.durationWeeks);
     const failed = missed > 0;
     const perfect = scheduled > 0 && missed === 0 && pending === 0;
-    const chargedAmount = isPast && failed ? stake : 0; // 没収
-    const refundedAmount = isPast && perfect ? stake : 0; // 返還
+    const chargedAmount = isPast && failed ? stake : 0; // 未達 → 課金
+    const refundedAmount = isPast && perfect ? stake : 0; // 達成 → 免除(¥0)
 
     weeks.push({
       weekIndex: w,
@@ -221,19 +220,21 @@ export function isSeasonComplete(goal: Goal | null): boolean {
   return compareDate(todayStr(), goalEndDate(goal)) > 0;
 }
 
-/** 現シーズンの成績サマリー（デポジット） */
+/** 現シーズンの成績サマリー（案C: 課金・免除） */
 export interface SeasonResult {
   done: number;
   missed: number;
   scheduled: number;
   perfectWeeks: number;
   allPerfect: boolean;
-  /** 没収された額（未達分） */
-  forfeited: number;
-  /** 返還された額（達成分） */
-  returned: number;
-  /** まだ結果が出ていない預かり中の額 */
-  held: number;
+  /** 課金された額（未達の週ぶん） */
+  charged: number;
+  /** 免除された額（達成した週ぶん・¥0で済んだぶん） */
+  waived: number;
+  /** まだ結果が出ていない（進行中・今後の週ぶん）額 */
+  pending: number;
+  /** コミット額の合計 */
+  commit: number;
   minutes: number;
 }
 
@@ -243,26 +244,27 @@ export function buildSeasonResult(goal: Goal | null, minutes: MinutesMap): Seaso
   let missed = 0;
   let scheduled = 0;
   let perfectWeeks = 0;
-  let forfeited = 0;
-  let returned = 0;
+  let charged = 0;
+  let waived = 0;
   for (const w of weeks) {
     done += w.done;
     missed += w.missed;
     scheduled += w.scheduled;
-    forfeited += w.chargedAmount;
-    returned += w.refundedAmount;
+    charged += w.chargedAmount;
+    waived += w.refundedAmount;
     if (w.scheduled > 0 && w.missed === 0 && w.pending === 0) perfectWeeks += 1;
   }
-  const deposit = goal?.deposit ?? 0;
+  const commit = goal?.deposit ?? 0;
   return {
     done,
     missed,
     scheduled,
     perfectWeeks,
     allPerfect: scheduled > 0 && missed === 0,
-    forfeited,
-    returned,
-    held: Math.max(0, deposit - forfeited - returned),
+    charged,
+    waived,
+    pending: Math.max(0, commit - charged - waived),
+    commit,
     minutes: goal ? seasonMinutes(goal, minutes) : 0,
   };
 }

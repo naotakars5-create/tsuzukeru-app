@@ -44,7 +44,7 @@ export interface Goal {
   weeklyTarget: number;
   /** 1日の目標勉強時間（分）。この時間に届いた日が「達成」 */
   dailyTargetMin: number;
-  /** 掛け金（デポジット・自分で預けるお金。達成で全額返還・モック） */
+  /** コミット額（達成すれば¥0、未達の週ぶんだけ課金・モック。お金は預からない） */
   deposit: number;
   /** 開始日 'YYYY-MM-DD' */
   startDate: string;
@@ -79,12 +79,10 @@ export interface LifetimeStats {
   perfectSeasons: number;
   /** 通算勉強時間（分・全シーズン） */
   totalMinutes: number;
-  /** 通算で預けた掛け金（モック） */
-  totalDeposited: number;
-  /** 通算で返還された額（達成分・モック） */
-  totalReturned: number;
-  /** 通算で没収された額（未達分・モック） */
-  totalForfeited: number;
+  /** 通算で課金された額（未達の週ぶん・モック） */
+  totalCharged: number;
+  /** 通算で免除された額（達成した週ぶん・モック） */
+  totalWaived: number;
 }
 
 /** 自分のプロフィール */
@@ -178,9 +176,9 @@ export interface WeekSummary {
   done: number;
   missed: number;
   pending: number;
-  /** この週で確定した課金（モック・未達があると週¥100没収） */
+  /** この週で確定した課金（モック・未達があると週ぶんを課金） */
   chargedAmount: number;
-  /** この週で返金された額（モック・週の予定を完全達成で¥100返金） */
+  /** この週で免除された額（モック・週の予定を完全達成で¥0） */
   refundedAmount: number;
   isCurrent: boolean;
 }

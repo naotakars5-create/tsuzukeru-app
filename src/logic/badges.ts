@@ -15,7 +15,7 @@ export interface BadgeContext {
   perfectWeeks: number; // これまでの完全達成した週の数
   seasonsCompleted: number; // 完走シーズン数
   perfectSeasons: number; // 完全達成で完走したシーズン数
-  totalReturned: number; // 通算返還額（掛け金を取り戻した額）
+  totalWaived: number; // 通算免除額（達成して課金ゼロで済んだ額）
 }
 
 interface BadgeDefWithTest extends BadgeDef {
@@ -73,19 +73,19 @@ export const BADGES: BadgeDefWithTest[] = [
   },
   {
     key: 'full_return',
-    label: '全額奪還',
-    description: '掛け金を全額取り戻した',
+    label: '課金ゼロ',
+    description: '一度も課金されずシーズン完走',
     icon: 'wallet',
     color: '#A78BFA',
     test: (c) => c.perfectSeasons >= 1,
   },
   {
     key: 'returned_3000',
-    label: '損して得取れ',
-    description: '通算 ¥3,000 以上を返還',
+    label: '免除の達人',
+    description: '通算 ¥3,000 以上を免除',
     icon: 'cash',
     color: '#4ADE80',
-    test: (c) => c.totalReturned >= 3000,
+    test: (c) => c.totalWaived >= 3000,
   },
   {
     key: 'done_50',

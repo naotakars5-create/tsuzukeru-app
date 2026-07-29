@@ -77,8 +77,8 @@ export default function TodayScreen() {
               <Ionicons name="alert-circle" size={18} color={colors.danger} />
               <Text style={styles.bannerText}>
                 {weekAlreadyCharged
-                  ? `今週ぶんの掛け金 ¥${stake.toLocaleString()} は没収確定。記録は今日から立て直せる`
-                  : `未達だと、今週ぶんの掛け金 ¥${stake.toLocaleString()} が戻ってきません`}
+                  ? `今週ぶん ¥${stake.toLocaleString()} は課金確定。記録は今日から立て直せる`
+                  : `未達だと、今週ぶん ¥${stake.toLocaleString()} が後から課金されます`}
               </Text>
             </View>
           )}
