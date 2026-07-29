@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
+import { FlameMascot } from '@/components/FlameMascot';
 import { colors, font, spacing, radius } from '@/theme';
 import { formatStopwatch, formatMinutes } from '@/logic/time';
 import { weekStake } from '@/logic/billing';
@@ -105,6 +106,23 @@ export default function TodayScreen() {
             )}
           </View>
 
+          {/* マスコットの応援 */}
+          <View style={styles.cheerRow}>
+            <FlameMascot
+              size={52}
+              mood={reached ? 'celebrate' : running ? 'happy' : 'idle'}
+            />
+            <View style={styles.speech}>
+              <Text style={styles.speechText}>
+                {reached
+                  ? 'やりきったね！かっこいい🔥'
+                  : running
+                  ? '燃えてる燃えてる、その調子！'
+                  : 'ボタンを押して、始めよう'}
+              </Text>
+            </View>
+          </View>
+
           <View style={styles.controls}>
             <Animated.View style={{ transform: [{ scale: pulse }], alignSelf: 'stretch' }}>
               {running ? (
@@ -185,6 +203,23 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   doneTagText: { fontSize: font.sub, fontWeight: '800', color: colors.success },
+
+  cheerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  speech: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  speechText: { fontSize: font.sub, fontWeight: '700', color: colors.text },
 
   controls: { paddingBottom: 34, gap: spacing.md },
   bigBtn: { height: 64 },
