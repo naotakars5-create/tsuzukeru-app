@@ -12,19 +12,11 @@ export type IconName = ComponentProps<typeof Ionicons>['name'];
 /** 目標の頻度: 毎日 / 特定曜日 / 週N回（曜日は自由） */
 export type Frequency = 'daily' | 'weekdays' | 'weekly_count';
 
-/** 資格・試験コミュニティ（仲間・ランキングのグループ分けに使う） */
-export type GoalCategory =
-  | 'univ'
-  | 'highschool'
-  | 'gyosei'
-  | 'takken'
-  | 'boki'
-  | 'shindanshi'
-  | 'sharoushi'
-  | 'fp'
-  | 'toeic'
-  | 'komuin'
-  | 'other';
+/**
+ * 資格・試験コミュニティのキー（仲間・ランキングのグループ分けに使う）。
+ * 種類が多いので固定の直和ではなく文字列ID。定義は src/logic/category.ts。
+ */
+export type GoalCategory = string;
 
 /** その日の達成状態 */
 export type DayStatus = 'done' | 'missed' | 'pending';
@@ -100,14 +92,20 @@ export interface Profile {
 /** バッジの解除状態: key -> 解除日 'YYYY-MM-DD' */
 export type BadgeMap = Record<string, string>;
 
-/** 任意で作る/参加するグループ（モック） */
+/** 任意で作る/参加するコミュニティ（モック） */
 export interface CustomGroup {
   /** 参加コード（共有用・モック） */
   code: string;
-  /** グループ名 */
+  /** コミュニティ名 */
   name: string;
   /** 自分が作成者か */
   owner: boolean;
+  /** 関連する資格カテゴリ（任意） */
+  category?: GoalCategory;
+  /** 参加人数（モック表示用） */
+  members?: number;
+  /** ひとこと説明（任意） */
+  tagline?: string;
 }
 
 /** 保存されるアプリの状態のスナップショット */

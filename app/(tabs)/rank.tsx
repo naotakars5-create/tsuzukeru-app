@@ -10,7 +10,12 @@ import { StatTile } from '@/components/StatTile';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { RankMedal } from '@/components/RankMedal';
 import { colors, font, radius, spacing } from '@/theme';
-import { RANK_TIERS } from '@/logic/rank';
+import {
+  RANK_TIERS,
+  POINTS_PER_DONE,
+  STREAK_BONUS_EVERY,
+  STREAK_BONUS_POINTS,
+} from '@/logic/rank';
 
 /** ランク / ポイント画面。称号・実績バッジ・通算スタッツを表示（換金機能はない）。 */
 export default function RankScreen() {
@@ -29,6 +34,11 @@ export default function RankScreen() {
   const spanStart = progress.rank.minPoints;
   const spanEnd = nextRank ? nextRank.minPoints : spanStart;
   const spanRatio = nextRank ? (progress.points - spanStart) / (spanEnd - spanStart) : 1;
+
+  // ポイントの内訳（理屈を明示するため）
+  const basePts = progress.totalDone * POINTS_PER_DONE;
+  const streakBonusCount = Math.floor(progress.bestStreak / STREAK_BONUS_EVERY);
+  const bonusPts = streakBonusCount * STREAK_BONUS_POINTS;
 
   return (
     <ScrollView
@@ -70,6 +80,58 @@ export default function RankScreen() {
           accent={colors.success}
         />
       </View>
+
+      {/* ポイントの仕組み（理屈を明示） */}
+      <Card>
+        <View style={styles.ptHead}>
+          <Ionicons name="help-circle" size={18} color={colors.primary} />
+          <Text style={styles.ptTitle}>ポイントの決まり方</Text>
+        </View>
+        <Text style={styles.ptLead}>
+          ポイントは
+          <Text style={styles.ptStrong}>勉強した「時間の長さ」ではなく</Text>、
+          1日の目標時間に届いた
+          <Text style={styles.ptStrong}>「達成日数」と「連続」</Text>
+          で決まります。短時間でも毎日続けるほど伸びます。
+        </Text>
+
+        <View style={styles.formulaRow}>
+          <View style={styles.formulaItem}>
+            <Text style={styles.formulaLabel}>達成ベース</Text>
+            <Text style={styles.formulaCalc}>
+              {progress.totalDone}日 × {POINTS_PER_DONE}pt
+            </Text>
+            <Text style={styles.formulaVal}>{basePts.toLocaleString()}pt</Text>
+          </View>
+          <Text style={styles.formulaPlus}>＋</Text>
+          <View style={styles.formulaItem}>
+            <Text style={styles.formulaLabel}>連続ボーナス</Text>
+            <Text style={styles.formulaCalc}>
+              {STREAK_BONUS_EVERY}日連続 × {streakBonusCount}回
+            </Text>
+            <Text style={styles.formulaVal}>{bonusPts.toLocaleString()}pt</Text>
+          </View>
+          <Text style={styles.formulaPlus}>＝</Text>
+          <View style={styles.formulaItem}>
+            <Text style={styles.formulaLabel}>合計</Text>
+            <Text style={styles.formulaCalc}>あなたの</Text>
+            <Text style={[styles.formulaVal, { color: colors.primary }]}>
+              {progress.points.toLocaleString()}pt
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.ptBullets}>
+          <PtBullet
+            text={`「達成」= その日の勉強時間が1日の目標に届くこと（達成1日ごとに +${POINTS_PER_DONE}pt）`}
+          />
+          <PtBullet
+            text={`${STREAK_BONUS_EVERY}日連続で達成するごとに、さらに +${STREAK_BONUS_POINTS}pt のボーナス`}
+          />
+          <PtBullet text="勉強時間そのものは別に記録され、ランキングやプロフィールに表示されます" />
+          <PtBullet text="ポイントは称号・進捗の表示だけに使い、換金はできません" />
+        </View>
+      </Card>
 
       {/* ランク一覧 */}
       <Card>
@@ -174,6 +236,16 @@ export default function RankScreen() {
   );
 }
 
+/** ポイント説明の箇条書き1行 */
+function PtBullet({ text }: { text: string }) {
+  return (
+    <View style={styles.ptBulletRow}>
+      <Ionicons name="checkmark-circle" size={14} color={colors.success} style={{ marginTop: 1 }} />
+      <Text style={styles.ptBulletText}>{text}</Text>
+    </View>
+  );
+}
+
 /** 通算スタッツの1マス */
 function LifeStat({
   icon,
@@ -236,6 +308,36 @@ const styles = StyleSheet.create({
   tileRow: { flexDirection: 'row' },
 
   sectionLabel: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
+
+  ptHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  ptTitle: { fontSize: font.body, fontWeight: '900', color: colors.text },
+  ptLead: { fontSize: font.sub, color: colors.textSub, lineHeight: 21, marginTop: spacing.sm },
+  ptStrong: { color: colors.text, fontWeight: '800' },
+  formulaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    marginTop: spacing.md,
+  },
+  formulaItem: { flex: 1, alignItems: 'center' },
+  formulaLabel: { fontSize: 10, color: colors.textSub, fontWeight: '700' },
+  formulaCalc: { fontSize: 10, color: colors.textMuted, marginTop: 3, fontVariant: ['tabular-nums'] },
+  formulaVal: {
+    fontSize: font.body,
+    fontWeight: '900',
+    color: colors.text,
+    marginTop: 3,
+    fontVariant: ['tabular-nums'],
+  },
+  formulaPlus: { fontSize: font.body, color: colors.textMuted, fontWeight: '800', marginHorizontal: 2 },
+  ptBullets: { marginTop: spacing.md, gap: spacing.sm },
+  ptBulletRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
+  ptBulletText: { flex: 1, fontSize: font.small, color: colors.textSub, lineHeight: 17 },
+
   tierRow: {
     flexDirection: 'row',
     alignItems: 'center',

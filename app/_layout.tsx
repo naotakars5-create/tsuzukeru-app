@@ -39,6 +39,10 @@ export default function RootLayout() {
           />
           <Stack.Screen name="rival/[id]" options={{ title: 'プロフィール' }} />
           <Stack.Screen
+            name="communities"
+            options={{ title: 'コミュニティを探す', presentation: 'modal' }}
+          />
+          <Stack.Screen
             name="ignite"
             options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
           />

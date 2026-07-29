@@ -16,7 +16,8 @@ import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { Frequency, GoalCategory, IconName } from '@/types';
-import { CATEGORIES, DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
+import { DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
+import { CategoryPicker } from '@/components/CategoryPicker';
 import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
 import { quoteOfToday } from '@/logic/quotes';
 import { todayStr } from '@/logic/date';
@@ -153,25 +154,10 @@ export default function GoalSetupScreen() {
         {/* コミュニティ（目指す資格） */}
         <Card>
           <Text style={styles.label}>目指す資格・試験（コミュニティ）</Text>
-          <Text style={styles.helper}>同じ資格を目指す仲間と月間ランキングで競えます。</Text>
-          <View style={styles.catRow}>
-            {CATEGORIES.map((c) => {
-              const active = category === c.key;
-              return (
-                <Pressable
-                  key={c.key}
-                  onPress={() => setCategory(c.key)}
-                  style={[
-                    styles.catChip,
-                    active && { backgroundColor: `${c.color}26`, borderColor: c.color },
-                  ]}
-                >
-                  <Ionicons name={c.icon} size={16} color={active ? c.color : colors.textSub} />
-                  <Text style={[styles.catChipText, active && { color: c.color }]}>{c.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Text style={styles.helper}>
+            ジャンルから選ぶか、検索できます。同じ資格を目指す仲間と月間ランキングで競えます。
+          </Text>
+          <CategoryPicker value={category} onChange={setCategory} />
         </Card>
 
         {/* 頻度 */}

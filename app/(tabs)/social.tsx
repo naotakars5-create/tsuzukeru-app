@@ -10,13 +10,11 @@ import {
   buildLeaderboard,
   monthlyRankDelta,
   rankIndexOf,
-  generateGroupCode,
   communityCount,
 } from '@/logic/social';
 import { POINTS_PER_DONE } from '@/logic/rank';
 import { formatMinutesShort } from '@/logic/time';
 import { LeaderboardEntry } from '@/types';
-import { promptAsync, confirmAsync, notifyAsync } from '@/logic/confirm';
 
 /**
  * 仲間タブ: 月間ランキング。自分の順位を主役に、近しいランクの相手と競う。
@@ -25,7 +23,7 @@ import { promptAsync, confirmAsync, notifyAsync } from '@/logic/confirm';
  */
 export default function SocialScreen() {
   const router = useRouter();
-  const { goal, progress, seasonResult, group, setGroup, profile } = useApp();
+  const { goal, progress, seasonResult, group, profile } = useApp();
 
   const category = categoryOf(goal?.category);
   const myRankIndex = rankIndexOf(progress.points);
@@ -61,23 +59,6 @@ export default function SocialScreen() {
   const myPosition = myIndex + 1;
   const above = myIndex > 0 ? leaderboard[myIndex - 1] : null;
   const delta = monthlyRankDelta(category.key);
-
-  const onCreateGroup = async () => {
-    const name = await promptAsync('グループを作成', 'グループ名を入力', `${category.label}仲間`);
-    if (!name) return;
-    const code = generateGroupCode(name + Date.now());
-    await setGroup({ code, name: name.trim(), owner: true });
-    notifyAsync('グループを作成しました', `参加コード: ${code}\n※ 共有機能は今後追加予定です`);
-  };
-  const onJoinGroup = async () => {
-    const code = await promptAsync('グループに参加', '参加コードを入力', '');
-    if (!code) return;
-    await setGroup({ code: code.trim().toUpperCase(), name: `グループ ${code.trim().toUpperCase()}`, owner: false });
-  };
-  const onLeaveGroup = async () => {
-    const ok = await confirmAsync('グループを抜けますか？', undefined, '抜ける');
-    if (ok) await setGroup(null);
-  };
 
   const openProfile = (e: LeaderboardEntry) => {
     if (e.isMe) router.push('/profile-edit');
@@ -148,34 +129,38 @@ export default function SocialScreen() {
         </Text>
       </LinearGradient>
 
-      {/* グループ */}
+      {/* コミュニティ（テーマ別・任意参加） */}
       {group ? (
-        <View style={styles.groupCard}>
+        <Pressable style={styles.groupCard} onPress={() => router.push('/communities')}>
           <View style={styles.groupHead}>
             <View style={styles.titleRow}>
               <Ionicons name="people-circle" size={18} color={colors.primary} />
               <Text style={styles.groupName}>{group.name}</Text>
+              {group.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
             </View>
-            <Pressable onPress={onLeaveGroup} hitSlop={8}>
-              <Text style={styles.leaveText}>抜ける</Text>
-            </Pressable>
+            <View style={styles.titleRow}>
+              <Text style={styles.changeText}>探す/変更</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textSub} />
+            </View>
           </View>
+          {group.tagline ? <Text style={styles.groupTagline}>{group.tagline}</Text> : null}
           <View style={styles.codeRow}>
             <Text style={styles.codeLabel}>参加コード</Text>
             <Text style={styles.codeValue}>{group.code}</Text>
+            {typeof group.members === 'number' ? (
+              <Text style={styles.codeLabel}>・{group.members}人</Text>
+            ) : null}
           </View>
-        </View>
+        </Pressable>
       ) : (
         <View style={styles.groupJoin}>
-          <Text style={styles.groupJoinText}>仲間だけのグループで競うこともできます</Text>
+          <Text style={styles.groupJoinText}>
+            資格ランキングに加えて、テーマ別コミュニティにも参加できます（朝活・社会人など）。
+          </Text>
           <View style={styles.groupBtnRow}>
-            <Pressable style={styles.groupBtn} onPress={onCreateGroup}>
-              <Ionicons name="add-circle" size={16} color={colors.primary} />
-              <Text style={styles.groupBtnText}>グループを作る</Text>
-            </Pressable>
-            <Pressable style={styles.groupBtn} onPress={onJoinGroup}>
-              <Ionicons name="enter" size={16} color={colors.primary} />
-              <Text style={styles.groupBtnText}>コードで参加</Text>
+            <Pressable style={styles.discoverBtn} onPress={() => router.push('/communities')}>
+              <Ionicons name="search" size={16} color={colors.onAccent} />
+              <Text style={styles.discoverBtnText}>コミュニティを探す・作る</Text>
             </Pressable>
           </View>
         </View>
@@ -329,6 +314,18 @@ const styles = StyleSheet.create({
   groupHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   groupName: { fontSize: 15, fontWeight: '800', color: colors.text },
+  ownerTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.onAccent,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  changeText: { fontSize: 12, color: colors.textSub, fontWeight: '700' },
+  groupTagline: { fontSize: 12, color: colors.textSub, marginTop: 6 },
   leaveText: { fontSize: 13, color: colors.danger, fontWeight: '700' },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   codeLabel: { fontSize: 12, color: colors.textSub, fontWeight: '600' },
@@ -348,19 +345,19 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
   },
-  groupJoinText: { fontSize: 13, color: colors.textSub, fontWeight: '600' },
+  groupJoinText: { fontSize: 13, color: colors.textSub, fontWeight: '600', lineHeight: 19 },
   groupBtnRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  groupBtn: {
+  discoverBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.surfaceAlt,
+    gap: 8,
+    backgroundColor: colors.primary,
     borderRadius: radius.full,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
-  groupBtnText: { fontSize: 13, fontWeight: '800', color: colors.text },
+  discoverBtnText: { fontSize: 14, fontWeight: '800', color: colors.onAccent },
 
   rankHead: {
     flexDirection: 'row',
