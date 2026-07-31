@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
-import { FlameMascot } from '@/components/FlameMascot';
 import { colors, font, radius, spacing } from '@/theme';
 
 const { width } = Dimensions.get('window');
@@ -108,9 +108,9 @@ export default function IgniteScreen() {
       {/* 発光 */}
       <Animated.View style={[styles.glow, glowStyle]} pointerEvents="none" />
 
-      {/* ヒノコが弾けるように登場 */}
+      {/* 炎が弾けるように燃え上がる */}
       <Animated.View style={{ transform: [{ scale: mascotScale }] }}>
-        <FlameMascot size={172} mood="celebrate" />
+        <Ionicons name="flame" size={150} color={colors.primary} />
       </Animated.View>
 
       {/* コピー */}

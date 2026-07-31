@@ -110,6 +110,14 @@ export interface CustomGroup {
   tagline?: string;
 }
 
+/** コミュニティ作成の月間カウント（プレミアム限定・月3個まで） */
+export interface CommunityCreations {
+  /** 対象の月 'YYYY-MM' */
+  month: string;
+  /** その月に作成した数 */
+  count: number;
+}
+
 /** 保存されるアプリの状態のスナップショット */
 export interface PersistedState {
   goal: Goal | null;
@@ -122,6 +130,10 @@ export interface PersistedState {
   badges: BadgeMap;
   profile: Profile;
   group: CustomGroup | null;
+  /** 有料会員（プレミアム）か（モック） */
+  premium: boolean;
+  /** コミュニティ作成の月間カウント */
+  communityCreations: CommunityCreations;
 }
 
 /** ランク（称号）の定義 */

@@ -13,6 +13,7 @@ import {
   BadgeMap,
   Profile,
   CustomGroup,
+  CommunityCreations,
 } from '@/types';
 import { EMPTY_LIFETIME } from '@/logic/summary';
 
@@ -24,6 +25,10 @@ const KEY_LIFETIME = 'tsuzukeru.lifetime.v1';
 const KEY_BADGES = 'tsuzukeru.badges.v1';
 const KEY_PROFILE = 'tsuzukeru.profile.v1';
 const KEY_GROUP = 'tsuzukeru.group.v1';
+const KEY_PREMIUM = 'tsuzukeru.premium.v1';
+const KEY_COMMUNITY_CREATIONS = 'tsuzukeru.communityCreations.v1';
+
+const DEFAULT_COMMUNITY_CREATIONS: CommunityCreations = { month: '', count: 0 };
 
 const DEFAULT_REMINDER: ReminderSettings = { enabled: false, hour: 20, minute: 0 };
 
@@ -36,17 +41,29 @@ export const DEFAULT_PROFILE: Profile = {
 
 export async function loadState(): Promise<PersistedState> {
   try {
-    const [goalRaw, minutesRaw, timerRaw, reminderRaw, lifetimeRaw, badgesRaw, profileRaw, groupRaw] =
-      await Promise.all([
-        AsyncStorage.getItem(KEY_GOAL),
-        AsyncStorage.getItem(KEY_MINUTES),
-        AsyncStorage.getItem(KEY_TIMER),
-        AsyncStorage.getItem(KEY_REMINDER),
-        AsyncStorage.getItem(KEY_LIFETIME),
-        AsyncStorage.getItem(KEY_BADGES),
-        AsyncStorage.getItem(KEY_PROFILE),
-        AsyncStorage.getItem(KEY_GROUP),
-      ]);
+    const [
+      goalRaw,
+      minutesRaw,
+      timerRaw,
+      reminderRaw,
+      lifetimeRaw,
+      badgesRaw,
+      profileRaw,
+      groupRaw,
+      premiumRaw,
+      creationsRaw,
+    ] = await Promise.all([
+      AsyncStorage.getItem(KEY_GOAL),
+      AsyncStorage.getItem(KEY_MINUTES),
+      AsyncStorage.getItem(KEY_TIMER),
+      AsyncStorage.getItem(KEY_REMINDER),
+      AsyncStorage.getItem(KEY_LIFETIME),
+      AsyncStorage.getItem(KEY_BADGES),
+      AsyncStorage.getItem(KEY_PROFILE),
+      AsyncStorage.getItem(KEY_GROUP),
+      AsyncStorage.getItem(KEY_PREMIUM),
+      AsyncStorage.getItem(KEY_COMMUNITY_CREATIONS),
+    ]);
     const goal: Goal | null = goalRaw ? JSON.parse(goalRaw) : null;
     // 旧バージョン互換
     if (goal) {
@@ -68,7 +85,22 @@ export async function loadState(): Promise<PersistedState> {
       ? { ...DEFAULT_PROFILE, ...JSON.parse(profileRaw) }
       : DEFAULT_PROFILE;
     const group: CustomGroup | null = groupRaw ? JSON.parse(groupRaw) : null;
-    return { goal, minutes, timerStartedAt, reminder, lifetime, badges, profile, group };
+    const premium: boolean = premiumRaw ? JSON.parse(premiumRaw) : false;
+    const communityCreations: CommunityCreations = creationsRaw
+      ? { ...DEFAULT_COMMUNITY_CREATIONS, ...JSON.parse(creationsRaw) }
+      : DEFAULT_COMMUNITY_CREATIONS;
+    return {
+      goal,
+      minutes,
+      timerStartedAt,
+      reminder,
+      lifetime,
+      badges,
+      profile,
+      group,
+      premium,
+      communityCreations,
+    };
   } catch (e) {
     console.warn('loadState failed', e);
     return {
@@ -80,6 +112,8 @@ export async function loadState(): Promise<PersistedState> {
       badges: {},
       profile: DEFAULT_PROFILE,
       group: null,
+      premium: false,
+      communityCreations: DEFAULT_COMMUNITY_CREATIONS,
     };
   }
 }
@@ -119,6 +153,14 @@ export async function saveGroup(group: CustomGroup | null): Promise<void> {
   else await AsyncStorage.removeItem(KEY_GROUP);
 }
 
+export async function savePremium(premium: boolean): Promise<void> {
+  await AsyncStorage.setItem(KEY_PREMIUM, JSON.stringify(premium));
+}
+
+export async function saveCommunityCreations(c: CommunityCreations): Promise<void> {
+  await AsyncStorage.setItem(KEY_COMMUNITY_CREATIONS, JSON.stringify(c));
+}
+
 export async function clearAll(): Promise<void> {
   await AsyncStorage.multiRemove([
     KEY_GOAL,
@@ -129,5 +171,7 @@ export async function clearAll(): Promise<void> {
     KEY_BADGES,
     KEY_PROFILE,
     KEY_GROUP,
+    KEY_PREMIUM,
+    KEY_COMMUNITY_CREATIONS,
   ]);
 }

@@ -269,11 +269,14 @@ export default function GoalSetupScreen() {
                   onPress={() => setDeposit(d)}
                   style={[styles.timeChip, active && styles.countChipActive]}
                 >
-                  <Text style={[styles.countValue, active && styles.countValueActive]}>
-                    ¥{(d / 1000).toLocaleString()}k
+                  <Text
+                    style={[styles.countValue, { fontSize: 15 }, active && styles.countValueActive]}
+                    numberOfLines={1}
+                  >
+                    ¥{d.toLocaleString()}
                   </Text>
                   <Text style={[styles.countUnit, active && styles.countValueActive]}>
-                    {d.toLocaleString()}
+                    週¥{weekStake(d, 4).toLocaleString()}
                   </Text>
                 </Pressable>
               );

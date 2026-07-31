@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
-import { FlameMascot } from '@/components/FlameMascot';
 import { colors, font, spacing, radius } from '@/theme';
 import { formatStopwatch, formatMinutes } from '@/logic/time';
 import { weekStake } from '@/logic/billing';
@@ -104,23 +103,6 @@ export default function TodayScreen() {
                 <Text style={styles.doneTagText}>今日の目標を達成！</Text>
               </View>
             )}
-          </View>
-
-          {/* マスコットの応援 */}
-          <View style={styles.cheerRow}>
-            <FlameMascot
-              size={52}
-              mood={reached ? 'celebrate' : running ? 'happy' : 'idle'}
-            />
-            <View style={styles.speech}>
-              <Text style={styles.speechText}>
-                {reached
-                  ? 'やりきったね！かっこいい🔥'
-                  : running
-                  ? '燃えてる燃えてる、その調子！'
-                  : 'ボタンを押して、始めよう'}
-              </Text>
-            </View>
           </View>
 
           <View style={styles.controls}>

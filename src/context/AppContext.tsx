@@ -21,6 +21,7 @@ import {
   BadgeView,
   Profile,
   CustomGroup,
+  CommunityCreations,
 } from '@/types';
 import {
   loadState,
@@ -32,9 +33,14 @@ import {
   saveBadges,
   saveProfile,
   saveGroup,
+  savePremium,
+  saveCommunityCreations,
   clearAll,
   DEFAULT_PROFILE,
 } from '@/storage';
+
+/** コミュニティ作成の月間上限（プレミアム限定） */
+export const COMMUNITY_CREATE_LIMIT = 3;
 import { isScheduledDay, statusOf } from '@/logic/schedule';
 import { todayStr } from '@/logic/date';
 import {
@@ -77,6 +83,18 @@ interface AppContextValue {
   updateReminder: (settings: ReminderSettings) => Promise<boolean>;
   updateProfile: (p: Profile) => Promise<void>;
   setGroup: (g: CustomGroup | null) => Promise<void>;
+  /** 有料会員（プレミアム）か（モック） */
+  premium: boolean;
+  /** プレミアム加入/解約（モック） */
+  setPremium: (v: boolean) => Promise<void>;
+  /** コミュニティ作成の月間上限 */
+  communityLimit: number;
+  /** 今月すでに作成したコミュニティ数 */
+  communityCreationsThisMonth: number;
+  /** いまコミュニティを作成できるか（プレミアム && 上限未満） */
+  canCreateCommunity: boolean;
+  /** コミュニティ作成を1件記録する（月をまたいだらリセット） */
+  recordCommunityCreation: () => Promise<void>;
   resetAll: () => Promise<void>;
 }
 
@@ -103,6 +121,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [group, setGroupState] = useState<CustomGroup | null>(null);
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
+  const [premium, setPremiumState] = useState(false);
+  const [communityCreations, setCommunityCreationsState] = useState<CommunityCreations>({
+    month: '',
+    count: 0,
+  });
 
   useEffect(() => {
     (async () => {
@@ -115,8 +138,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setProfile(state.profile);
       setGroupState(state.group);
       setTimerStartedAt(state.timerStartedAt);
+      setPremiumState(state.premium);
+      setCommunityCreationsState(state.communityCreations);
       setReady(true);
     })();
+  }, []);
+
+  const currentMonth = todayStr().slice(0, 7);
+  const communityCreationsThisMonth =
+    communityCreations.month === currentMonth ? communityCreations.count : 0;
+  const canCreateCommunity = premium && communityCreationsThisMonth < COMMUNITY_CREATE_LIMIT;
+
+  const setPremium = useCallback(async (v: boolean) => {
+    setPremiumState(v);
+    await savePremium(v);
+  }, []);
+
+  const recordCommunityCreation = useCallback(async () => {
+    const month = todayStr().slice(0, 7);
+    setCommunityCreationsState((prev) => {
+      const base = prev.month === month ? prev.count : 0;
+      const next = { month, count: base + 1 };
+      saveCommunityCreations(next);
+      return next;
+    });
   }, []);
 
   const progress = useMemo(() => buildProgress(goal, minutes, lifetime), [goal, minutes, lifetime]);
@@ -279,6 +324,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBadgesMap({});
     setProfile(DEFAULT_PROFILE);
     setGroupState(null);
+    setPremiumState(false);
+    setCommunityCreationsState({ month: '', count: 0 });
     await cancelReminders();
     await clearAll();
   }, []);
@@ -334,6 +381,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateReminder,
     updateProfile,
     setGroup,
+    premium,
+    setPremium,
+    communityLimit: COMMUNITY_CREATE_LIMIT,
+    communityCreationsThisMonth,
+    canCreateCommunity,
+    recordCommunityCreation,
     resetAll,
   };
 

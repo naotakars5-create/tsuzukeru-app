@@ -6,7 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { colors, font, radius, spacing } from '@/theme';
 import { searchCommunities, generateCode, CommunityInfo } from '@/logic/communities';
 import { categoryOf } from '@/logic/category';
-import { promptAsync, notifyAsync } from '@/logic/confirm';
+import { promptAsync, notifyAsync, confirmAsync } from '@/logic/confirm';
 
 /**
  * コミュニティを探す・作る・参加する画面。
@@ -14,10 +14,21 @@ import { promptAsync, notifyAsync } from '@/logic/confirm';
  */
 export default function CommunitiesScreen() {
   const router = useRouter();
-  const { group, setGroup, goal } = useApp();
+  const {
+    group,
+    setGroup,
+    goal,
+    premium,
+    setPremium,
+    communityLimit,
+    communityCreationsThisMonth,
+    canCreateCommunity,
+    recordCommunityCreation,
+  } = useApp();
   const [query, setQuery] = useState('');
 
   const results = useMemo(() => searchCommunities(query), [query]);
+  const createsLeft = Math.max(0, communityLimit - communityCreationsThisMonth);
 
   const join = async (c: CommunityInfo) => {
     await setGroup({
@@ -33,6 +44,26 @@ export default function CommunitiesScreen() {
   };
 
   const create = async () => {
+    // プレミアム限定
+    if (!premium) {
+      const ok = await confirmAsync(
+        'プレミアム限定の機能です',
+        'コミュニティの作成はプレミアム会員だけの機能です（月3個まで）。プレミアムに登録しますか？（モック・実際の決済はしません）',
+        'プレミアムに登録'
+      );
+      if (!ok) return;
+      await setPremium(true);
+      notifyAsync('プレミアムに登録しました', 'コミュニティを毎月3個まで作成できます（モック）。');
+    }
+    // 月間上限（プレミアムでも月3個まで）
+    if (communityCreationsThisMonth >= communityLimit) {
+      notifyAsync(
+        '今月の作成上限に達しました',
+        `コミュニティの作成は1か月に${communityLimit}個までです。来月またお試しください。`
+      );
+      return;
+    }
+
     const name = await promptAsync('コミュニティを作る', '名前を入力（例: 朝5時起き部）', '');
     if (!name) return;
     const tagline = (await promptAsync('ひとこと説明（任意）', 'どんな仲間を集める？', '')) ?? '';
@@ -45,7 +76,11 @@ export default function CommunitiesScreen() {
       members: 1,
       tagline: tagline.trim() || 'あなたが作ったコミュニティ',
     });
-    notifyAsync('作成しました', `参加コード: ${code}\nこのコードを共有すると仲間が参加できます（共有機能は今後追加）。`);
+    await recordCommunityCreation();
+    notifyAsync(
+      '作成しました',
+      `参加コード: ${code}\n今月の残り作成数: ${Math.max(0, createsLeft - 1)}個\nこのコードを共有すると仲間が参加できます（共有機能は今後追加）。`
+    );
     router.back();
   };
 
@@ -82,13 +117,32 @@ export default function CommunitiesScreen() {
         {/* 作る / コードで参加 */}
         <View style={styles.actionRow}>
           <Pressable style={styles.actionBtn} onPress={create}>
-            <Ionicons name="add-circle" size={18} color={colors.primary} />
+            <Ionicons name={premium ? 'add-circle' : 'lock-closed'} size={18} color={colors.primary} />
             <Text style={styles.actionText}>新しく作る</Text>
+            {!premium && (
+              <View style={styles.proTag}>
+                <Text style={styles.proTagText}>PRO</Text>
+              </View>
+            )}
           </Pressable>
           <Pressable style={styles.actionBtn} onPress={joinByCode(setGroup, router)}>
             <Ionicons name="enter" size={18} color={colors.primary} />
             <Text style={styles.actionText}>コードで参加</Text>
           </Pressable>
+        </View>
+
+        {/* 作成の可否ステータス */}
+        <View style={styles.createStatus}>
+          <Ionicons
+            name={premium ? 'checkmark-circle' : 'information-circle'}
+            size={14}
+            color={premium ? colors.success : colors.textMuted}
+          />
+          <Text style={styles.createStatusText}>
+            {premium
+              ? `プレミアム会員 ・ 今月あと ${createsLeft}/${communityLimit} 個 作成できます`
+              : `コミュニティ作成はプレミアム限定（月${communityLimit}個まで）。参加は誰でも無料です`}
+          </Text>
         </View>
 
         {/* 検索 */}
@@ -218,6 +272,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   actionText: { fontSize: font.sub, fontWeight: '800', color: colors.text },
+  proTag: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  proTagText: { fontSize: 9, fontWeight: '900', color: colors.onAccent, letterSpacing: 0.5 },
+  createStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 2 },
+  createStatusText: { flex: 1, fontSize: font.small, color: colors.textSub, lineHeight: 16 },
 
   searchRow: {
     flexDirection: 'row',

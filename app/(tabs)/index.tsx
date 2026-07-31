@@ -16,7 +16,6 @@ import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { AchievementGrid } from '@/components/AchievementGrid';
-import { FlameMascot, MascotMood } from '@/components/FlameMascot';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import { frequencyLabel } from '@/logic/schedule';
@@ -60,8 +59,9 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <ScrollView contentContainerStyle={styles.welcomeWrap} showsVerticalScrollIndicator={false}>
-          <FlameMascot size={150} mood="happy" />
-          <Text style={styles.mascotName}>ヒノコ</Text>
+          <ProgressRing ratio={0} size={128} strokeWidth={14} glow={false}>
+            <Ionicons name="flame" size={40} color={colors.primary} />
+          </ProgressRing>
           <Text style={styles.emptyTitle}>心を燃やせ。</Text>
           <Text style={styles.welcomeLead}>
             意志じゃなく、仕組みで勉強を続ける。{'\n'}資格合格を、続く人のものにする。
@@ -108,12 +108,16 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.celebrateHead}>
-            <FlameMascot size={128} mood="celebrate" />
-            <Text style={styles.sectionLabel}>シーズン {seasonNumber} 完了</Text>
-            <Text style={styles.completeTitle}>
-              {allPerfect ? '完全達成、あっぱれ！' : '4週間、走りきった。'}
-            </Text>
+          <View style={styles.completeHeadRow}>
+            <View>
+              <Text style={styles.sectionLabel}>シーズン {seasonNumber} 完了</Text>
+              <Text style={styles.completeTitle}>
+                {allPerfect ? '完全達成、あっぱれ！' : '4週間、走りきった。'}
+              </Text>
+            </View>
+            <View style={styles.completeTrophy}>
+              <Ionicons name="trophy" size={26} color={colors.primary} />
+            </View>
           </View>
 
           {/* 成績サマリー */}
@@ -187,32 +191,27 @@ export default function HomeScreen() {
   const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
   const weekPct = Math.round(weekRatio * 100);
   const atRisk = isTodayScheduled && todayStatus !== 'done' && progress.streak > 0;
-  const homeMood: MascotMood =
-    todayStatus === 'done' ? 'happy' : atRisk ? 'worried' : 'idle';
-  const mascotLine =
+  const todayLine =
     todayStatus === 'done'
-      ? 'いいね、今日はもう達成！'
+      ? '今日はもう達成。いい流れ。'
       : atRisk
-      ? 'このままだと連続が消えちゃう…'
+      ? '連続を切らさず、今日の1歩を。'
       : !isTodayScheduled
-      ? '今日はおやすみ。ゆっくりね'
-      : 'さあ、今日の1歩いこう！';
+      ? '今日はおやすみ。ゆっくりね。'
+      : 'さあ、今日の1歩、行こう。';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 挨拶ヘッダー（マスコットが状況に反応） */}
+        {/* 挨拶ヘッダー */}
         <View style={styles.greetRow}>
-          <View style={styles.greetLeft}>
-            <FlameMascot size={56} mood={homeMood} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.greetSub}>
-                {greeting()} ・ シーズン {seasonNumber}
-              </Text>
-              <Text style={styles.greetMain} numberOfLines={1}>
-                {mascotLine}
-              </Text>
-            </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greetSub}>
+              {greeting()} ・ シーズン {seasonNumber}
+            </Text>
+            <Text style={styles.greetMain} numberOfLines={1}>
+              {todayLine}
+            </Text>
           </View>
           <Pressable style={styles.bell} onPress={() => router.push('/settings')}>
             <Ionicons name="notifications-outline" size={20} color={colors.textSub} />
@@ -441,13 +440,6 @@ const styles = StyleSheet.create({
   pillarTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
   pillarDesc: { fontSize: font.small, color: colors.textSub, marginTop: 2, lineHeight: 16 },
   welcomeNote: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.md },
-  mascotName: {
-    fontSize: font.small,
-    fontWeight: '800',
-    color: colors.primary,
-    letterSpacing: 2,
-    marginTop: spacing.sm,
-  },
 
   riskCard: {
     flexDirection: 'row',

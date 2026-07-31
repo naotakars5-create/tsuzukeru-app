@@ -12,11 +12,11 @@
  *  - "罰金" ではなく "達成で免除される料金" として設計（消費者契約法対策）
  */
 
-/** コミット額の選択肢 */
-export const DEPOSIT_OPTIONS = [1000, 3000, 5000, 10000];
+/** コミット額の選択肢（未達の週ぶんだけ課金・モック） */
+export const DEPOSIT_OPTIONS = [400, 1200, 4000, 12000];
 
 /** コミット額のデフォルト */
-export const DEFAULT_DEPOSIT = 3000;
+export const DEFAULT_DEPOSIT = 1200;
 
 /** 課金額のうち運営が受け取る割合（案Cでは全額が運営フィー。将来寄付等に配分可） */
 export const PLATFORM_FEE_RATE = 1.0;
