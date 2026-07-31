@@ -1,0 +1,46 @@
+name: Deploy Web (EAS Hosting)
+
+# コードが更新されたら、GitHub が自動で Web 版を書き出して本番公開する。
+# もう Codespace でコマンドを打つ必要はなく、更新＝自動反映になる。
+#   - main か claude/** ブランチへの push で自動実行
+#   - Actions タブの「Run workflow」ボタンで手動実行も可能
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    # 中身に関係ないファイルだけの変更ではデプロイしない
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+# 同じブランチで連続 push したときは、古い実行を止めて最新だけ動かす
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: コードを取得
+        uses: actions/checkout@v4
+
+      - name: Node.js を用意
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 依存をインストール
+        run: npm ci
+
+      - name: Web 版を書き出す
+        run: npx expo export --platform web
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 本番へデプロイ（EAS Hosting）
+        run: npx eas-cli@latest deploy --prod --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
