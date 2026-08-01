@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { confirmAsync } from '@/logic/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import { categoryOf } from '@/logic/category';
 import { frequencyLabel } from '@/logic/schedule';
 import { todayStr } from '@/logic/date';
 import { formatMinutes, formatMinutesShort } from '@/logic/time';
+import { randomHotQuote } from '@/logic/quotes';
 import { IconName } from '@/types';
 
 /** 時間帯に合わせた挨拶 */
@@ -48,6 +49,14 @@ export default function HomeScreen() {
     isTodayScheduled,
     todayStatus,
   } = useApp();
+
+  // 毎回変わる“熱い格言”（ホームを開くたびに選び直す）
+  const [quote, setQuote] = React.useState(() => randomHotQuote());
+  useFocusEffect(
+    React.useCallback(() => {
+      setQuote(randomHotQuote());
+    }, [])
+  );
 
   if (!ready) {
     return (
@@ -192,28 +201,21 @@ export default function HomeScreen() {
   const currentWeek = weeks.find((w) => w.isCurrent) ?? weeks[0];
   const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
   const weekPct = Math.round(weekRatio * 100);
-  const atRisk = isTodayScheduled && todayStatus !== 'done' && progress.streak > 0;
-  const todayLine =
-    todayStatus === 'done'
-      ? '今日はもう達成。いい流れ。'
-      : atRisk
-      ? '連続を切らさず、今日の1歩を。'
-      : !isTodayScheduled
-      ? '今日はおやすみ。ゆっくりね。'
-      : 'さあ、今日の1歩、行こう。';
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 挨拶ヘッダー */}
+        {/* 挨拶ヘッダー（毎回変わる“熱い格言”） */}
         <View style={styles.greetRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.greetSub}>
               {greeting()} ・ シーズン {seasonNumber}
             </Text>
-            <Text style={styles.greetMain} numberOfLines={1}>
-              {todayLine}
-            </Text>
+            <View style={styles.quoteRow}>
+              <Ionicons name="flame" size={16} color={colors.primary} style={{ marginTop: 3 }} />
+              <Text style={styles.greetQuote} numberOfLines={3}>
+                {quote}
+              </Text>
+            </View>
           </View>
           <Pressable style={styles.bell} onPress={() => router.push('/settings')}>
             <Ionicons name="notifications-outline" size={20} color={colors.textSub} />
@@ -505,6 +507,8 @@ const styles = StyleSheet.create({
   greetLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, marginRight: spacing.sm },
   greetSub: { fontSize: 13, color: colors.textSub },
   greetMain: { fontSize: 17, fontWeight: '800', color: colors.text, marginTop: 2 },
+  quoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 },
+  greetQuote: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.text, lineHeight: 22 },
   bell: {
     width: 40,
     height: 40,
