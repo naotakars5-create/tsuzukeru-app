@@ -157,14 +157,3 @@ export function avatarColor(name: string): string {
   return AVATAR_COLORS[hash(name) % AVATAR_COLORS.length];
 }
 
-/** グループ参加コードを生成（モック・6桁英数字） */
-export function generateGroupCode(seed: string): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let h = hash(seed);
-  let out = '';
-  for (let i = 0; i < 6; i++) {
-    out += chars[h % chars.length];
-    h = Math.floor(h / chars.length) + hash(out);
-  }
-  return out;
-}

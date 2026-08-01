@@ -128,6 +128,9 @@ export interface ChatMessage {
 /** コミュニティコード -> 自分の投稿一覧 */
 export type ChatMap = Record<string, ChatMessage[]>;
 
+/** コミュニティコード -> 掲示板を最後に読んだ時刻(ms) */
+export type ChatReadMap = Record<string, number>;
+
 /** コミュニティ作成の月間カウント（プレミアム限定・月3個まで） */
 export interface CommunityCreations {
   /** 対象の月 'YYYY-MM' */
@@ -149,13 +152,16 @@ export interface PersistedState {
   lifetime: LifetimeStats;
   badges: BadgeMap;
   profile: Profile;
-  group: CustomGroup | null;
+  /** 参加中のコミュニティ（最大3つ） */
+  groups: CustomGroup[];
   /** 有料会員（プレミアム）か（モック） */
   premium: boolean;
   /** コミュニティ作成の月間カウント */
   communityCreations: CommunityCreations;
   /** コミュニティ掲示板への自分の投稿 */
   chats: ChatMap;
+  /** 掲示板の既読時刻（コードごと） */
+  chatReads: ChatReadMap;
 }
 
 /** ランク（称号）の定義 */

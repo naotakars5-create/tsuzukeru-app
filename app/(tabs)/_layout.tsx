@@ -1,10 +1,12 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useApp } from '@/context/AppContext';
 import { colors } from '@/theme';
 
 /** 下部タブ: ホーム / 週次 / 仲間 / ランク / 設定 */
 export default function TabsLayout() {
+  const { groupUnreadCount } = useApp();
   return (
     <Tabs
       screenOptions={{
@@ -49,6 +51,14 @@ export default function TabsLayout() {
         options={{
           title: '仲間',
           headerTitle: '仲間',
+          // 参加中コミュニティの掲示板に未読があるとバッジ表示
+          tabBarBadge: groupUnreadCount > 0 ? groupUnreadCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.primary,
+            color: colors.onAccent,
+            fontSize: 10,
+            fontWeight: '800',
+          },
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'people' : 'people-outline'} size={size} color={color} />
           ),

@@ -25,6 +25,7 @@ import {
   CommunityCreations,
   ChatMap,
   ChatMessage,
+  ChatReadMap,
 } from '@/types';
 import {
   loadState,
@@ -36,10 +37,11 @@ import {
   saveLifetime,
   saveBadges,
   saveProfile,
-  saveGroup,
+  saveGroups,
   savePremium,
   saveCommunityCreations,
   saveChats,
+  saveChatReads,
   clearAll,
   DEFAULT_PROFILE,
 } from '@/storage';
@@ -69,7 +71,8 @@ interface AppContextValue {
   reminder: ReminderSettings;
   lifetime: LifetimeStats;
   profile: Profile;
-  group: CustomGroup | null;
+  /** 参加中のコミュニティ（最大3つ） */
+  groups: CustomGroup[];
   progress: ReturnType<typeof buildProgress>;
   weeks: ReturnType<typeof buildWeeks>;
   seasonResult: ReturnType<typeof buildSeasonResult>;
@@ -91,7 +94,10 @@ interface AppContextValue {
   startNextSeason: () => Promise<void>;
   updateReminder: (settings: ReminderSettings) => Promise<boolean>;
   updateProfile: (p: Profile) => Promise<void>;
-  setGroup: (g: CustomGroup | null) => Promise<void>;
+  /** コミュニティに参加（最大3つ。参加できたらtrue） */
+  joinGroup: (g: CustomGroup) => Promise<boolean>;
+  /** コミュニティから抜ける */
+  leaveGroup: (code: string) => Promise<void>;
   /** 有料会員（プレミアム）か（モック） */
   premium: boolean;
   /** プレミアム加入/解約（モック） */
@@ -108,6 +114,16 @@ interface AppContextValue {
   chats: ChatMap;
   /** 掲示板に投稿する */
   postChatMessage: (code: string, text: string) => Promise<void>;
+  /** 他メンバーの返信を掲示板に追加する（モック演出用） */
+  postChatReply: (code: string, author: string, text: string) => Promise<void>;
+  /** 掲示板の既読時刻（コードごと） */
+  chatReads: ChatReadMap;
+  /** 掲示板を既読にする */
+  markChatRead: (code: string) => Promise<void>;
+  /** 参加中コミュニティの未読メッセージ数（未参加なら0） */
+  groupUnreadCount: number;
+  /** コミュニティごとの未読数（参加中のみ） */
+  unreadByCode: Record<string, number>;
   resetAll: () => Promise<void>;
 }
 
@@ -133,7 +149,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [lifetime, setLifetime] = useState<LifetimeStats>(EMPTY_LIFETIME);
   const [badgesMap, setBadgesMap] = useState<BadgeMap>({});
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
-  const [group, setGroupState] = useState<CustomGroup | null>(null);
+  const [groups, setGroupsState] = useState<CustomGroup[]>([]);
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
   const [premium, setPremiumState] = useState(false);
   const [communityCreations, setCommunityCreationsState] = useState<CommunityCreations>({
@@ -141,6 +157,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     count: 0,
   });
   const [chats, setChats] = useState<ChatMap>({});
+  const [chatReads, setChatReads] = useState<ChatReadMap>({});
 
   useEffect(() => {
     (async () => {
@@ -152,11 +169,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLifetime(state.lifetime);
       setBadgesMap(state.badges);
       setProfile(state.profile);
-      setGroupState(state.group);
+      setGroupsState(state.groups);
       setTimerStartedAt(state.timerStartedAt);
       setPremiumState(state.premium);
       setCommunityCreationsState(state.communityCreations);
       setChats(state.chats);
+      setChatReads(state.chatReads);
       setReady(true);
     })();
   }, []);
@@ -187,8 +205,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         saveChats(next);
         return next;
       });
+      // 自分の投稿と同時に既読も更新（自分の投稿で未読が増えないように）
+      setChatReads((prev) => {
+        const next = { ...prev, [code]: Date.now() };
+        saveChatReads(next);
+        return next;
+      });
     },
     [profile.name]
+  );
+
+  const postChatReply = useCallback(async (code: string, author: string, text: string) => {
+    if (!code || !text.trim()) return;
+    const msg: ChatMessage = {
+      id: `${Date.now()}-r${Math.round(Math.random() * 1e6)}`,
+      author,
+      text: text.trim(),
+      at: Date.now(),
+      mine: false,
+    };
+    setChats((prev) => {
+      const next = { ...prev, [code]: [...(prev[code] ?? []), msg] };
+      saveChats(next);
+      return next;
+    });
+  }, []);
+
+  const markChatRead = useCallback(async (code: string) => {
+    if (!code) return;
+    setChatReads((prev) => {
+      const next = { ...prev, [code]: Date.now() };
+      saveChatReads(next);
+      return next;
+    });
+  }, []);
+
+  // 参加中コミュニティの未読数（他メンバーの投稿のうち、既読時刻より新しいもの）
+  const unreadByCode = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const g of groups) {
+      const lastRead = chatReads[g.code] ?? 0;
+      out[g.code] = (chats[g.code] ?? []).filter((m) => !m.mine && m.at > lastRead).length;
+    }
+    return out;
+  }, [groups, chats, chatReads]);
+
+  const groupUnreadCount = useMemo(
+    () => Object.values(unreadByCode).reduce((a, b) => a + b, 0),
+    [unreadByCode]
   );
 
   const recordCommunityCreation = useCallback(async () => {
@@ -357,9 +421,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await saveProfile(p);
   }, []);
 
-  const setGroup = useCallback(async (g: CustomGroup | null) => {
-    setGroupState(g);
-    await saveGroup(g);
+  /** 最大参加数 */
+  const MAX_GROUPS = 3;
+
+  const joinGroup = useCallback(async (g: CustomGroup): Promise<boolean> => {
+    let ok = true;
+    setGroupsState((prev) => {
+      if (prev.some((x) => x.code === g.code)) return prev; // 参加済みはそのまま
+      if (prev.length >= MAX_GROUPS) {
+        ok = false;
+        return prev;
+      }
+      const next = [...prev, g];
+      saveGroups(next);
+      return next;
+    });
+    return ok;
+  }, []);
+
+  const leaveGroup = useCallback(async (code: string) => {
+    setGroupsState((prev) => {
+      const next = prev.filter((x) => x.code !== code);
+      saveGroups(next);
+      return next;
+    });
   }, []);
 
   const resetAll = useCallback(async () => {
@@ -372,10 +457,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLifetime(EMPTY_LIFETIME);
     setBadgesMap({});
     setProfile(DEFAULT_PROFILE);
-    setGroupState(null);
+    setGroupsState([]);
     setPremiumState(false);
     setCommunityCreationsState({ month: '', count: 0 });
     setChats({});
+    setChatReads({});
     await cancelReminders();
     await clearAll();
   }, []);
@@ -414,7 +500,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     reminder,
     lifetime,
     profile,
-    group,
+    groups,
     progress,
     weeks,
     seasonResult,
@@ -432,7 +518,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     startNextSeason,
     updateReminder,
     updateProfile,
-    setGroup,
+    joinGroup,
+    leaveGroup,
     premium,
     setPremium,
     communityLimit: COMMUNITY_CREATE_LIMIT,
@@ -441,6 +528,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     recordCommunityCreation,
     chats,
     postChatMessage,
+    postChatReply,
+    chatReads,
+    markChatRead,
+    groupUnreadCount,
+    unreadByCode,
     resetAll,
   };
 
