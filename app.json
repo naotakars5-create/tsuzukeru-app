@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "継続 つづける",
+    "name": "覚悟の勉強",
     "slug": "tsuzukeru-app",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "owner": "naotaka0131",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

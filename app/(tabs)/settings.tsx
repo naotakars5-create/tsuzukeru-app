@@ -231,7 +231,7 @@ export default function SettingsScreen() {
         />
       </Card>
 
-      <Text style={styles.version}>継続 つづける — MVP v1.1.0</Text>
+      <Text style={styles.version}>覚悟の勉強 — MVP v1.2.0</Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
   );

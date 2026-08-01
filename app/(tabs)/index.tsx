@@ -64,6 +64,7 @@ export default function HomeScreen() {
           <ProgressRing ratio={0} size={128} strokeWidth={14} glow={false}>
             <Ionicons name="flame" size={40} color={colors.primary} />
           </ProgressRing>
+          <Text style={styles.brandName}>覚悟の勉強</Text>
           <Text style={styles.emptyTitle}>心を燃やせ。</Text>
           <Text style={styles.welcomeLead}>
             意志じゃなく、仕組みで勉強を続ける。{'\n'}資格合格を、続く人のものにする。
@@ -462,6 +463,13 @@ const styles = StyleSheet.create({
   pillarTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
   pillarDesc: { fontSize: font.small, color: colors.textSub, marginTop: 2, lineHeight: 16 },
   welcomeNote: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.md },
+  brandName: {
+    fontSize: font.small,
+    fontWeight: '900',
+    color: colors.primary,
+    letterSpacing: 3,
+    marginTop: spacing.lg,
+  },
 
   memoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   memoIcon: {
