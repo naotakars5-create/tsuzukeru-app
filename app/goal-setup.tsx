@@ -18,9 +18,9 @@ import { colors, font, radius, spacing } from '@/theme';
 import { Frequency, GoalCategory, IconName } from '@/types';
 import { DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
 import { CategoryPicker } from '@/components/CategoryPicker';
+import { communityCount } from '@/logic/social';
 import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
-import { quoteOfToday } from '@/logic/quotes';
-import { todayStr } from '@/logic/date';
+import { randomHotQuote } from '@/logic/quotes';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
 import { DAILY_TARGET_OPTIONS, formatMinutes } from '@/logic/time';
 
@@ -40,8 +40,9 @@ export default function GoalSetupScreen() {
   const [dailyTargetMin, setDailyTargetMin] = useState<number>(goal?.dailyTargetMin ?? 120);
   const [deposit, setDeposit] = useState<number>(goal?.deposit ?? DEFAULT_DEPOSIT);
 
-  const quote = quoteOfToday(todayStr());
+  const [quote] = useState(() => randomHotQuote());
   const perWeekStake = weekStake(deposit, 4);
+  const challengerCount = communityCount(category, 8);
 
   const toggleWeekday = (d: number) => {
     setWeekdays((prev) =>
@@ -104,12 +105,12 @@ export default function GoalSetupScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* やる気の格言 */}
+        {/* やる気の格言（毎回変わる・偉人の名言は作者つき） */}
         <View style={styles.quoteCard}>
           <Ionicons name="flame" size={18} color={colors.primary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.quoteText}>{quote.text}</Text>
-            {quote.sub ? <Text style={styles.quoteSub}>{quote.sub}</Text> : null}
+            {quote.author ? <Text style={styles.quoteSub}>— {quote.author}</Text> : null}
           </View>
         </View>
 
@@ -158,6 +159,13 @@ export default function GoalSetupScreen() {
             ジャンルから選ぶか、検索できます。同じ資格を目指す仲間と月間ランキングで競えます。
           </Text>
           <CategoryPicker value={category} onChange={setCategory} />
+          <View style={styles.rivalTeaser}>
+            <Ionicons name="flame" size={15} color={colors.orange} />
+            <Text style={styles.rivalTeaserText}>
+              <Text style={styles.rivalTeaserNum}>{challengerCount}</Text>人が
+              「{categoryOf(category).label}」に挑戦中。あなたも競える。
+            </Text>
+          </View>
         </Card>
 
         {/* 頻度 */}
@@ -282,22 +290,24 @@ export default function GoalSetupScreen() {
               );
             })}
           </View>
-          <View style={styles.stakeRules}>
-            <View style={styles.stakeRule}>
-              <Ionicons name="checkmark-circle" size={15} color={colors.success} />
-              <Text style={styles.stakeRuleText}>
-                その週を達成 → ¥0（課金なし・免除）
-              </Text>
+          {/* 2つの結末を視覚的に対比 */}
+          <View style={styles.outcomeRow}>
+            <View style={[styles.outcomeCard, styles.outcomeGood]}>
+              <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+              <Text style={styles.outcomeLabel}>続けたら</Text>
+              <Text style={[styles.outcomeAmount, { color: colors.success }]}>¥0</Text>
+              <Text style={styles.outcomeSub}>達成した週は無料</Text>
             </View>
-            <View style={styles.stakeRule}>
-              <Ionicons name="card" size={15} color={colors.danger} />
-              <Text style={styles.stakeRuleText}>
-                未達の週 → ¥{perWeekStake.toLocaleString()}/週 だけ後から課金
-              </Text>
+            <View style={styles.outcomeVs}>
+              <Text style={styles.outcomeVsText}>VS</Text>
             </View>
-            <View style={styles.stakeRule}>
-              <Ionicons name="trophy" size={15} color={colors.warning} />
-              <Text style={styles.stakeRuleText}>完全達成なら ¥0（続けた人は無料）</Text>
+            <View style={[styles.outcomeCard, styles.outcomeBad]}>
+              <Ionicons name="card" size={22} color={colors.danger} />
+              <Text style={styles.outcomeLabel}>サボったら</Text>
+              <Text style={[styles.outcomeAmount, { color: colors.danger }]}>
+                ¥{perWeekStake.toLocaleString()}
+              </Text>
+              <Text style={styles.outcomeSub}>その週ぶんだけ課金</Text>
             </View>
           </View>
         </Card>
@@ -480,4 +490,35 @@ const styles = StyleSheet.create({
   stakeRules: { marginTop: spacing.md, gap: spacing.sm },
   stakeRule: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stakeRuleText: { fontSize: font.sub, color: colors.textSub, fontWeight: '600', flex: 1 },
+
+  outcomeRow: { flexDirection: 'row', alignItems: 'stretch', marginTop: spacing.lg, gap: spacing.sm },
+  outcomeCard: {
+    flex: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    gap: 3,
+  },
+  outcomeGood: { backgroundColor: colors.successBg, borderColor: 'rgba(74,222,128,0.4)' },
+  outcomeBad: { backgroundColor: colors.surfaceDanger, borderColor: colors.borderDanger },
+  outcomeLabel: { fontSize: font.small, color: colors.textSub, fontWeight: '800', marginTop: 2 },
+  outcomeAmount: { fontSize: 30, fontWeight: '900', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  outcomeSub: { fontSize: font.small, color: colors.textMuted, fontWeight: '600' },
+  outcomeVs: { justifyContent: 'center', alignItems: 'center', width: 24 },
+  outcomeVsText: { fontSize: font.small, fontWeight: '900', color: colors.textMuted },
+
+  rivalTeaser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  rivalTeaserText: { flex: 1, fontSize: font.small, color: colors.textSub, fontWeight: '600', lineHeight: 17 },
+  rivalTeaserNum: { color: colors.orange, fontWeight: '900', fontVariant: ['tabular-nums'] },
 });

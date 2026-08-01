@@ -81,58 +81,6 @@ export default function RankScreen() {
         />
       </View>
 
-      {/* ポイントの仕組み（理屈を明示） */}
-      <Card>
-        <View style={styles.ptHead}>
-          <Ionicons name="help-circle" size={18} color={colors.primary} />
-          <Text style={styles.ptTitle}>ポイントの決まり方</Text>
-        </View>
-        <Text style={styles.ptLead}>
-          ポイントは
-          <Text style={styles.ptStrong}>勉強した「時間の長さ」ではなく</Text>、
-          1日の目標時間に届いた
-          <Text style={styles.ptStrong}>「達成日数」と「連続」</Text>
-          で決まります。短時間でも毎日続けるほど伸びます。
-        </Text>
-
-        <View style={styles.formulaRow}>
-          <View style={styles.formulaItem}>
-            <Text style={styles.formulaLabel}>達成ベース</Text>
-            <Text style={styles.formulaCalc}>
-              {progress.totalDone}日 × {POINTS_PER_DONE}pt
-            </Text>
-            <Text style={styles.formulaVal}>{basePts.toLocaleString()}pt</Text>
-          </View>
-          <Text style={styles.formulaPlus}>＋</Text>
-          <View style={styles.formulaItem}>
-            <Text style={styles.formulaLabel}>連続ボーナス</Text>
-            <Text style={styles.formulaCalc}>
-              {STREAK_BONUS_EVERY}日連続 × {streakBonusCount}回
-            </Text>
-            <Text style={styles.formulaVal}>{bonusPts.toLocaleString()}pt</Text>
-          </View>
-          <Text style={styles.formulaPlus}>＝</Text>
-          <View style={styles.formulaItem}>
-            <Text style={styles.formulaLabel}>合計</Text>
-            <Text style={styles.formulaCalc}>あなたの</Text>
-            <Text style={[styles.formulaVal, { color: colors.primary }]}>
-              {progress.points.toLocaleString()}pt
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.ptBullets}>
-          <PtBullet
-            text={`「達成」= その日の勉強時間が1日の目標に届くこと（達成1日ごとに +${POINTS_PER_DONE}pt）`}
-          />
-          <PtBullet
-            text={`${STREAK_BONUS_EVERY}日連続で達成するごとに、さらに +${STREAK_BONUS_POINTS}pt のボーナス`}
-          />
-          <PtBullet text="勉強時間そのものは別に記録され、ランキングやプロフィールに表示されます" />
-          <PtBullet text="ポイントは称号・進捗の表示だけに使い、換金はできません" />
-        </View>
-      </Card>
-
       {/* ランク一覧 */}
       <Card>
         <Text style={styles.sectionLabel}>称号一覧</Text>
@@ -225,6 +173,58 @@ export default function RankScreen() {
             value={`¥${lifetime.totalWaived.toLocaleString()}`}
             accent={colors.success}
           />
+        </View>
+      </Card>
+
+      {/* ポイントの仕組み（参考・一番下） */}
+      <Card>
+        <View style={styles.ptHead}>
+          <Ionicons name="help-circle" size={18} color={colors.textSub} />
+          <Text style={styles.ptTitle}>ポイントの決まり方</Text>
+        </View>
+        <Text style={styles.ptLead}>
+          ポイントは
+          <Text style={styles.ptStrong}>勉強した「時間の長さ」ではなく</Text>、
+          1日の目標時間に届いた
+          <Text style={styles.ptStrong}>「達成日数」と「連続」</Text>
+          で決まります。短時間でも毎日続けるほど伸びます。
+        </Text>
+
+        <View style={styles.formulaRow}>
+          <View style={styles.formulaItem}>
+            <Text style={styles.formulaLabel}>達成ベース</Text>
+            <Text style={styles.formulaCalc}>
+              {progress.totalDone}日 × {POINTS_PER_DONE}pt
+            </Text>
+            <Text style={styles.formulaVal}>{basePts.toLocaleString()}pt</Text>
+          </View>
+          <Text style={styles.formulaPlus}>＋</Text>
+          <View style={styles.formulaItem}>
+            <Text style={styles.formulaLabel}>連続ボーナス</Text>
+            <Text style={styles.formulaCalc}>
+              {STREAK_BONUS_EVERY}日連続 × {streakBonusCount}回
+            </Text>
+            <Text style={styles.formulaVal}>{bonusPts.toLocaleString()}pt</Text>
+          </View>
+          <Text style={styles.formulaPlus}>＝</Text>
+          <View style={styles.formulaItem}>
+            <Text style={styles.formulaLabel}>合計</Text>
+            <Text style={styles.formulaCalc}>あなたの</Text>
+            <Text style={[styles.formulaVal, { color: colors.primary }]}>
+              {progress.points.toLocaleString()}pt
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.ptBullets}>
+          <PtBullet
+            text={`「達成」= その日の勉強時間が1日の目標に届くこと（達成1日ごとに +${POINTS_PER_DONE}pt）`}
+          />
+          <PtBullet
+            text={`${STREAK_BONUS_EVERY}日連続で達成するごとに、さらに +${STREAK_BONUS_POINTS}pt のボーナス`}
+          />
+          <PtBullet text="勉強時間そのものは別に記録され、ランキングやプロフィールに表示されます" />
+          <PtBullet text="ポイントは称号・進捗の表示だけに使い、換金はできません" />
         </View>
       </Card>
 
