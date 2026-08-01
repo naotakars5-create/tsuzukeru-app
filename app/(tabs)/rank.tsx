@@ -51,13 +51,28 @@ export default function RankScreen() {
         <RankMedal rank={progress.rank} size={112} />
         <Text style={styles.heroLabel}>{progress.rank.label}</Text>
         <Text style={styles.heroPoints}>{progress.points} pt</Text>
-        <View style={{ height: spacing.lg, alignSelf: 'stretch' }} />
-        <ProgressBar ratio={spanRatio} height={10} />
-        <Text style={styles.nextText}>
-          {nextRank
-            ? `次の ${nextRank.label} まであと ${progress.pointsToNext}pt`
-            : '最高ランクに到達しました！'}
-        </Text>
+
+        {/* 次ランクへの道のり（今→次を視覚化） */}
+        <View style={styles.progWrap}>
+          <View style={styles.progBarRow}>
+            <View style={{ flex: 1 }}>
+              <ProgressBar ratio={spanRatio} height={10} />
+            </View>
+            {nextRank && (
+              <View style={styles.nextMedalWrap}>
+                <RankMedal rank={nextRank} size={44} locked />
+              </View>
+            )}
+          </View>
+          {nextRank ? (
+            <Text style={styles.nextText}>
+              次の <Text style={styles.nextStrong}>{nextRank.label}</Text> まで あと{' '}
+              <Text style={styles.nextStrong}>{progress.pointsToNext}pt</Text>
+            </Text>
+          ) : (
+            <Text style={styles.nextText}>最高ランクに到達しました！</Text>
+          )}
+        </View>
       </FlameHero>
 
       <PrimaryButton
@@ -303,7 +318,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
+  progWrap: { alignSelf: 'stretch', marginTop: spacing.xl },
+  progBarRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  nextMedalWrap: { alignItems: 'center', justifyContent: 'center' },
   nextText: { marginTop: spacing.md, fontSize: font.sub, color: colors.onFlame, opacity: 0.95, fontWeight: '700' },
+  nextStrong: { color: colors.primary, fontWeight: '900' },
 
   tileRow: { flexDirection: 'row' },
 
@@ -346,7 +365,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
   },
-  tierRowCurrent: { backgroundColor: colors.surfaceAlt },
+  tierRowCurrent: {
+    backgroundColor: 'rgba(198,244,50,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(198,244,50,0.4)',
+  },
   tierIcon: {
     width: 40,
     height: 40,

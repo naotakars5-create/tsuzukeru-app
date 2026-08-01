@@ -67,6 +67,10 @@ export default function SocialScreen() {
 
   const myPhoto = profile.photo ?? null;
 
+  const top3 = leaderboard.slice(0, 3);
+  const rest = leaderboard.slice(3);
+  const maxPoints = leaderboard[0]?.points || 1;
+
   return (
     <ScrollView
       style={styles.screen}
@@ -88,6 +92,9 @@ export default function SocialScreen() {
           </View>
         </View>
       </View>
+
+      {/* トップ3の表彰台（視覚的なランキングの主役） */}
+      <Podium entries={top3} myPhoto={myPhoto} onPress={openProfile} />
 
       {/* 自分の順位ヒーロー */}
       <LinearGradient
@@ -168,19 +175,22 @@ export default function SocialScreen() {
         </View>
       )}
 
-      {/* ランキング */}
+      {/* ランキング（4位以下） */}
       <View style={styles.rankHead}>
-        <Text style={styles.sectionLabel}>月間ランキング</Text>
+        <Text style={styles.sectionLabel}>
+          {rest.length > 0 ? '4位以下' : '月間ランキング'}
+        </Text>
         <Text style={styles.rankPeriod}>今月</Text>
       </View>
 
       <View style={styles.list}>
-        {leaderboard.map((e, i) => (
+        {(rest.length > 0 ? rest : leaderboard).map((e, i) => (
           <RankRow
             key={e.id}
             entry={e}
-            position={i + 1}
+            position={rest.length > 0 ? i + 4 : i + 1}
             photo={e.isMe ? myPhoto : null}
+            maxPoints={maxPoints}
             onPress={() => openProfile(e)}
           />
         ))}
@@ -196,18 +206,103 @@ export default function SocialScreen() {
 
 const MEDAL_COLORS = [colors.gold, colors.silver, colors.bronze];
 
-function RankRow({
+/** トップ3の表彰台 */
+function Podium({
+  entries,
+  myPhoto,
+  onPress,
+}: {
+  entries: LeaderboardEntry[];
+  myPhoto: string | null;
+  onPress: (e: LeaderboardEntry) => void;
+}) {
+  if (entries.length < 3) return null;
+  const order = [entries[1], entries[0], entries[2]]; // 表示は 2位・1位・3位
+  const positions = [2, 1, 3];
+  const heights = [58, 84, 46];
+  return (
+    <View style={styles.podium}>
+      {order.map((e, idx) => (
+        <PodiumCol
+          key={e.id}
+          entry={e}
+          position={positions[idx]}
+          height={heights[idx]}
+          photo={e.isMe ? myPhoto : null}
+          onPress={() => onPress(e)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function PodiumCol({
   entry,
   position,
+  height,
   photo,
   onPress,
 }: {
   entry: LeaderboardEntry;
   position: number;
+  height: number;
+  photo: string | null;
+  onPress: () => void;
+}) {
+  const medal = MEDAL_COLORS[position - 1];
+  const first = position === 1;
+  const av = first ? 62 : 52;
+  return (
+    <Pressable style={styles.podCol} onPress={onPress}>
+      {first ? (
+        <Ionicons name="trophy" size={20} color={medal} style={{ marginBottom: 2 }} />
+      ) : (
+        <View style={{ height: 22 }} />
+      )}
+      <View
+        style={[
+          styles.podAvatar,
+          { width: av, height: av, borderRadius: av / 2, borderColor: medal },
+          entry.isMe && { borderColor: colors.primary },
+        ]}
+      >
+        {entry.isMe && photo ? (
+          <Image source={{ uri: photo }} style={styles.podAvatarImg} />
+        ) : entry.isMe ? (
+          <Ionicons name="person" size={first ? 26 : 22} color={colors.primary} />
+        ) : (
+          <Text style={[styles.podInitial, first && { fontSize: 22 }]}>{entry.name.slice(0, 1)}</Text>
+        )}
+      </View>
+      <Text style={[styles.podName, entry.isMe && { color: colors.primary }]} numberOfLines={1}>
+        {entry.isMe ? 'あなた' : entry.name}
+      </Text>
+      <Text style={styles.podPts}>
+        {entry.points.toLocaleString()}
+        <Text style={styles.podPtsUnit}> pt</Text>
+      </Text>
+      <View style={[styles.podBar, { height, backgroundColor: `${medal}22`, borderColor: `${medal}66` }]}>
+        <Text style={[styles.podRank, { color: medal }]}>{position}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function RankRow({
+  entry,
+  position,
+  photo,
+  maxPoints,
+  onPress,
+}: {
+  entry: LeaderboardEntry;
+  position: number;
   photo?: string | null;
+  maxPoints: number;
   onPress: () => void;
 }) {
   const isTop3 = position <= 3;
+  const barPct = Math.max(6, Math.round((entry.points / maxPoints) * 100));
   return (
     <Pressable
       onPress={onPress}
@@ -248,10 +343,15 @@ function RankRow({
           <Text style={styles.streakText}>{formatMinutesShort(entry.studyMinutes)}</Text>
           {entry.broken && <Text style={styles.brokenText}>・連続0日</Text>}
         </View>
-        {/* 意気込み */}
-        <Text style={styles.motto} numberOfLines={1}>
-          “{entry.motivation}”
-        </Text>
+        {/* ポイントの相対バー（1位比） */}
+        <View style={styles.ptBarTrack}>
+          <View
+            style={[
+              styles.ptBarFill,
+              { width: `${barPct}%`, backgroundColor: entry.isMe ? colors.primary : '#3A4450' },
+            ]}
+          />
+        </View>
       </View>
 
       <View style={styles.rightCol}>
@@ -381,6 +481,43 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { ...labelStyle },
   rankPeriod: { fontSize: 12, color: colors.textSub },
+
+  // 表彰台
+  podium: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 4, paddingHorizontal: 4 },
+  podCol: { flex: 1, alignItems: 'center' },
+  podAvatar: {
+    borderWidth: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  podAvatarImg: { width: '100%', height: '100%' },
+  podInitial: { fontSize: 18, fontWeight: '900', color: colors.textSub },
+  podName: { fontSize: 12, fontWeight: '800', color: colors.text, maxWidth: '100%' },
+  podPts: { fontSize: 14, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'], marginTop: 1 },
+  podPtsUnit: { fontSize: 10, color: colors.textSub, fontWeight: '700' },
+  podBar: {
+    width: '100%',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    marginTop: 8,
+    alignItems: 'center',
+    paddingTop: 6,
+  },
+  podRank: { fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
+
+  ptBarTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.surfaceAlt,
+    marginTop: 7,
+    overflow: 'hidden',
+  },
+  ptBarFill: { height: '100%', borderRadius: 3 },
 
   list: { gap: 8 },
   row: {
