@@ -113,6 +113,21 @@ export interface CustomGroup {
   tagline?: string;
 }
 
+/** コミュニティの掲示板メッセージ（モック・端末内保存） */
+export interface ChatMessage {
+  id: string;
+  /** 投稿者の表示名 */
+  author: string;
+  text: string;
+  /** 投稿時刻(ms) */
+  at: number;
+  /** 自分の投稿か */
+  mine: boolean;
+}
+
+/** コミュニティコード -> 自分の投稿一覧 */
+export type ChatMap = Record<string, ChatMessage[]>;
+
 /** コミュニティ作成の月間カウント（プレミアム限定・月3個まで） */
 export interface CommunityCreations {
   /** 対象の月 'YYYY-MM' */
@@ -139,6 +154,8 @@ export interface PersistedState {
   premium: boolean;
   /** コミュニティ作成の月間カウント */
   communityCreations: CommunityCreations;
+  /** コミュニティ掲示板への自分の投稿 */
+  chats: ChatMap;
 }
 
 /** ランク（称号）の定義 */

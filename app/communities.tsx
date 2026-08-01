@@ -30,6 +30,25 @@ export default function CommunitiesScreen() {
   const results = useMemo(() => searchCommunities(query), [query]);
   const createsLeft = Math.max(0, communityLimit - communityCreationsThisMonth);
 
+  const openCommunity = (c: {
+    code: string;
+    name: string;
+    category?: string;
+    tagline?: string;
+    members?: number;
+  }) => {
+    router.push({
+      pathname: '/community/[code]',
+      params: {
+        code: c.code,
+        name: c.name,
+        category: c.category ?? '',
+        tagline: c.tagline ?? '',
+        members: c.members != null ? String(c.members) : '',
+      },
+    });
+  };
+
   const join = async (c: CommunityInfo) => {
     await setGroup({
       code: c.code,
@@ -39,8 +58,7 @@ export default function CommunitiesScreen() {
       members: c.members,
       tagline: c.tagline,
     });
-    notifyAsync('参加しました', `「${c.name}」に参加しました。仲間タブで確認できます。`);
-    router.back();
+    openCommunity(c);
   };
 
   const create = async () => {
@@ -81,7 +99,7 @@ export default function CommunitiesScreen() {
       '作成しました',
       `参加コード: ${code}\n今月の残り作成数: ${Math.max(0, createsLeft - 1)}個\nこのコードを共有すると仲間が参加できます（共有機能は今後追加）。`
     );
-    router.back();
+    openCommunity({ code, name: name.trim(), category: goal?.category, tagline: tagline.trim(), members: 1 });
   };
 
   const leave = async () => {
@@ -96,12 +114,16 @@ export default function CommunitiesScreen() {
           資格ごとの自動ランキングに加えて、テーマ別コミュニティにも参加できます。
         </Text>
 
-        {/* 参加中 */}
+        {/* 参加中（タップで入室） */}
         {group && (
-          <View style={styles.joinedCard}>
+          <Pressable style={styles.joinedCard} onPress={() => openCommunity(group)}>
             <View style={styles.joinedHead}>
               <Ionicons name="people-circle" size={18} color={colors.primary} />
               <Text style={styles.joinedTitle}>参加中: {group.name}</Text>
+              <View style={styles.enterRow}>
+                <Text style={styles.enterText}>入る</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+              </View>
             </View>
             {group.tagline ? <Text style={styles.joinedTag}>{group.tagline}</Text> : null}
             <View style={styles.joinedMetaRow}>
@@ -111,7 +133,7 @@ export default function CommunitiesScreen() {
                 <Text style={styles.leaveText}>抜ける</Text>
               </Pressable>
             </View>
-          </View>
+          </Pressable>
         )}
 
         {/* 作る / コードで参加 */}
@@ -242,6 +264,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   joinedHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  enterRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 'auto' },
+  enterText: { fontSize: font.small, fontWeight: '800', color: colors.primary },
   joinedTitle: { fontSize: font.body, fontWeight: '900', color: colors.text },
   joinedTag: { fontSize: font.small, color: colors.textSub, marginTop: 4 },
   joinedMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },

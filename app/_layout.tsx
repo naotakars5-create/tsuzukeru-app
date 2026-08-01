@@ -46,6 +46,7 @@ export default function RootLayout() {
             name="communities"
             options={{ title: 'コミュニティを探す', presentation: 'modal' }}
           />
+          <Stack.Screen name="community/[code]" options={{ title: 'コミュニティ' }} />
           <Stack.Screen
             name="ignite"
             options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}

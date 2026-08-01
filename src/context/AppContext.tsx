@@ -23,6 +23,8 @@ import {
   Profile,
   CustomGroup,
   CommunityCreations,
+  ChatMap,
+  ChatMessage,
 } from '@/types';
 import {
   loadState,
@@ -37,6 +39,7 @@ import {
   saveGroup,
   savePremium,
   saveCommunityCreations,
+  saveChats,
   clearAll,
   DEFAULT_PROFILE,
 } from '@/storage';
@@ -101,6 +104,10 @@ interface AppContextValue {
   canCreateCommunity: boolean;
   /** コミュニティ作成を1件記録する（月をまたいだらリセット） */
   recordCommunityCreation: () => Promise<void>;
+  /** コミュニティ掲示板への自分の投稿（コード -> 投稿） */
+  chats: ChatMap;
+  /** 掲示板に投稿する */
+  postChatMessage: (code: string, text: string) => Promise<void>;
   resetAll: () => Promise<void>;
 }
 
@@ -133,6 +140,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     month: '',
     count: 0,
   });
+  const [chats, setChats] = useState<ChatMap>({});
 
   useEffect(() => {
     (async () => {
@@ -148,6 +156,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setTimerStartedAt(state.timerStartedAt);
       setPremiumState(state.premium);
       setCommunityCreationsState(state.communityCreations);
+      setChats(state.chats);
       setReady(true);
     })();
   }, []);
@@ -161,6 +170,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPremiumState(v);
     await savePremium(v);
   }, []);
+
+  const postChatMessage = useCallback(
+    async (code: string, text: string) => {
+      const t = text.trim();
+      if (!t || !code) return;
+      const msg: ChatMessage = {
+        id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+        author: profile.name,
+        text: t,
+        at: Date.now(),
+        mine: true,
+      };
+      setChats((prev) => {
+        const next = { ...prev, [code]: [...(prev[code] ?? []), msg] };
+        saveChats(next);
+        return next;
+      });
+    },
+    [profile.name]
+  );
 
   const recordCommunityCreation = useCallback(async () => {
     const month = todayStr().slice(0, 7);
@@ -346,6 +375,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setGroupState(null);
     setPremiumState(false);
     setCommunityCreationsState({ month: '', count: 0 });
+    setChats({});
     await cancelReminders();
     await clearAll();
   }, []);
@@ -409,6 +439,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     communityCreationsThisMonth,
     canCreateCommunity,
     recordCommunityCreation,
+    chats,
+    postChatMessage,
     resetAll,
   };
 
