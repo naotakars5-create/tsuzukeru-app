@@ -5,8 +5,9 @@
  * サーバーが無いためダミー。将来API連携に差し替える。
  */
 
-import { CustomGroup, GoalCategory } from '@/types';
+import { ChatMessage, CustomGroup, GoalCategory, RankTier } from '@/types';
 import { CATEGORIES } from './category';
+import { rankForPoints } from './rank';
 
 /** 文字列 -> 32bit ハッシュ */
 function hash(s: string): number {
@@ -69,6 +70,110 @@ export function searchCommunities(q: string): CommunityInfo[] {
       cat.toLowerCase().includes(s)
     );
   });
+}
+
+// ── コミュニティ内のメンバー & 掲示板（モック） ──────────────
+
+const MEMBER_NAMES = [
+  'カズ', 'モモカ', 'テツ', 'リョウ', 'アユミ', 'ダイキ', 'ミサキ', 'ユウタ',
+  'サクラ', 'ケンジ', 'ナナ', 'ハルト', 'アオイ', 'ソウタ', 'アサヒ', 'ヒカリ',
+  'マコト', 'スバル', 'ノゾミ', 'イブキ', 'レン', 'ユイ', 'ショウ', 'カエデ',
+];
+
+const MEMBER_MOTIVES = [
+  '今度こそ合格する。',
+  '受かるまでやめない。',
+  '毎日コツコツ。',
+  '朝活で差をつける。',
+  '仕事終わりの1時間。',
+  '積み重ねは裏切らない。',
+];
+
+const CHAT_SEEDS = [
+  '今日は3時間やった。みんなも頑張ろう！',
+  'ここのみんながいるから続けられてる。',
+  '朝型に切り替えたら捗るようになった。',
+  '過去問むずすぎ…でも諦めない。',
+  '週末まとめてやる派、誰かいる？',
+  'モチベ下がってたけど、このコミュ見て復活した。',
+  '今週も皆勤いけそう。',
+  'スキマ時間の使い方、共有しませんか？',
+];
+
+/** コミュニティ内メンバー（ランキング用） */
+export interface CommunityMember {
+  id: string;
+  name: string;
+  points: number;
+  streak: number;
+  studyMinutes: number;
+  rank: RankTier;
+  isMe: boolean;
+}
+
+/** 自分の情報 */
+export interface MeInput {
+  name: string;
+  points: number;
+  streak: number;
+  studyMinutes: number;
+}
+
+/** コミュニティ内のメンバー一覧（自分を含む・ポイント降順・モック） */
+export function buildCommunityMembers(code: string, me: MeInput): CommunityMember[] {
+  const h = hash(code);
+  const count = 8 + (h % 7); // 8〜14人
+  const members: CommunityMember[] = [];
+  const used = new Set<string>();
+  for (let i = 0; i < count; i++) {
+    let name = MEMBER_NAMES[(h + i * 5) % MEMBER_NAMES.length];
+    if (used.has(name)) name = `${name}${(i % 9) + 1}`;
+    used.add(name);
+    const pts = 40 + (hash(code + name + i) % 460);
+    members.push({
+      id: `m${i}-${name}`,
+      name,
+      points: pts,
+      streak: hash('s' + name + code) % 21,
+      studyMinutes: pts * 6 + (hash('t' + name) % 240),
+      rank: rankForPoints(pts),
+      isMe: false,
+    });
+  }
+  members.push({
+    id: 'me',
+    name: me.name || 'あなた',
+    points: me.points,
+    streak: me.streak,
+    studyMinutes: me.studyMinutes,
+    rank: rankForPoints(me.points),
+    isMe: true,
+  });
+  return members.sort((a, b) => b.points - a.points);
+}
+
+/** 掲示板の初期メッセージ（他メンバーのモック投稿。now を基準に過去へ並べる） */
+export function seedChat(code: string, now: number): ChatMessage[] {
+  const h = hash(code);
+  const n = 3 + (h % 4); // 3〜6件
+  const out: ChatMessage[] = [];
+  for (let i = 0; i < n; i++) {
+    const name = MEMBER_NAMES[(h + i * 7) % MEMBER_NAMES.length];
+    const text = CHAT_SEEDS[(h + i * 3) % CHAT_SEEDS.length];
+    out.push({
+      id: `seed-${code}-${i}`,
+      author: name,
+      text,
+      at: now - (n - i) * (3 + (hash(code + i) % 20)) * 3600000,
+      mine: false,
+    });
+  }
+  return out;
+}
+
+/** モチベ文言（メンバー名から安定して選ぶ） */
+export function memberMotive(name: string): string {
+  return MEMBER_MOTIVES[hash(name) % MEMBER_MOTIVES.length];
 }
 
 /** 参加コードを生成（モック・6桁英数字） */

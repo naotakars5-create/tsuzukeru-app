@@ -15,6 +15,7 @@ import {
   Profile,
   CustomGroup,
   CommunityCreations,
+  ChatMap,
 } from '@/types';
 import { EMPTY_LIFETIME } from '@/logic/summary';
 
@@ -29,6 +30,7 @@ const KEY_PROFILE = 'tsuzukeru.profile.v1';
 const KEY_GROUP = 'tsuzukeru.group.v1';
 const KEY_PREMIUM = 'tsuzukeru.premium.v1';
 const KEY_COMMUNITY_CREATIONS = 'tsuzukeru.communityCreations.v1';
+const KEY_CHATS = 'tsuzukeru.chats.v1';
 
 const DEFAULT_COMMUNITY_CREATIONS: CommunityCreations = { month: '', count: 0 };
 
@@ -55,6 +57,7 @@ export async function loadState(): Promise<PersistedState> {
       groupRaw,
       premiumRaw,
       creationsRaw,
+      chatsRaw,
     ] = await Promise.all([
       AsyncStorage.getItem(KEY_GOAL),
       AsyncStorage.getItem(KEY_MINUTES),
@@ -67,6 +70,7 @@ export async function loadState(): Promise<PersistedState> {
       AsyncStorage.getItem(KEY_GROUP),
       AsyncStorage.getItem(KEY_PREMIUM),
       AsyncStorage.getItem(KEY_COMMUNITY_CREATIONS),
+      AsyncStorage.getItem(KEY_CHATS),
     ]);
     const goal: Goal | null = goalRaw ? JSON.parse(goalRaw) : null;
     // 旧バージョン互換
@@ -94,6 +98,7 @@ export async function loadState(): Promise<PersistedState> {
     const communityCreations: CommunityCreations = creationsRaw
       ? { ...DEFAULT_COMMUNITY_CREATIONS, ...JSON.parse(creationsRaw) }
       : DEFAULT_COMMUNITY_CREATIONS;
+    const chats: ChatMap = chatsRaw ? JSON.parse(chatsRaw) : {};
     return {
       goal,
       minutes,
@@ -106,6 +111,7 @@ export async function loadState(): Promise<PersistedState> {
       group,
       premium,
       communityCreations,
+      chats,
     };
   } catch (e) {
     console.warn('loadState failed', e);
@@ -121,6 +127,7 @@ export async function loadState(): Promise<PersistedState> {
       group: null,
       premium: false,
       communityCreations: DEFAULT_COMMUNITY_CREATIONS,
+      chats: {},
     };
   }
 }
@@ -172,6 +179,10 @@ export async function saveCommunityCreations(c: CommunityCreations): Promise<voi
   await AsyncStorage.setItem(KEY_COMMUNITY_CREATIONS, JSON.stringify(c));
 }
 
+export async function saveChats(chats: ChatMap): Promise<void> {
+  await AsyncStorage.setItem(KEY_CHATS, JSON.stringify(chats));
+}
+
 export async function clearAll(): Promise<void> {
   await AsyncStorage.multiRemove([
     KEY_GOAL,
@@ -185,5 +196,6 @@ export async function clearAll(): Promise<void> {
     KEY_GROUP,
     KEY_PREMIUM,
     KEY_COMMUNITY_CREATIONS,
+    KEY_CHATS,
   ]);
 }

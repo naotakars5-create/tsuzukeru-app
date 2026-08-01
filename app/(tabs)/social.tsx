@@ -67,6 +67,20 @@ export default function SocialScreen() {
 
   const myPhoto = profile.photo ?? null;
 
+  const openCommunity = () => {
+    if (!group) return;
+    router.push({
+      pathname: '/community/[code]',
+      params: {
+        code: group.code,
+        name: group.name,
+        category: group.category ?? '',
+        tagline: group.tagline ?? '',
+        members: group.members != null ? String(group.members) : '',
+      },
+    });
+  };
+
   const top3 = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);
   const maxPoints = leaderboard[0]?.points || 1;
@@ -140,17 +154,21 @@ export default function SocialScreen() {
 
       {/* コミュニティ（テーマ別・任意参加） */}
       {group ? (
-        <Pressable style={styles.groupCard} onPress={() => router.push('/communities')}>
+        <Pressable style={styles.groupCard} onPress={openCommunity}>
           <View style={styles.groupHead}>
             <View style={styles.titleRow}>
               <Ionicons name="people-circle" size={18} color={colors.primary} />
               <Text style={styles.groupName}>{group.name}</Text>
               {group.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
             </View>
-            <View style={styles.titleRow}>
+            <Pressable style={styles.titleRow} onPress={() => router.push('/communities')} hitSlop={8}>
               <Text style={styles.changeText}>探す/変更</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textSub} />
-            </View>
+            </Pressable>
+          </View>
+          <View style={styles.enterHint}>
+            <Ionicons name="chatbubbles" size={13} color={colors.primary} />
+            <Text style={styles.enterHintText}>タップでランキング・掲示板を開く</Text>
           </View>
           {group.tagline ? <Text style={styles.groupTagline}>{group.tagline}</Text> : null}
           <View style={styles.codeRow}>
@@ -438,6 +456,8 @@ const styles = StyleSheet.create({
   },
   changeText: { fontSize: 12, color: colors.textSub, fontWeight: '700' },
   groupTagline: { fontSize: 12, color: colors.textSub, marginTop: 6 },
+  enterHint: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+  enterHintText: { fontSize: 12, color: colors.primary, fontWeight: '700' },
   leaveText: { fontSize: 13, color: colors.danger, fontWeight: '700' },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   codeLabel: { fontSize: 12, color: colors.textSub, fontWeight: '600' },
