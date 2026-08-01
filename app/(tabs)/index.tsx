@@ -79,10 +79,10 @@ export default function HomeScreen() {
           </Text>
 
           <View style={styles.pillars}>
-            <Pillar icon="alert-circle" color={colors.danger} title="サボると、痛み" desc="未達の週だけ後から課金（モック）。だから続く。" />
+            <Pillar icon="alert-circle" color={colors.danger} title="サボると、痛み" desc="未達の週だけ、後から課金。だから続く。" />
             <Pillar icon="gift" color={colors.success} title="続けると、報酬" desc="1ヶ月やり切れば翌月無料。ランクも上がる。" />
             <Pillar icon="people" color={colors.primary} title="仲間と、競う" desc="同じ資格を目指す人と月間ランキングで競争。" />
-            <Pillar icon="timer" color={colors.purple} title="時間で、記録" desc="ストップウォッチで勉強時間を計測して積み上げ。" />
+            <Pillar icon="timer" color={colors.silver} title="時間で、記録" desc="ストップウォッチで勉強時間を計測して積み上げ。" />
           </View>
 
           <PrimaryButton
@@ -110,7 +110,7 @@ export default function HomeScreen() {
     const onNext = async () => {
       const ok = await confirmAsync(
         '次のシーズンを始める',
-        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\nコミット額は ¥${goal.deposit.toLocaleString()}（お金は預かりません。未達の週だけ課金・モック）。`,
+        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\nコミット額は ¥${goal.deposit.toLocaleString()}（お金は預かりません。未達の週だけ課金）。`,
         '始める'
       );
       if (ok) startNextSeason();
@@ -255,10 +255,10 @@ export default function HomeScreen() {
             </ProgressRing>
 
             <View style={styles.chipCol}>
-              <StatChip icon="flame" accent={colors.orange} label="連続" value={progress.streak} unit="日" />
+              <StatChip icon="flame" accent={colors.primary} label="連続" value={progress.streak} unit="日" />
               <StatChip
                 icon="time"
-                accent={colors.purple}
+                accent={colors.silver}
                 label="今月の勉強"
                 value={formatMinutesShort(progress.studyMinutes)}
               />
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.lg },
+  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.lg, letterSpacing: -0.6 },
   emptyText: {
     fontSize: font.body,
     color: colors.textSub,
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.sm,
   },
-  completeTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: 4 },
+  completeTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: 4, letterSpacing: -0.6 },
   completeTrophy: {
     width: 48,
     height: 48,

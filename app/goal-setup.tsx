@@ -160,7 +160,7 @@ export default function GoalSetupScreen() {
           </Text>
           <CategoryPicker value={category} onChange={setCategory} />
           <View style={styles.rivalTeaser}>
-            <Ionicons name="flame" size={15} color={colors.orange} />
+            <Ionicons name="flame" size={15} color={colors.primary} />
             <Text style={styles.rivalTeaserText}>
               <Text style={styles.rivalTeaserNum}>{challengerCount}</Text>人が
               「{categoryOf(category).label}」に挑戦中。あなたも競える。
@@ -264,7 +264,7 @@ export default function GoalSetupScreen() {
 
         {/* コミット額（案C・モック。お金は預からない） */}
         <Card>
-          <Text style={styles.label}>コミット額を決める（モック・実際の決済はしません）</Text>
+          <Text style={styles.label}>コミット額を決める</Text>
           <Text style={styles.helper}>
             お金は預かりません。達成すれば¥0、サボった週ぶんだけ後からカードに課金される方式です。
           </Text>
@@ -520,5 +520,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   rivalTeaserText: { flex: 1, fontSize: font.small, color: colors.textSub, fontWeight: '600', lineHeight: 17 },
-  rivalTeaserNum: { color: colors.orange, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  rivalTeaserNum: { color: colors.primary, fontWeight: '900', fontVariant: ['tabular-nums'] },
 });

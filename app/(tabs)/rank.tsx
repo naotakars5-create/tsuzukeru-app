@@ -71,7 +71,7 @@ export default function RankScreen() {
       <View style={styles.tileRow}>
         <StatTile value={progress.streak} label="連続達成" icon="flame" />
         <View style={{ width: spacing.md }} />
-        <StatTile value={progress.bestStreak} label="最高連続" icon="medal" accent={colors.warning} />
+        <StatTile value={progress.bestStreak} label="最高連続" icon="medal" accent={colors.silver} />
         <View style={{ width: spacing.md }} />
         <StatTile
           value={progress.doneCount}

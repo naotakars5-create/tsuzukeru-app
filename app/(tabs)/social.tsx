@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 66,
     letterSpacing: -2,
-    color: colors.orange,
+    color: colors.primary,
     fontVariant: ['tabular-nums'],
   },
   heroNumUnit: { fontSize: 26, fontWeight: '700', color: colors.textSub, marginBottom: 4 },

@@ -90,8 +90,8 @@ export default function ShareCardScreen() {
         {/* スタッツ3つ */}
         <View style={styles.statsRow}>
           <Stat icon={progress.rank.icon} color={progress.rank.color} value={progress.rank.label} label="ランク" />
-          <Stat icon="podium" color={colors.orange} value={`上位${topPct}%`} label={category.label} />
-          <Stat icon="time" color={colors.purple} value={formatMinutesShort(progress.totalMinutes)} label="総勉強" />
+          <Stat icon="podium" color={colors.primary} value={`上位${topPct}%`} label={category.label} />
+          <Stat icon="time" color={colors.silver} value={formatMinutesShort(progress.totalMinutes)} label="総勉強" />
         </View>
 
         <Text style={styles.tagline}>サボると課金、続けると報酬。</Text>
