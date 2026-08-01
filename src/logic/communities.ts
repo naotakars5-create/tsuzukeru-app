@@ -107,6 +107,8 @@ export interface CommunityMember {
   points: number;
   streak: number;
   studyMinutes: number;
+  /** 今週の勉強時間（分） */
+  weekMinutes: number;
   rank: RankTier;
   isMe: boolean;
 }
@@ -117,6 +119,8 @@ export interface MeInput {
   points: number;
   streak: number;
   studyMinutes: number;
+  /** 今週の勉強時間（分） */
+  weekMinutes: number;
 }
 
 /** コミュニティ内のメンバー一覧（自分を含む・ポイント降順・モック） */
@@ -136,6 +140,7 @@ export function buildCommunityMembers(code: string, me: MeInput): CommunityMembe
       points: pts,
       streak: hash('s' + name + code) % 21,
       studyMinutes: pts * 6 + (hash('t' + name) % 240),
+      weekMinutes: 60 + (hash('w' + name + code) % 900),
       rank: rankForPoints(pts),
       isMe: false,
     });
@@ -146,6 +151,7 @@ export function buildCommunityMembers(code: string, me: MeInput): CommunityMembe
     points: me.points,
     streak: me.streak,
     studyMinutes: me.studyMinutes,
+    weekMinutes: me.weekMinutes,
     rank: rankForPoints(me.points),
     isMe: true,
   });
@@ -174,6 +180,31 @@ export function seedChat(code: string, now: number): ChatMessage[] {
 /** モチベ文言（メンバー名から安定して選ぶ） */
 export function memberMotive(name: string): string {
   return MEMBER_MOTIVES[hash(name) % MEMBER_MOTIVES.length];
+}
+
+// 投稿への“返信”の弾（モック演出用）
+const REPLY_POOL = [
+  'いいね、その調子！',
+  'おつかれさま！私も今からやる。',
+  'ナイス積み上げ🔥 負けてられない。',
+  'わかる。一緒にがんばろう。',
+  'その集中力、見習います…！',
+  '今日もお互い一歩前進だね。',
+  '刺激もらった。俺もやる。',
+  'えらい！明日も続けよう。',
+  'このコミュ、みんな熱くて好き。',
+  '私も同じところやってる。がんばろ！',
+];
+
+/**
+ * 投稿への返信を1件選ぶ（モック）。
+ * seed（投稿内容や時刻）で返信者と文面を変える。返信者名を返す。
+ */
+export function pickReply(code: string, seed: string): { author: string; text: string } {
+  const h = hash(code + seed);
+  const author = MEMBER_NAMES[h % MEMBER_NAMES.length];
+  const text = REPLY_POOL[(h >> 3) % REPLY_POOL.length];
+  return { author, text };
 }
 
 /** 参加コードを生成（モック・6桁英数字） */

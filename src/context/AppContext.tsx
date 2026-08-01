@@ -25,6 +25,7 @@ import {
   CommunityCreations,
   ChatMap,
   ChatMessage,
+  ChatReadMap,
 } from '@/types';
 import {
   loadState,
@@ -40,6 +41,7 @@ import {
   savePremium,
   saveCommunityCreations,
   saveChats,
+  saveChatReads,
   clearAll,
   DEFAULT_PROFILE,
 } from '@/storage';
@@ -108,6 +110,14 @@ interface AppContextValue {
   chats: ChatMap;
   /** 掲示板に投稿する */
   postChatMessage: (code: string, text: string) => Promise<void>;
+  /** 他メンバーの返信を掲示板に追加する（モック演出用） */
+  postChatReply: (code: string, author: string, text: string) => Promise<void>;
+  /** 掲示板の既読時刻（コードごと） */
+  chatReads: ChatReadMap;
+  /** 掲示板を既読にする */
+  markChatRead: (code: string) => Promise<void>;
+  /** 参加中コミュニティの未読メッセージ数（未参加なら0） */
+  groupUnreadCount: number;
   resetAll: () => Promise<void>;
 }
 
@@ -141,6 +151,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     count: 0,
   });
   const [chats, setChats] = useState<ChatMap>({});
+  const [chatReads, setChatReads] = useState<ChatReadMap>({});
 
   useEffect(() => {
     (async () => {
@@ -157,6 +168,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPremiumState(state.premium);
       setCommunityCreationsState(state.communityCreations);
       setChats(state.chats);
+      setChatReads(state.chatReads);
       setReady(true);
     })();
   }, []);
@@ -187,9 +199,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         saveChats(next);
         return next;
       });
+      // 自分の投稿と同時に既読も更新（自分の投稿で未読が増えないように）
+      setChatReads((prev) => {
+        const next = { ...prev, [code]: Date.now() };
+        saveChatReads(next);
+        return next;
+      });
     },
     [profile.name]
   );
+
+  const postChatReply = useCallback(async (code: string, author: string, text: string) => {
+    if (!code || !text.trim()) return;
+    const msg: ChatMessage = {
+      id: `${Date.now()}-r${Math.round(Math.random() * 1e6)}`,
+      author,
+      text: text.trim(),
+      at: Date.now(),
+      mine: false,
+    };
+    setChats((prev) => {
+      const next = { ...prev, [code]: [...(prev[code] ?? []), msg] };
+      saveChats(next);
+      return next;
+    });
+  }, []);
+
+  const markChatRead = useCallback(async (code: string) => {
+    if (!code) return;
+    setChatReads((prev) => {
+      const next = { ...prev, [code]: Date.now() };
+      saveChatReads(next);
+      return next;
+    });
+  }, []);
+
+  // 参加中コミュニティの未読数（他メンバーの投稿のうち、既読時刻より新しいもの）
+  const groupUnreadCount = useMemo(() => {
+    if (!group) return 0;
+    const lastRead = chatReads[group.code] ?? 0;
+    return (chats[group.code] ?? []).filter((m) => !m.mine && m.at > lastRead).length;
+  }, [group, chats, chatReads]);
 
   const recordCommunityCreation = useCallback(async () => {
     const month = todayStr().slice(0, 7);
@@ -376,6 +426,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPremiumState(false);
     setCommunityCreationsState({ month: '', count: 0 });
     setChats({});
+    setChatReads({});
     await cancelReminders();
     await clearAll();
   }, []);
@@ -441,6 +492,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     recordCommunityCreation,
     chats,
     postChatMessage,
+    postChatReply,
+    chatReads,
+    markChatRead,
+    groupUnreadCount,
     resetAll,
   };
 

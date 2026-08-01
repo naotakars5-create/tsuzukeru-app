@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { colors, font, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
-import { buildCommunityMembers, seedChat, CommunityMember } from '@/logic/communities';
+import { buildCommunityMembers, seedChat, pickReply, CommunityMember } from '@/logic/communities';
 import { formatMinutesShort } from '@/logic/time';
+import { addDays, todayStr } from '@/logic/date';
+import { minutesOf } from '@/logic/schedule';
 import { ChatMessage } from '@/types';
 
 type Tab = 'rank' | 'chat';
+/** ランキングの指標: 通算ポイント / 今週の勉強時間 */
+type Metric = 'points' | 'week';
 
 /** 相対時刻（ざっくり） */
 function ago(ms: number, now: number): string {
@@ -47,22 +51,41 @@ export default function CommunityDetailScreen() {
   const name = params.name ?? 'コミュニティ';
   const cat = params.category ? categoryOf(params.category) : null;
 
-  const { progress, profile, chats, postChatMessage } = useApp();
+  const { progress, profile, minutes, chats, postChatMessage, postChatReply, markChatRead } =
+    useApp();
   const [tab, setTab] = useState<Tab>('rank');
+  const [metric, setMetric] = useState<Metric>('points');
   const [draft, setDraft] = useState('');
   const [now] = useState(() => Date.now());
 
-  const members = useMemo(
-    () =>
-      buildCommunityMembers(code, {
-        name: profile.name,
-        points: progress.points,
-        streak: progress.streak,
-        studyMinutes: progress.totalMinutes,
-      }),
-    [code, profile.name, progress.points, progress.streak, progress.totalMinutes]
-  );
+  // 自分の今週（直近7日）の勉強時間
+  const myWeekMinutes = useMemo(() => {
+    const today = todayStr();
+    let total = 0;
+    for (let i = 0; i < 7; i++) total += minutesOf(minutes, addDays(today, -i));
+    return total;
+  }, [minutes]);
+
+  const members = useMemo(() => {
+    const base = buildCommunityMembers(code, {
+      name: profile.name,
+      points: progress.points,
+      streak: progress.streak,
+      studyMinutes: progress.totalMinutes,
+      weekMinutes: myWeekMinutes,
+    });
+    // 指標に応じて並べ替え
+    return metric === 'points'
+      ? base
+      : [...base].sort((a, b) => b.weekMinutes - a.weekMinutes);
+  }, [code, profile.name, progress.points, progress.streak, progress.totalMinutes, myWeekMinutes, metric]);
   const myPos = members.findIndex((m) => m.isMe) + 1;
+
+  // 掲示板を開いている間は既読にする（新着が来ても既読化）
+  const myMsgCount = (chats[code] ?? []).length;
+  useEffect(() => {
+    if (tab === 'chat' && code) markChatRead(code);
+  }, [tab, code, myMsgCount, markChatRead]);
 
   const messages = useMemo(() => {
     const seeds = seedChat(code, now);
@@ -78,6 +101,10 @@ export default function CommunityDetailScreen() {
     postChatMessage(code, t);
     setDraft('');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    // 少し間をおいて、他メンバーからの“返信”が届く（モック演出）
+    const { author, text } = pickReply(code, t + Date.now());
+    const delay = 4000 + Math.random() * 6000;
+    setTimeout(() => postChatReply(code, author, text), delay);
   };
 
   return (
@@ -111,11 +138,25 @@ export default function CommunityDetailScreen() {
 
       {tab === 'rank' ? (
         <ScrollView contentContainerStyle={styles.rankList} showsVerticalScrollIndicator={false}>
+          {/* 指標の切り替え: 通算ポイント / 今週の勉強時間 */}
+          <View style={styles.metricRow}>
+            <MetricBtn
+              active={metric === 'points'}
+              label="ポイント"
+              onPress={() => setMetric('points')}
+            />
+            <MetricBtn
+              active={metric === 'week'}
+              label="今週の勉強時間"
+              onPress={() => setMetric('week')}
+            />
+          </View>
           <Text style={styles.myPosLine}>
             あなたは <Text style={styles.myPosNum}>{myPos}</Text> 位 / {members.length}人中
+            {metric === 'week' ? '（今週の勉強時間）' : ''}
           </Text>
           {members.map((m, i) => (
-            <MemberRow key={m.id} member={m} position={i + 1} />
+            <MemberRow key={m.id} member={m} position={i + 1} metric={metric} />
           ))}
           <Text style={styles.note}>
             ※ メンバー・ポイントは試作用のモックです。実際のメンバー同期は今後追加予定です。
@@ -180,9 +221,33 @@ function TabBtn({
   );
 }
 
+function MetricBtn({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={[styles.metricBtn, active && styles.metricBtnActive]} onPress={onPress}>
+      <Text style={[styles.metricText, active && styles.metricTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const MEDAL = [colors.gold, colors.silver, colors.bronze];
 
-function MemberRow({ member, position }: { member: CommunityMember; position: number }) {
+function MemberRow({
+  member,
+  position,
+  metric,
+}: {
+  member: CommunityMember;
+  position: number;
+  metric: Metric;
+}) {
   const top3 = position <= 3;
   return (
     <View style={[styles.row, member.isMe && styles.meRow]}>
@@ -209,9 +274,15 @@ function MemberRow({ member, position }: { member: CommunityMember; position: nu
           <Text style={styles.minText}>{formatMinutesShort(member.studyMinutes)}</Text>
         </View>
       </View>
-      <Text style={[styles.points, member.isMe && { color: colors.primary }]}>
-        {member.points.toLocaleString()}
-      </Text>
+      {metric === 'points' ? (
+        <Text style={[styles.points, member.isMe && { color: colors.primary }]}>
+          {member.points.toLocaleString()}
+        </Text>
+      ) : (
+        <Text style={[styles.points, member.isMe && { color: colors.primary }]}>
+          {formatMinutesShort(member.weekMinutes)}
+        </Text>
+      )}
     </View>
   );
 }
@@ -282,6 +353,18 @@ const styles = StyleSheet.create({
 
   // ランキング
   rankList: { paddingHorizontal: spacing.lg, gap: 8 },
+  metricRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: 4 },
+  metricBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  metricBtnActive: { backgroundColor: 'rgba(198,244,50,0.14)', borderColor: colors.primary },
+  metricText: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
+  metricTextActive: { color: colors.primary },
   myPosLine: { fontSize: font.sub, color: colors.textSub, fontWeight: '600', marginBottom: 4 },
   myPosNum: { color: colors.primary, fontWeight: '900', fontSize: font.heading },
   row: {

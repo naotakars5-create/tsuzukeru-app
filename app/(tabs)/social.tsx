@@ -23,7 +23,7 @@ import { LeaderboardEntry } from '@/types';
  */
 export default function SocialScreen() {
   const router = useRouter();
-  const { goal, progress, seasonResult, group, profile } = useApp();
+  const { goal, progress, seasonResult, group, profile, groupUnreadCount } = useApp();
 
   const category = categoryOf(goal?.category);
   const myRankIndex = rankIndexOf(progress.points);
@@ -169,6 +169,11 @@ export default function SocialScreen() {
           <View style={styles.enterHint}>
             <Ionicons name="chatbubbles" size={13} color={colors.primary} />
             <Text style={styles.enterHintText}>タップでランキング・掲示板を開く</Text>
+            {groupUnreadCount > 0 && (
+              <View style={styles.unreadPill}>
+                <Text style={styles.unreadPillText}>新着 {groupUnreadCount}件</Text>
+              </View>
+            )}
           </View>
           {group.tagline ? <Text style={styles.groupTagline}>{group.tagline}</Text> : null}
           <View style={styles.codeRow}>
@@ -458,6 +463,14 @@ const styles = StyleSheet.create({
   groupTagline: { fontSize: 12, color: colors.textSub, marginTop: 6 },
   enterHint: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
   enterHintText: { fontSize: 12, color: colors.primary, fontWeight: '700' },
+  unreadPill: {
+    marginLeft: 'auto',
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  unreadPillText: { fontSize: 10, fontWeight: '900', color: colors.onAccent },
   leaveText: { fontSize: 13, color: colors.danger, fontWeight: '700' },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   codeLabel: { fontSize: 12, color: colors.textSub, fontWeight: '600' },
