@@ -152,9 +152,12 @@ export function myRankInSample(
   return { position: above + 1, total: names.length + 1 };
 }
 
-/** そのコミュニティの挑戦者数（実人数＋ベース143人で「賑わい」を出す・モック） */
-export function communityCount(category: GoalCategory, boardLength: number): number {
-  return boardLength + 143 + (hash('cc' + category) % 60);
+/**
+ * その資格コミュニティの挑戦者数（モック）。
+ * 画面によって数字がぶれないよう、カテゴリだけから安定して決まる。
+ */
+export function communityCount(category: GoalCategory): number {
+  return 154 + (hash('cc' + category) % 60);
 }
 
 /** 先月からの順位変動（モック: 日付から決まる 0〜2） */

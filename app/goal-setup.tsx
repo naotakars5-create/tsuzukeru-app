@@ -42,7 +42,7 @@ export default function GoalSetupScreen() {
 
   const [quote] = useState(() => randomHotQuote());
   const perWeekStake = weekStake(deposit, 4);
-  const challengerCount = communityCount(category, 8);
+  const challengerCount = communityCount(category);
 
   const toggleWeekday = (d: number) => {
     setWeekdays((prev) =>
