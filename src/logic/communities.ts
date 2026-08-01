@@ -80,15 +80,6 @@ const MEMBER_NAMES = [
   'マコト', 'スバル', 'ノゾミ', 'イブキ', 'レン', 'ユイ', 'ショウ', 'カエデ',
 ];
 
-const MEMBER_MOTIVES = [
-  '今度こそ合格する。',
-  '受かるまでやめない。',
-  '毎日コツコツ。',
-  '朝活で差をつける。',
-  '仕事終わりの1時間。',
-  '積み重ねは裏切らない。',
-];
-
 const CHAT_SEEDS = [
   '今日は3時間やった。みんなも頑張ろう！',
   'ここのみんながいるから続けられてる。',
@@ -175,11 +166,6 @@ export function seedChat(code: string, now: number): ChatMessage[] {
     });
   }
   return out;
-}
-
-/** モチベ文言（メンバー名から安定して選ぶ） */
-export function memberMotive(name: string): string {
-  return MEMBER_MOTIVES[hash(name) % MEMBER_MOTIVES.length];
 }
 
 // 投稿への“返信”の弾（モック演出用）

@@ -19,6 +19,7 @@ import {
   ChatReadMap,
 } from '@/types';
 import { EMPTY_LIFETIME } from '@/logic/summary';
+import { DEFAULT_DEPOSIT } from '@/logic/billing';
 
 const KEY_GOAL = 'tsuzukeru.goal.v1';
 const KEY_MINUTES = 'tsuzukeru.minutes.v1';
@@ -82,7 +83,7 @@ export async function loadState(): Promise<PersistedState> {
       if (!goal.category) goal.category = 'other';
       if (goal.weeklyTarget == null) goal.weeklyTarget = 3;
       if (goal.dailyTargetMin == null) goal.dailyTargetMin = 120;
-      if (goal.deposit == null) goal.deposit = 3000;
+      if (goal.deposit == null) goal.deposit = DEFAULT_DEPOSIT;
     }
     const minutes: MinutesMap = minutesRaw ? JSON.parse(minutesRaw) : {};
     const notes: NotesMap = notesRaw ? JSON.parse(notesRaw) : {};

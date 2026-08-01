@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -55,12 +55,21 @@ export function PhotoCropper({ visible, imageUri, imageW, imageH, onCancel, onDo
     return { x: clamp(x, -mx, mx), y: clamp(y, -my, my) };
   };
 
+  // PanResponder は初回に一度だけ作られるため、最新の clamp を ref 経由で参照する
+  // （そうしないと初回レンダー時の画像サイズ/ビューポートで可動域が固定されてしまう）
+  const clampRef = useRef(clampOffset);
+  clampRef.current = clampOffset;
+
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderMove: (_, g) => {
-        const next = clampOffset(committed.current.x + g.dx, committed.current.y + g.dy, zoomRef.current);
+        const next = clampRef.current(
+          committed.current.x + g.dx,
+          committed.current.y + g.dy,
+          zoomRef.current
+        );
         setOffset(next);
       },
       onPanResponderRelease: () => {
@@ -72,6 +81,13 @@ export function PhotoCropper({ visible, imageUri, imageW, imageH, onCancel, onDo
   // offset を ref でも保持（PanResponder のクロージャ用）
   const offsetRef = useRef(offset);
   offsetRef.current = offset;
+
+  // 新しい画像を開いたら位置・ズームをリセット
+  useEffect(() => {
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+    committed.current = { x: 0, y: 0 };
+  }, [imageUri]);
 
   const onViewportLayout = (e: LayoutChangeEvent) => {
     const w = Math.round(e.nativeEvent.layout.width);
@@ -191,18 +207,25 @@ function Slider({
   const widthRef = useRef(0);
   widthRef.current = width;
 
+  // onChange も最新を ref で参照（PanResponder は初回クロージャを掴むため）
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
   const setFromX = (x: number) => {
     const w = widthRef.current || 1;
     const ratio = clamp(x / w, 0, 1);
-    onChange(min + ratio * (max - min));
+    onChangeRef.current(min + ratio * (max - min));
   };
+
+  const setFromXRef = useRef(setFromX);
+  setFromXRef.current = setFromX;
 
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => setFromX(e.nativeEvent.locationX),
-      onPanResponderMove: (e) => setFromX(e.nativeEvent.locationX),
+      onPanResponderGrant: (e) => setFromXRef.current(e.nativeEvent.locationX),
+      onPanResponderMove: (e) => setFromXRef.current(e.nativeEvent.locationX),
     })
   ).current;
 

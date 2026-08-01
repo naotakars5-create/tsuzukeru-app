@@ -214,10 +214,10 @@ export default function CommunitiesScreen() {
                   </View>
                 </View>
                 {joined ? (
-                  <View style={styles.joinedPill}>
+                  <Pressable style={styles.joinedPill} onPress={() => openCommunity(c)}>
                     <Ionicons name="checkmark" size={14} color={colors.success} />
                     <Text style={styles.joinedPillText}>参加中</Text>
-                  </View>
+                  </Pressable>
                 ) : (
                   <Pressable style={styles.joinBtn} onPress={() => join(c)}>
                     <Text style={styles.joinBtnText}>参加</Text>
@@ -246,8 +246,13 @@ function joinByCode(
     const code = await promptAsync('コードで参加', '6桁の参加コードを入力', '');
     if (!code) return;
     const c = code.trim().toUpperCase();
-    await setGroup({ code: c, name: `コミュニティ ${c}`, owner: false, members: undefined, tagline: 'コードで参加' });
-    router.back();
+    const name = `コミュニティ ${c}`;
+    await setGroup({ code: c, name, owner: false, members: undefined, tagline: 'コードで参加' });
+    // 参加したらそのまま入室する
+    router.push({
+      pathname: '/community/[code]',
+      params: { code: c, name, category: '', tagline: 'コードで参加', members: '' },
+    });
   };
 }
 
