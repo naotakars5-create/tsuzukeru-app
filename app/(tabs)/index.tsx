@@ -16,6 +16,7 @@ import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { AchievementGrid } from '@/components/AchievementGrid';
+import { Logo } from '@/components/Logo';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import { frequencyLabel } from '@/logic/schedule';
@@ -61,9 +62,7 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <ScrollView contentContainerStyle={styles.welcomeWrap} showsVerticalScrollIndicator={false}>
-          <ProgressRing ratio={0} size={128} strokeWidth={14} glow={false}>
-            <Ionicons name="flame" size={40} color={colors.primary} />
-          </ProgressRing>
+          <Logo size={132} />
           <Text style={styles.brandName}>覚悟の勉強</Text>
           <Text style={styles.emptyTitle}>心を燃やせ。</Text>
           <Text style={styles.welcomeLead}>
