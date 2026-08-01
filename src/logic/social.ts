@@ -28,11 +28,26 @@ const NAME_POOL = [
   'アサヒ', 'ヒカリ', 'マコト', 'スバル', 'ノゾミ', 'イブキ', 'レン',
 ];
 
-/** コミュニティごとに7人の固定ライバルを選ぶ（コミュニティごとに顔ぶれが変わる） */
+/** 資格コミュニティから抽出されるライバルの人数（毎日ランダムに選ばれる） */
+export const RIVAL_SAMPLE_SIZE = 30;
+
+/** ランキングに表示する上位の人数（＋自分） */
+export const LEADERBOARD_TOP_N = 10;
+
+/**
+ * その日抽出されるライバル名（コミュニティごと・日付ごとに顔ぶれが変わる）。
+ * 同じ資格の全挑戦者から RIVAL_SAMPLE_SIZE 人がランダムに選ばれる想定のモック。
+ */
 function rivalNames(category: GoalCategory): string[] {
-  const start = hash(category) % NAME_POOL.length;
+  const start = hash(category + todayStr()) % NAME_POOL.length;
+  const step = 1 + (hash('step' + category + todayStr()) % 5);
   const out: string[] = [];
-  for (let i = 0; i < 7; i++) out.push(NAME_POOL[(start + i) % NAME_POOL.length]);
+  for (let i = 0; i < RIVAL_SAMPLE_SIZE; i++) {
+    const base = NAME_POOL[(start + i * step) % NAME_POOL.length];
+    // プールより多く必要なので、周回ごとに連番を付けて重複を避ける
+    const lap = Math.floor((i * step) / NAME_POOL.length);
+    out.push(lap > 0 ? `${base}${lap + 1}` : base);
+  }
   return out;
 }
 
@@ -78,6 +93,7 @@ function monthPointsForRank(rankIndex: number, seed: number): number {
 
 /**
  * 同カテゴリの月間ランキング（自分を含む・ポイント降順）。
+ * その日ランダムに選ばれた RIVAL_SAMPLE_SIZE 人から、上位 LEADERBOARD_TOP_N 人＋自分を返す。
  */
 export function buildLeaderboard(
   category: GoalCategory,
@@ -115,7 +131,25 @@ export function buildLeaderboard(
     rank: RANK_TIERS[myRankIndex],
     isMe: true,
   };
-  return [...rivals, me].sort((a, b) => b.points - a.points);
+  const sorted = [...rivals].sort((a, b) => b.points - a.points);
+  const top = sorted.slice(0, LEADERBOARD_TOP_N);
+  // 自分が上位に入っていない場合も、自分の行は必ず表示する
+  const merged = [...top, me].sort((a, b) => b.points - a.points);
+  return merged;
+}
+
+/** 抽出母数における自分の順位（全 RIVAL_SAMPLE_SIZE +1 人の中での位置） */
+export function myRankInSample(
+  category: GoalCategory,
+  myRankIndex: number,
+  myMonthPoints: number
+): { position: number; total: number } {
+  const names = rivalNames(category);
+  const rivalPoints = names.map((name, i) =>
+    monthPointsForRank(rivalRankIndex(myRankIndex, i), hash(name + todayStr()))
+  );
+  const above = rivalPoints.filter((p) => p > myMonthPoints).length;
+  return { position: above + 1, total: names.length + 1 };
 }
 
 /** そのコミュニティの挑戦者数（実人数＋ベース143人で「賑わい」を出す・モック） */

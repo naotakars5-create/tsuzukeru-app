@@ -29,6 +29,9 @@ import { minutesOf } from '@/logic/schedule';
 import { ChatMessage } from '@/types';
 
 type Tab = 'rank' | 'chat';
+
+/** ランキングに表示する上位の人数（＋自分） */
+const RANK_VISIBLE_TOP = 50;
 /** ランキングの指標: 通算ポイント / 今週の勉強時間 */
 type Metric = 'points' | 'week';
 
@@ -80,7 +83,8 @@ export default function CommunityDetailScreen() {
     return Number.isFinite(n) && n > 0 ? Math.min(n, MAX_COMMUNITY_MEMBERS) : defaultMemberCount(code);
   }, [params.members, code]);
 
-  const members = useMemo(() => {
+  // 全参加者を指標順に並べた完全なランキング（順位計算はこちらを使う）
+  const allRanked = useMemo(() => {
     const base = buildCommunityMembers(
       code,
       {
@@ -92,12 +96,25 @@ export default function CommunityDetailScreen() {
       },
       totalMembers
     );
-    // 指標に応じて並べ替え
     return metric === 'points'
       ? base
       : [...base].sort((a, b) => b.weekMinutes - a.weekMinutes);
   }, [code, profile.name, progress.points, progress.streak, progress.totalMinutes, myWeekMinutes, metric, totalMembers]);
-  const myPos = members.findIndex((m) => m.isMe) + 1;
+
+  const myPos = allRanked.findIndex((m) => m.isMe) + 1;
+  const totalCount = allRanked.length;
+
+  // 表示は「上位50名＋自分」。自分が50位以内ならそのまま
+  const shown = useMemo(() => {
+    const top = allRanked.slice(0, RANK_VISIBLE_TOP);
+    if (top.some((m) => m.isMe)) return top.map((m, i) => ({ member: m, position: i + 1 }));
+    const me = allRanked[myPos - 1];
+    return [
+      ...top.map((m, i) => ({ member: m, position: i + 1 })),
+      ...(me ? [{ member: me, position: myPos }] : []),
+    ];
+  }, [allRanked, myPos]);
+  const meOutsideTop = myPos > RANK_VISIBLE_TOP;
 
   // 掲示板を開いている間は既読にする（新着が来ても既読化）
   const myMsgCount = (chats[code] ?? []).length;
@@ -144,8 +161,8 @@ export default function CommunityDetailScreen() {
           </Text>
           <Text style={styles.headMeta} numberOfLines={1}>
             {params.tagline
-              ? `${params.tagline} ・ ${members.length}人`
-              : `${members.length}人が参加中（定員${MAX_COMMUNITY_MEMBERS}人）`}
+              ? `${params.tagline} ・ ${totalCount}人`
+              : `${totalCount}人が参加中（定員${MAX_COMMUNITY_MEMBERS}人）`}
           </Text>
         </View>
       </View>
@@ -158,8 +175,8 @@ export default function CommunityDetailScreen() {
 
       {tab === 'rank' ? (
         <FlatList
-          data={members}
-          keyExtractor={(m) => m.id}
+          data={shown}
+          keyExtractor={(row) => row.member.id}
           contentContainerStyle={styles.rankList}
           showsVerticalScrollIndicator={false}
           initialNumToRender={20}
@@ -180,20 +197,26 @@ export default function CommunityDetailScreen() {
                 />
               </View>
               <Text style={styles.myPosLine}>
-                あなたは <Text style={styles.myPosNum}>{myPos}</Text> 位 / {members.length}人中
+                あなたは <Text style={styles.myPosNum}>{myPos}</Text> 位 / {totalCount}人中
                 {metric === 'week' ? '（今週の勉強時間）' : ''}
               </Text>
             </View>
           }
           renderItem={({ item, index }) => (
             <View style={{ marginBottom: 8 }}>
-              <MemberRow member={item} position={index + 1} metric={metric} />
+              {/* 自分が上位50位圏外のときは区切りを入れる */}
+              {meOutsideTop && index === shown.length - 1 && (
+                <Text style={styles.gapLabel}>・・・</Text>
+              )}
+              <MemberRow member={item.member} position={item.position} metric={metric} />
             </View>
           )}
           ListFooterComponent={
             <View>
               <Text style={styles.note}>
-                ※ メンバー・ポイントは試作用のモックです。実際のメンバー同期は今後追加予定です。
+                ※ ランキングは
+                <Text style={styles.noteStrong}>上位{RANK_VISIBLE_TOP}名とあなた</Text>
+                を表示しています（順位は全{totalCount}人での順位）。メンバー・ポイントは試作用のモックです。
               </Text>
               <View style={{ height: spacing.xl }} />
             </View>
@@ -433,6 +456,14 @@ const styles = StyleSheet.create({
   minText: { fontSize: 11, color: colors.textMuted, fontVariant: ['tabular-nums'] },
   points: { fontSize: 16, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18, marginTop: spacing.md },
+  noteStrong: { color: colors.textSub, fontWeight: '800' },
+  gapLabel: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: font.body,
+    letterSpacing: 4,
+    marginBottom: 6,
+  },
 
   // チャット
   chatList: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
