@@ -212,9 +212,12 @@ export default function HomeScreen() {
             </Text>
             <View style={styles.quoteRow}>
               <Ionicons name="flame" size={16} color={colors.primary} style={{ marginTop: 3 }} />
-              <Text style={styles.greetQuote} numberOfLines={3}>
-                {quote}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.greetQuote} numberOfLines={6}>
+                  {quote.text}
+                </Text>
+                {quote.author ? <Text style={styles.greetAuthor}>— {quote.author}</Text> : null}
+              </View>
             </View>
           </View>
           <Pressable style={styles.bell} onPress={() => router.push('/settings')}>
@@ -508,7 +511,8 @@ const styles = StyleSheet.create({
   greetSub: { fontSize: 13, color: colors.textSub },
   greetMain: { fontSize: 17, fontWeight: '800', color: colors.text, marginTop: 2 },
   quoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 },
-  greetQuote: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.text, lineHeight: 22 },
+  greetQuote: { fontSize: 15, fontWeight: '800', color: colors.text, lineHeight: 21 },
+  greetAuthor: { fontSize: 12, fontWeight: '700', color: colors.primary, marginTop: 4, textAlign: 'right' },
   bell: {
     width: 40,
     height: 40,
