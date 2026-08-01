@@ -52,6 +52,9 @@ export type RecordMap = Record<string, DayStatus>;
 /** 日付をキーにした勉強時間（分） { '2026-07-21': 125 } */
 export type MinutesMap = Record<string, number>;
 
+/** 日付をキーにした学習メモ { '2026-07-21': '英単語50個、過去問大問3' } */
+export type NotesMap = Record<string, string>;
+
 /** リマインド通知の設定（端末内のローカル通知） */
 export interface ReminderSettings {
   enabled: boolean;
@@ -123,6 +126,8 @@ export interface PersistedState {
   goal: Goal | null;
   /** 日ごとの勉強時間（分） */
   minutes: MinutesMap;
+  /** 日ごとの学習メモ */
+  notes: NotesMap;
   /** ストップウォッチ計測開始時刻(ms)。null=計測していない */
   timerStartedAt: number | null;
   reminder: ReminderSettings;

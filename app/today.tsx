@@ -136,6 +136,15 @@ export default function TodayScreen() {
               </Text>
             )}
 
+            {!running && (
+              <PrimaryButton
+                label="今日の学習メモを書く"
+                icon="create"
+                variant="secondary"
+                onPress={() => router.push('/journal')}
+              />
+            )}
+
             <PrimaryButton label="戻る" variant="ghost" onPress={() => router.back()} />
           </View>
         </>

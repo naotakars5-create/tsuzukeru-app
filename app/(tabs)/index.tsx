@@ -19,6 +19,7 @@ import { AchievementGrid } from '@/components/AchievementGrid';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import { frequencyLabel } from '@/logic/schedule';
+import { todayStr } from '@/logic/date';
 import { formatMinutes, formatMinutesShort } from '@/logic/time';
 import { IconName } from '@/types';
 
@@ -36,6 +37,7 @@ export default function HomeScreen() {
     ready,
     goal,
     minutes,
+    notes,
     progress,
     weeks,
     seasonResult,
@@ -314,6 +316,26 @@ export default function HomeScreen() {
           )}
         </Card>
 
+        {/* 学習メモ（記録帳）への入口 */}
+        <Pressable onPress={() => router.push('/journal')}>
+          <Card>
+            <View style={styles.memoRow}>
+              <View style={styles.memoIcon}>
+                <Ionicons name="create" size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.memoTitle}>学習メモ</Text>
+                <Text style={styles.memoPreview} numberOfLines={1}>
+                  {notes[todayStr()]?.trim()
+                    ? notes[todayStr()]
+                    : '今日やったこと・気づきを残そう'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </Card>
+        </Pressable>
+
         {/* 達成グリッド（ヒートマップ） */}
         <Card style={styles.gridCard}>
           <View style={styles.gridHead}>
@@ -440,6 +462,18 @@ const styles = StyleSheet.create({
   pillarTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
   pillarDesc: { fontSize: font.small, color: colors.textSub, marginTop: 2, lineHeight: 16 },
   welcomeNote: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.md },
+
+  memoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  memoIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memoTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
+  memoPreview: { fontSize: font.small, color: colors.textSub, marginTop: 2 },
 
   riskCard: {
     flexDirection: 'row',

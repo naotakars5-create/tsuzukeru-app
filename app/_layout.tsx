@@ -34,6 +34,10 @@ export default function RootLayout() {
             options={{ title: '今日の達成', presentation: 'card' }}
           />
           <Stack.Screen
+            name="journal"
+            options={{ title: '学習メモ', presentation: 'card' }}
+          />
+          <Stack.Screen
             name="profile-edit"
             options={{ title: 'プロフィール編集', presentation: 'modal' }}
           />

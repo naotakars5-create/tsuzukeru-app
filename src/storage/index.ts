@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Goal,
   MinutesMap,
+  NotesMap,
   PersistedState,
   ReminderSettings,
   LifetimeStats,
@@ -19,6 +20,7 @@ import { EMPTY_LIFETIME } from '@/logic/summary';
 
 const KEY_GOAL = 'tsuzukeru.goal.v1';
 const KEY_MINUTES = 'tsuzukeru.minutes.v1';
+const KEY_NOTES = 'tsuzukeru.notes.v1';
 const KEY_TIMER = 'tsuzukeru.timer.v1';
 const KEY_REMINDER = 'tsuzukeru.reminder.v1';
 const KEY_LIFETIME = 'tsuzukeru.lifetime.v1';
@@ -44,6 +46,7 @@ export async function loadState(): Promise<PersistedState> {
     const [
       goalRaw,
       minutesRaw,
+      notesRaw,
       timerRaw,
       reminderRaw,
       lifetimeRaw,
@@ -55,6 +58,7 @@ export async function loadState(): Promise<PersistedState> {
     ] = await Promise.all([
       AsyncStorage.getItem(KEY_GOAL),
       AsyncStorage.getItem(KEY_MINUTES),
+      AsyncStorage.getItem(KEY_NOTES),
       AsyncStorage.getItem(KEY_TIMER),
       AsyncStorage.getItem(KEY_REMINDER),
       AsyncStorage.getItem(KEY_LIFETIME),
@@ -73,6 +77,7 @@ export async function loadState(): Promise<PersistedState> {
       if (goal.deposit == null) goal.deposit = 3000;
     }
     const minutes: MinutesMap = minutesRaw ? JSON.parse(minutesRaw) : {};
+    const notes: NotesMap = notesRaw ? JSON.parse(notesRaw) : {};
     const timerStartedAt: number | null = timerRaw ? JSON.parse(timerRaw) : null;
     const reminder: ReminderSettings = reminderRaw
       ? { ...DEFAULT_REMINDER, ...JSON.parse(reminderRaw) }
@@ -92,6 +97,7 @@ export async function loadState(): Promise<PersistedState> {
     return {
       goal,
       minutes,
+      notes,
       timerStartedAt,
       reminder,
       lifetime,
@@ -106,6 +112,7 @@ export async function loadState(): Promise<PersistedState> {
     return {
       goal: null,
       minutes: {},
+      notes: {},
       timerStartedAt: null,
       reminder: DEFAULT_REMINDER,
       lifetime: EMPTY_LIFETIME,
@@ -125,6 +132,10 @@ export async function saveGoal(goal: Goal | null): Promise<void> {
 
 export async function saveMinutes(minutes: MinutesMap): Promise<void> {
   await AsyncStorage.setItem(KEY_MINUTES, JSON.stringify(minutes));
+}
+
+export async function saveNotes(notes: NotesMap): Promise<void> {
+  await AsyncStorage.setItem(KEY_NOTES, JSON.stringify(notes));
 }
 
 export async function saveTimer(startedAt: number | null): Promise<void> {
@@ -165,6 +176,7 @@ export async function clearAll(): Promise<void> {
   await AsyncStorage.multiRemove([
     KEY_GOAL,
     KEY_MINUTES,
+    KEY_NOTES,
     KEY_TIMER,
     KEY_REMINDER,
     KEY_LIFETIME,

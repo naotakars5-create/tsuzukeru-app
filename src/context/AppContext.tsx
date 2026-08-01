@@ -15,6 +15,7 @@ import React, {
 import {
   Goal,
   MinutesMap,
+  NotesMap,
   ReminderSettings,
   LifetimeStats,
   BadgeMap,
@@ -27,6 +28,7 @@ import {
   loadState,
   saveGoal,
   saveMinutes,
+  saveNotes,
   saveTimer,
   saveReminder,
   saveLifetime,
@@ -57,6 +59,10 @@ interface AppContextValue {
   ready: boolean;
   goal: Goal | null;
   minutes: MinutesMap;
+  /** 日ごとの学習メモ */
+  notes: NotesMap;
+  /** ある日のメモを保存（空文字ならその日のメモを削除） */
+  setNote: (date: string, text: string) => Promise<void>;
   reminder: ReminderSettings;
   lifetime: LifetimeStats;
   profile: Profile;
@@ -115,6 +121,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [minutes, setMinutes] = useState<MinutesMap>({});
+  const [notes, setNotes] = useState<NotesMap>({});
   const [reminder, setReminder] = useState<ReminderSettings>({ enabled: false, hour: 20, minute: 0 });
   const [lifetime, setLifetime] = useState<LifetimeStats>(EMPTY_LIFETIME);
   const [badgesMap, setBadgesMap] = useState<BadgeMap>({});
@@ -132,6 +139,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const state = await loadState();
       setGoal(state.goal);
       setMinutes(state.minutes);
+      setNotes(state.notes);
       setReminder(state.reminder);
       setLifetime(state.lifetime);
       setBadgesMap(state.badges);
@@ -268,6 +276,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const setNote = useCallback(async (date: string, text: string) => {
+    setNotes((prev) => {
+      const next = { ...prev };
+      const t = text.trim();
+      if (t) next[date] = t;
+      else delete next[date];
+      saveNotes(next);
+      return next;
+    });
+  }, []);
+
   const startTimer = useCallback(() => {
     const now = Date.now();
     setTimerStartedAt(now);
@@ -317,6 +336,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const resetAll = useCallback(async () => {
     setGoal(null);
     setMinutes({});
+    setNotes({});
     setTimerStartedAt(null);
     await saveTimer(null);
     setReminder({ enabled: false, hour: 20, minute: 0 });
@@ -359,6 +379,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ready,
     goal,
     minutes,
+    notes,
+    setNote,
     reminder,
     lifetime,
     profile,
