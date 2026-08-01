@@ -11,6 +11,9 @@ import {
   monthlyRankDelta,
   rankIndexOf,
   communityCount,
+  myRankInSample,
+  RIVAL_SAMPLE_SIZE,
+  LEADERBOARD_TOP_N,
 } from '@/logic/social';
 import { POINTS_PER_DONE } from '@/logic/rank';
 import { formatMinutesShort } from '@/logic/time';
@@ -56,7 +59,9 @@ export default function SocialScreen() {
   }
 
   const myIndex = leaderboard.findIndex((e) => e.isMe);
-  const myPosition = myIndex + 1;
+  // 表示は上位10人＋自分だが、順位は抽出母数（30人＋自分）での本当の順位を出す
+  const sample = myRankInSample(category.key, myRankIndex, myMonthPoints);
+  const myPosition = sample.position;
   const above = myIndex > 0 ? leaderboard[myIndex - 1] : null;
   const delta = monthlyRankDelta(category.key);
 
@@ -124,7 +129,7 @@ export default function SocialScreen() {
             <Text style={styles.heroNum}>{myPosition}</Text>
             <Text style={styles.heroNumUnit}>位</Text>
           </View>
-          <Text style={styles.heroTotal}>/ {leaderboard.length}人中</Text>
+          <Text style={styles.heroTotal}>/ {sample.total}人中</Text>
           <View style={styles.deltaWrap}>
             {delta > 0 ? (
               <View style={styles.deltaRow}>
@@ -212,7 +217,7 @@ export default function SocialScreen() {
         <Text style={styles.sectionLabel}>
           {rest.length > 0 ? '4位以下' : '月間ランキング'}
         </Text>
-        <Text style={styles.rankPeriod}>今月</Text>
+        <Text style={styles.rankPeriod}>今月 ・ 上位{LEADERBOARD_TOP_N}人＋あなた</Text>
       </View>
 
       <View style={styles.list}>
@@ -229,7 +234,11 @@ export default function SocialScreen() {
       </View>
 
       <Text style={styles.note}>
-        ※ 仲間・ランキングは試作用のダミーデータです（近しいランクの相手が集まります）。実際の友だち連携は今後追加予定です。
+        ※ 対戦相手は毎日、同じ資格の挑戦者から
+        <Text style={styles.noteStrong}>ランダムに{RIVAL_SAMPLE_SIZE}人</Text>
+        が選ばれます（近しいランクの相手が集まります）。ランキングにはそのうち
+        <Text style={styles.noteStrong}>上位{LEADERBOARD_TOP_N}人とあなた</Text>
+        を表示しています。試作用のダミーデータで、実際の友だち連携は今後追加予定です。
       </Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
@@ -600,4 +609,5 @@ const styles = StyleSheet.create({
   points: { fontSize: 16, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
 
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18, marginTop: 18 },
+  noteStrong: { color: colors.textSub, fontWeight: '800' },
 });
