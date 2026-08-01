@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   Pressable,
   TextInput,
   KeyboardAvoidingView,
@@ -14,7 +15,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { colors, font, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
-import { buildCommunityMembers, seedChat, pickReply, CommunityMember } from '@/logic/communities';
+import {
+  buildCommunityMembers,
+  seedChat,
+  pickReply,
+  defaultMemberCount,
+  MAX_COMMUNITY_MEMBERS,
+  CommunityMember,
+} from '@/logic/communities';
 import { formatMinutesShort } from '@/logic/time';
 import { addDays, todayStr } from '@/logic/date';
 import { minutesOf } from '@/logic/schedule';
@@ -66,19 +74,29 @@ export default function CommunityDetailScreen() {
     return total;
   }, [minutes]);
 
+  // 全参加者数（パラメータ優先。なければコードから安定生成・定員500）
+  const totalMembers = useMemo(() => {
+    const n = parseInt(params.members ?? '', 10);
+    return Number.isFinite(n) && n > 0 ? Math.min(n, MAX_COMMUNITY_MEMBERS) : defaultMemberCount(code);
+  }, [params.members, code]);
+
   const members = useMemo(() => {
-    const base = buildCommunityMembers(code, {
-      name: profile.name,
-      points: progress.points,
-      streak: progress.streak,
-      studyMinutes: progress.totalMinutes,
-      weekMinutes: myWeekMinutes,
-    });
+    const base = buildCommunityMembers(
+      code,
+      {
+        name: profile.name,
+        points: progress.points,
+        streak: progress.streak,
+        studyMinutes: progress.totalMinutes,
+        weekMinutes: myWeekMinutes,
+      },
+      totalMembers
+    );
     // 指標に応じて並べ替え
     return metric === 'points'
       ? base
       : [...base].sort((a, b) => b.weekMinutes - a.weekMinutes);
-  }, [code, profile.name, progress.points, progress.streak, progress.totalMinutes, myWeekMinutes, metric]);
+  }, [code, profile.name, progress.points, progress.streak, progress.totalMinutes, myWeekMinutes, metric, totalMembers]);
   const myPos = members.findIndex((m) => m.isMe) + 1;
 
   // 掲示板を開いている間は既読にする（新着が来ても既読化）
@@ -125,7 +143,9 @@ export default function CommunityDetailScreen() {
             {name}
           </Text>
           <Text style={styles.headMeta} numberOfLines={1}>
-            {params.tagline ? params.tagline : `${members.length}人が参加中`}
+            {params.tagline
+              ? `${params.tagline} ・ ${members.length}人`
+              : `${members.length}人が参加中（定員${MAX_COMMUNITY_MEMBERS}人）`}
           </Text>
         </View>
       </View>
@@ -137,32 +157,48 @@ export default function CommunityDetailScreen() {
       </View>
 
       {tab === 'rank' ? (
-        <ScrollView contentContainerStyle={styles.rankList} showsVerticalScrollIndicator={false}>
-          {/* 指標の切り替え: 通算ポイント / 今週の勉強時間 */}
-          <View style={styles.metricRow}>
-            <MetricBtn
-              active={metric === 'points'}
-              label="ポイント"
-              onPress={() => setMetric('points')}
-            />
-            <MetricBtn
-              active={metric === 'week'}
-              label="今週の勉強時間"
-              onPress={() => setMetric('week')}
-            />
-          </View>
-          <Text style={styles.myPosLine}>
-            あなたは <Text style={styles.myPosNum}>{myPos}</Text> 位 / {members.length}人中
-            {metric === 'week' ? '（今週の勉強時間）' : ''}
-          </Text>
-          {members.map((m, i) => (
-            <MemberRow key={m.id} member={m} position={i + 1} metric={metric} />
-          ))}
-          <Text style={styles.note}>
-            ※ メンバー・ポイントは試作用のモックです。実際のメンバー同期は今後追加予定です。
-          </Text>
-          <View style={{ height: spacing.xl }} />
-        </ScrollView>
+        <FlatList
+          data={members}
+          keyExtractor={(m) => m.id}
+          contentContainerStyle={styles.rankList}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={20}
+          windowSize={10}
+          ListHeaderComponent={
+            <View>
+              {/* 指標の切り替え: 通算ポイント / 今週の勉強時間 */}
+              <View style={styles.metricRow}>
+                <MetricBtn
+                  active={metric === 'points'}
+                  label="ポイント"
+                  onPress={() => setMetric('points')}
+                />
+                <MetricBtn
+                  active={metric === 'week'}
+                  label="今週の勉強時間"
+                  onPress={() => setMetric('week')}
+                />
+              </View>
+              <Text style={styles.myPosLine}>
+                あなたは <Text style={styles.myPosNum}>{myPos}</Text> 位 / {members.length}人中
+                {metric === 'week' ? '（今週の勉強時間）' : ''}
+              </Text>
+            </View>
+          }
+          renderItem={({ item, index }) => (
+            <View style={{ marginBottom: 8 }}>
+              <MemberRow member={item} position={index + 1} metric={metric} />
+            </View>
+          )}
+          ListFooterComponent={
+            <View>
+              <Text style={styles.note}>
+                ※ メンバー・ポイントは試作用のモックです。実際のメンバー同期は今後追加予定です。
+              </Text>
+              <View style={{ height: spacing.xl }} />
+            </View>
+          }
+        />
       ) : (
         <>
           <ScrollView
@@ -352,8 +388,8 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.onAccent },
 
   // ランキング
-  rankList: { paddingHorizontal: spacing.lg, gap: 8 },
-  metricRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: 4 },
+  rankList: { paddingHorizontal: spacing.lg },
+  metricRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: 6 },
   metricBtn: {
     paddingVertical: 7,
     paddingHorizontal: spacing.md,
@@ -365,7 +401,7 @@ const styles = StyleSheet.create({
   metricBtnActive: { backgroundColor: 'rgba(198,244,50,0.14)', borderColor: colors.primary },
   metricText: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
   metricTextActive: { color: colors.primary },
-  myPosLine: { fontSize: font.sub, color: colors.textSub, fontWeight: '600', marginBottom: 4 },
+  myPosLine: { fontSize: font.sub, color: colors.textSub, fontWeight: '600', marginBottom: 10 },
   myPosNum: { color: colors.primary, fontWeight: '900', fontSize: font.heading },
   row: {
     flexDirection: 'row',

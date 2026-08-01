@@ -4,7 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { colors, font, radius, spacing } from '@/theme';
-import { searchCommunities, generateCode, CommunityInfo } from '@/logic/communities';
+import { searchCommunities, generateCode, CommunityInfo, MAX_COMMUNITY_MEMBERS } from '@/logic/communities';
 import { categoryOf } from '@/logic/category';
 import { promptAsync, notifyAsync, confirmAsync } from '@/logic/confirm';
 
@@ -15,8 +15,9 @@ import { promptAsync, notifyAsync, confirmAsync } from '@/logic/confirm';
 export default function CommunitiesScreen() {
   const router = useRouter();
   const {
-    group,
-    setGroup,
+    groups,
+    joinGroup,
+    leaveGroup,
     goal,
     premium,
     setPremium,
@@ -50,7 +51,12 @@ export default function CommunitiesScreen() {
   };
 
   const join = async (c: CommunityInfo) => {
-    await setGroup({
+    // 定員チェック（上限500人）
+    if ((c.members ?? 0) >= MAX_COMMUNITY_MEMBERS) {
+      notifyAsync('満員です', `このコミュニティは定員${MAX_COMMUNITY_MEMBERS}人に達しています。`);
+      return;
+    }
+    const ok = await joinGroup({
       code: c.code,
       name: c.name,
       owner: false,
@@ -58,6 +64,10 @@ export default function CommunitiesScreen() {
       members: c.members,
       tagline: c.tagline,
     });
+    if (!ok) {
+      notifyAsync('参加は3つまでです', 'コミュニティに同時に参加できるのは3つまでです。どれかを抜けてから参加してください。');
+      return;
+    }
     openCommunity(c);
   };
 
@@ -86,7 +96,7 @@ export default function CommunitiesScreen() {
     if (!name) return;
     const tagline = (await promptAsync('ひとこと説明（任意）', 'どんな仲間を集める？', '')) ?? '';
     const code = generateCode(name + Date.now());
-    await setGroup({
+    const ok = await joinGroup({
       code,
       name: name.trim(),
       owner: true,
@@ -94,6 +104,10 @@ export default function CommunitiesScreen() {
       members: 1,
       tagline: tagline.trim() || 'あなたが作ったコミュニティ',
     });
+    if (!ok) {
+      notifyAsync('参加は3つまでです', '作成したコミュニティに入るには、参加中のどれかを抜けてください。');
+      return;
+    }
     await recordCommunityCreation();
     notifyAsync(
       '作成しました',
@@ -102,8 +116,9 @@ export default function CommunitiesScreen() {
     openCommunity({ code, name: name.trim(), category: goal?.category, tagline: tagline.trim(), members: 1 });
   };
 
-  const leave = async () => {
-    await setGroup(null);
+  const leave = async (code: string) => {
+    const ok = await confirmAsync('このコミュニティを抜けますか？', undefined, '抜ける');
+    if (ok) await leaveGroup(code);
   };
 
   return (
@@ -114,26 +129,33 @@ export default function CommunitiesScreen() {
           資格ごとの自動ランキングに加えて、テーマ別コミュニティにも参加できます。
         </Text>
 
-        {/* 参加中（タップで入室） */}
-        {group && (
-          <Pressable style={styles.joinedCard} onPress={() => openCommunity(group)}>
-            <View style={styles.joinedHead}>
-              <Ionicons name="people-circle" size={18} color={colors.primary} />
-              <Text style={styles.joinedTitle}>参加中: {group.name}</Text>
-              <View style={styles.enterRow}>
-                <Text style={styles.enterText}>入る</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-              </View>
-            </View>
-            {group.tagline ? <Text style={styles.joinedTag}>{group.tagline}</Text> : null}
-            <View style={styles.joinedMetaRow}>
-              <Text style={styles.joinedMeta}>コード {group.code}</Text>
-              {group.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
-              <Pressable onPress={leave} hitSlop={8} style={{ marginLeft: 'auto' }}>
-                <Text style={styles.leaveText}>抜ける</Text>
+        {/* 参加中（最大3つ・タップで入室） */}
+        {groups.length > 0 && (
+          <View style={{ gap: spacing.sm }}>
+            <Text style={styles.joinedCount}>参加中 {groups.length}/3</Text>
+            {groups.map((g) => (
+              <Pressable key={g.code} style={styles.joinedCard} onPress={() => openCommunity(g)}>
+                <View style={styles.joinedHead}>
+                  <Ionicons name="people-circle" size={18} color={colors.primary} />
+                  <Text style={styles.joinedTitle} numberOfLines={1}>
+                    {g.name}
+                  </Text>
+                  <View style={styles.enterRow}>
+                    <Text style={styles.enterText}>入る</Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                  </View>
+                </View>
+                {g.tagline ? <Text style={styles.joinedTag}>{g.tagline}</Text> : null}
+                <View style={styles.joinedMetaRow}>
+                  <Text style={styles.joinedMeta}>コード {g.code}</Text>
+                  {g.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
+                  <Pressable onPress={() => leave(g.code)} hitSlop={8} style={{ marginLeft: 'auto' }}>
+                    <Text style={styles.leaveText}>抜ける</Text>
+                  </Pressable>
+                </View>
               </Pressable>
-            </View>
-          </Pressable>
+            ))}
+          </View>
         )}
 
         {/* 作る / コードで参加 */}
@@ -147,7 +169,7 @@ export default function CommunitiesScreen() {
               </View>
             )}
           </Pressable>
-          <Pressable style={styles.actionBtn} onPress={joinByCode(setGroup, router)}>
+          <Pressable style={styles.actionBtn} onPress={joinByCode(joinGroup, router)}>
             <Ionicons name="enter" size={18} color={colors.primary} />
             <Text style={styles.actionText}>コードで参加</Text>
           </Pressable>
@@ -195,7 +217,7 @@ export default function CommunitiesScreen() {
           </Text>
         ) : (
           results.map((c) => {
-            const joined = group?.code === c.code;
+            const joined = groups.some((g) => g.code === c.code);
             const cat = c.category ? categoryOf(c.category) : null;
             return (
               <View key={c.code} style={styles.row}>
@@ -239,7 +261,7 @@ export default function CommunitiesScreen() {
 
 /** コードで参加（ハンドラを生成） */
 function joinByCode(
-  setGroup: (g: any) => Promise<void>,
+  joinGroup: (g: any) => Promise<boolean>,
   router: ReturnType<typeof useRouter>
 ) {
   return async () => {
@@ -247,7 +269,11 @@ function joinByCode(
     if (!code) return;
     const c = code.trim().toUpperCase();
     const name = `コミュニティ ${c}`;
-    await setGroup({ code: c, name, owner: false, members: undefined, tagline: 'コードで参加' });
+    const ok = await joinGroup({ code: c, name, owner: false, members: undefined, tagline: 'コードで参加' });
+    if (!ok) {
+      notifyAsync('参加は3つまでです', 'コミュニティに同時に参加できるのは3つまでです。');
+      return;
+    }
     // 参加したらそのまま入室する
     router.push({
       pathname: '/community/[code]',
@@ -261,6 +287,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md },
   lead: { fontSize: font.sub, color: colors.textSub, lineHeight: 21 },
 
+  joinedCount: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
   joinedCard: {
     backgroundColor: 'rgba(198,244,50,0.08)',
     borderWidth: 1,

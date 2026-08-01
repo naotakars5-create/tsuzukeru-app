@@ -98,7 +98,12 @@ export async function loadState(): Promise<PersistedState> {
     const profile: Profile = profileRaw
       ? { ...DEFAULT_PROFILE, ...JSON.parse(profileRaw) }
       : DEFAULT_PROFILE;
-    const group: CustomGroup | null = groupRaw ? JSON.parse(groupRaw) : null;
+    // 旧バージョンは単一オブジェクト保存だったため、配列へ移行する
+    let groups: CustomGroup[] = [];
+    if (groupRaw) {
+      const parsed = JSON.parse(groupRaw);
+      groups = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+    }
     const premium: boolean = premiumRaw ? JSON.parse(premiumRaw) : false;
     const communityCreations: CommunityCreations = creationsRaw
       ? { ...DEFAULT_COMMUNITY_CREATIONS, ...JSON.parse(creationsRaw) }
@@ -114,7 +119,7 @@ export async function loadState(): Promise<PersistedState> {
       lifetime,
       badges,
       profile,
-      group,
+      groups,
       premium,
       communityCreations,
       chats,
@@ -131,7 +136,7 @@ export async function loadState(): Promise<PersistedState> {
       lifetime: EMPTY_LIFETIME,
       badges: {},
       profile: DEFAULT_PROFILE,
-      group: null,
+      groups: [],
       premium: false,
       communityCreations: DEFAULT_COMMUNITY_CREATIONS,
       chats: {},
@@ -174,9 +179,8 @@ export async function saveProfile(profile: Profile): Promise<void> {
   await AsyncStorage.setItem(KEY_PROFILE, JSON.stringify(profile));
 }
 
-export async function saveGroup(group: CustomGroup | null): Promise<void> {
-  if (group) await AsyncStorage.setItem(KEY_GROUP, JSON.stringify(group));
-  else await AsyncStorage.removeItem(KEY_GROUP);
+export async function saveGroups(groups: CustomGroup[]): Promise<void> {
+  await AsyncStorage.setItem(KEY_GROUP, JSON.stringify(groups));
 }
 
 export async function savePremium(premium: boolean): Promise<void> {

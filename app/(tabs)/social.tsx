@@ -23,7 +23,7 @@ import { LeaderboardEntry } from '@/types';
  */
 export default function SocialScreen() {
   const router = useRouter();
-  const { goal, progress, seasonResult, group, profile, groupUnreadCount } = useApp();
+  const { goal, progress, seasonResult, groups, profile, unreadByCode } = useApp();
 
   const category = categoryOf(goal?.category);
   const myRankIndex = rankIndexOf(progress.points);
@@ -67,16 +67,15 @@ export default function SocialScreen() {
 
   const myPhoto = profile.photo ?? null;
 
-  const openCommunity = () => {
-    if (!group) return;
+  const openCommunity = (g: (typeof groups)[number]) => {
     router.push({
       pathname: '/community/[code]',
       params: {
-        code: group.code,
-        name: group.name,
-        category: group.category ?? '',
-        tagline: group.tagline ?? '',
-        members: group.members != null ? String(group.members) : '',
+        code: g.code,
+        name: g.name,
+        category: g.category ?? '',
+        tagline: g.tagline ?? '',
+        members: g.members != null ? String(g.members) : '',
       },
     });
   };
@@ -118,7 +117,7 @@ export default function SocialScreen() {
         style={styles.hero}
       >
         <Text style={styles.heroLabel}>
-          あなたの順位 ・ {group ? group.name : `${category.label}・今月`}
+          あなたの順位 ・ {category.label}・今月
         </Text>
         <View style={styles.heroRow}>
           <View style={styles.heroNumRow}>
@@ -152,42 +151,52 @@ export default function SocialScreen() {
         </Text>
       </LinearGradient>
 
-      {/* コミュニティ（テーマ別・任意参加） */}
-      {group ? (
-        <Pressable style={styles.groupCard} onPress={openCommunity}>
-          <View style={styles.groupHead}>
-            <View style={styles.titleRow}>
-              <Ionicons name="people-circle" size={18} color={colors.primary} />
-              <Text style={styles.groupName}>{group.name}</Text>
-              {group.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
-            </View>
+      {/* コミュニティ（テーマ別・最大3つまで参加） */}
+      {groups.length > 0 ? (
+        <View style={styles.groupsWrap}>
+          <View style={styles.groupsHead}>
+            <Text style={styles.groupsTitle}>参加中のコミュニティ（{groups.length}/3）</Text>
             <Pressable style={styles.titleRow} onPress={() => router.push('/communities')} hitSlop={8}>
-              <Text style={styles.changeText}>探す/変更</Text>
+              <Text style={styles.changeText}>探す/追加</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textSub} />
             </Pressable>
           </View>
-          <View style={styles.enterHint}>
-            <Ionicons name="chatbubbles" size={13} color={colors.primary} />
-            <Text style={styles.enterHintText}>タップでランキング・掲示板を開く</Text>
-            {groupUnreadCount > 0 && (
-              <View style={styles.unreadPill}>
-                <Text style={styles.unreadPillText}>新着 {groupUnreadCount}件</Text>
-              </View>
-            )}
-          </View>
-          {group.tagline ? <Text style={styles.groupTagline}>{group.tagline}</Text> : null}
-          <View style={styles.codeRow}>
-            <Text style={styles.codeLabel}>参加コード</Text>
-            <Text style={styles.codeValue}>{group.code}</Text>
-            {typeof group.members === 'number' ? (
-              <Text style={styles.codeLabel}>・{group.members}人</Text>
-            ) : null}
-          </View>
-        </Pressable>
+          {groups.map((g) => {
+            const unread = unreadByCode[g.code] ?? 0;
+            return (
+              <Pressable key={g.code} style={styles.groupCard} onPress={() => openCommunity(g)}>
+                <View style={styles.groupHead}>
+                  <View style={styles.titleRow}>
+                    <Ionicons name="people-circle" size={18} color={colors.primary} />
+                    <Text style={styles.groupName} numberOfLines={1}>
+                      {g.name}
+                    </Text>
+                    {g.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
+                  </View>
+                  {unread > 0 ? (
+                    <View style={styles.unreadPill}>
+                      <Text style={styles.unreadPillText}>新着 {unread}件</Text>
+                    </View>
+                  ) : (
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  )}
+                </View>
+                <View style={styles.codeRow}>
+                  <Ionicons name="chatbubbles" size={12} color={colors.textSub} />
+                  <Text style={styles.codeLabel}>ランキング・掲示板</Text>
+                  {typeof g.members === 'number' ? (
+                    <Text style={styles.codeLabel}>・{g.members}人</Text>
+                  ) : null}
+                  <Text style={styles.codeLabel}>・コード {g.code}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
       ) : (
         <View style={styles.groupJoin}>
           <Text style={styles.groupJoinText}>
-            資格ランキングに加えて、テーマ別コミュニティにも参加できます（朝活・社会人など）。
+            資格ランキングに加えて、テーマ別コミュニティにも参加できます（最大3つ・朝活・社会人など）。
           </Text>
           <View style={styles.groupBtnRow}>
             <Pressable style={styles.discoverBtn} onPress={() => router.push('/communities')}>
@@ -438,8 +447,11 @@ const styles = StyleSheet.create({
   heroNext: { marginTop: 14, fontSize: 13, color: colors.textSub },
   heroNextNum: { color: colors.text, fontWeight: '800', fontVariant: ['tabular-nums'] },
 
+  groupsWrap: { marginTop: 16, gap: 8 },
+  groupsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  groupsTitle: { fontSize: 13, fontWeight: '800', color: colors.textSub },
   groupCard: {
-    marginTop: 16,
+    marginTop: 0,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,

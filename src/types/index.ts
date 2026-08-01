@@ -152,7 +152,8 @@ export interface PersistedState {
   lifetime: LifetimeStats;
   badges: BadgeMap;
   profile: Profile;
-  group: CustomGroup | null;
+  /** 参加中のコミュニティ（最大3つ） */
+  groups: CustomGroup[];
   /** 有料会員（プレミアム）か（モック） */
   premium: boolean;
   /** コミュニティ作成の月間カウント */

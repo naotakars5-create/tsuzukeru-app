@@ -42,16 +42,24 @@ const CURATED: Array<{ name: string; category?: GoalCategory; tagline: string }>
   { name: '看護学生の勉強垢', tagline: '実習と国試を両立', category: 'kangoshi' },
 ];
 
-/** コミュニティ全ディレクトリ（モック・人数は名前から安定生成） */
+/** 1コミュニティの定員 */
+export const MAX_COMMUNITY_MEMBERS = 500;
+
+/** コードから安定して決まる参加人数（おおむね100人前後〜・定員500まで） */
+export function defaultMemberCount(code: string): number {
+  return Math.min(MAX_COMMUNITY_MEMBERS, 85 + (hash('n' + code) % 210));
+}
+
+/** コミュニティ全ディレクトリ（モック・人数はコードから安定生成） */
 export function communityDirectory(): CommunityInfo[] {
   return CURATED.map((c) => {
-    const h = hash(c.name);
+    const code = generateCode(c.name);
     return {
-      code: generateCode(c.name),
+      code,
       name: c.name,
       owner: false,
       category: c.category,
-      members: 40 + (h % 460),
+      members: defaultMemberCount(code),
       tagline: c.tagline,
     };
   });
@@ -114,15 +122,26 @@ export interface MeInput {
   weekMinutes: number;
 }
 
-/** コミュニティ内のメンバー一覧（自分を含む・ポイント降順・モック） */
-export function buildCommunityMembers(code: string, me: MeInput): CommunityMember[] {
+/**
+ * コミュニティ内のメンバー一覧（自分を含む・ポイント降順・モック）。
+ * 全参加者（〜定員500人）ぶんを生成し、「◯人中◯位」を全員で出す。
+ * totalMembers を省略するとコードから安定した人数になる。
+ */
+export function buildCommunityMembers(
+  code: string,
+  me: MeInput,
+  totalMembers?: number
+): CommunityMember[] {
   const h = hash(code);
-  const count = 8 + (h % 7); // 8〜14人
+  const count = Math.max(
+    1,
+    Math.min(MAX_COMMUNITY_MEMBERS, totalMembers ?? defaultMemberCount(code)) - 1
+  ); // 自分を除いた人数
   const members: CommunityMember[] = [];
   const used = new Set<string>();
   for (let i = 0; i < count; i++) {
     let name = MEMBER_NAMES[(h + i * 5) % MEMBER_NAMES.length];
-    if (used.has(name)) name = `${name}${(i % 9) + 1}`;
+    if (used.has(name)) name = `${name}${Math.floor(i / MEMBER_NAMES.length) + 1}${(i % 9) + 1}`;
     used.add(name);
     const pts = 40 + (hash(code + name + i) % 460);
     members.push({
