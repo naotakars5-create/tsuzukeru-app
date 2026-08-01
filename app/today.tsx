@@ -7,7 +7,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { colors, font, spacing, radius } from '@/theme';
 import { formatStopwatch, formatMinutes } from '@/logic/time';
-import { WEEKLY_PENALTY } from '@/logic/billing';
+import { weekStake } from '@/logic/billing';
 
 /**
  * 勉強タイマー画面。グローバルなストップウォッチで勉強時間を計測し、
@@ -58,6 +58,7 @@ export default function TodayScreen() {
 
   const currentWeek = weeks.find((w) => w.isCurrent);
   const weekAlreadyCharged = (currentWeek?.missed ?? 0) > 0;
+  const stake = goal ? weekStake(goal.deposit, goal.durationWeeks) : 0;
 
   return (
     <View style={styles.screen}>
@@ -76,8 +77,8 @@ export default function TodayScreen() {
               <Ionicons name="alert-circle" size={18} color={colors.danger} />
               <Text style={styles.bannerText}>
                 {weekAlreadyCharged
-                  ? `今週は ¥${WEEKLY_PENALTY} 没収確定。記録は今日から立て直せる`
-                  : `目標に届かない日が続くと、今週ぶんの ¥${WEEKLY_PENALTY} が没収されます`}
+                  ? `今週ぶん ¥${stake.toLocaleString()} は課金確定。記録は今日から立て直せる`
+                  : `未達だと、今週ぶん ¥${stake.toLocaleString()} が後から課金されます`}
               </Text>
             </View>
           )}
@@ -135,6 +136,15 @@ export default function TodayScreen() {
               </Text>
             )}
 
+            {!running && (
+              <PrimaryButton
+                label="今日の学習メモを書く"
+                icon="create"
+                variant="secondary"
+                onPress={() => router.push('/journal')}
+              />
+            )}
+
             <PrimaryButton label="戻る" variant="ghost" onPress={() => router.back()} />
           </View>
         </>
@@ -184,6 +194,23 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   doneTagText: { fontSize: font.sub, fontWeight: '800', color: colors.success },
+
+  cheerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  speech: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  speechText: { fontSize: font.sub, fontWeight: '700', color: colors.text },
 
   controls: { paddingBottom: 34, gap: spacing.md },
   bigBtn: { height: 64 },

@@ -15,26 +15,34 @@ import React, {
 import {
   Goal,
   MinutesMap,
+  NotesMap,
   ReminderSettings,
   LifetimeStats,
   BadgeMap,
   BadgeView,
   Profile,
   CustomGroup,
+  CommunityCreations,
 } from '@/types';
 import {
   loadState,
   saveGoal,
   saveMinutes,
+  saveNotes,
   saveTimer,
   saveReminder,
   saveLifetime,
   saveBadges,
   saveProfile,
   saveGroup,
+  savePremium,
+  saveCommunityCreations,
   clearAll,
   DEFAULT_PROFILE,
 } from '@/storage';
+
+/** コミュニティ作成の月間上限（プレミアム限定） */
+export const COMMUNITY_CREATE_LIMIT = 3;
 import { isScheduledDay, statusOf } from '@/logic/schedule';
 import { todayStr } from '@/logic/date';
 import {
@@ -44,7 +52,6 @@ import {
   isSeasonComplete,
   EMPTY_LIFETIME,
 } from '@/logic/summary';
-import { MONTHLY_STAKE } from '@/logic/billing';
 import { scheduleDailyReminder, cancelReminders } from '@/logic/reminder';
 import { BADGES, satisfiedBadgeKeys } from '@/logic/badges';
 
@@ -52,6 +59,10 @@ interface AppContextValue {
   ready: boolean;
   goal: Goal | null;
   minutes: MinutesMap;
+  /** 日ごとの学習メモ */
+  notes: NotesMap;
+  /** ある日のメモを保存（空文字ならその日のメモを削除） */
+  setNote: (date: string, text: string) => Promise<void>;
   reminder: ReminderSettings;
   lifetime: LifetimeStats;
   profile: Profile;
@@ -61,7 +72,6 @@ interface AppContextValue {
   seasonResult: ReturnType<typeof buildSeasonResult>;
   seasonNumber: number;
   seasonComplete: boolean;
-  nextStartCharge: number;
   isTodayScheduled: boolean;
   todayStatus: 'done' | 'missed' | 'pending';
   badges: BadgeView[];
@@ -79,6 +89,18 @@ interface AppContextValue {
   updateReminder: (settings: ReminderSettings) => Promise<boolean>;
   updateProfile: (p: Profile) => Promise<void>;
   setGroup: (g: CustomGroup | null) => Promise<void>;
+  /** 有料会員（プレミアム）か（モック） */
+  premium: boolean;
+  /** プレミアム加入/解約（モック） */
+  setPremium: (v: boolean) => Promise<void>;
+  /** コミュニティ作成の月間上限 */
+  communityLimit: number;
+  /** 今月すでに作成したコミュニティ数 */
+  communityCreationsThisMonth: number;
+  /** いまコミュニティを作成できるか（プレミアム && 上限未満） */
+  canCreateCommunity: boolean;
+  /** コミュニティ作成を1件記録する（月をまたいだらリセット） */
+  recordCommunityCreation: () => Promise<void>;
   resetAll: () => Promise<void>;
 }
 
@@ -89,6 +111,7 @@ export interface NewGoalInput {
   weekdays: number[];
   weeklyTarget: number;
   dailyTargetMin: number;
+  deposit: number;
   durationWeeks: number;
 }
 
@@ -98,26 +121,55 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [minutes, setMinutes] = useState<MinutesMap>({});
+  const [notes, setNotes] = useState<NotesMap>({});
   const [reminder, setReminder] = useState<ReminderSettings>({ enabled: false, hour: 20, minute: 0 });
   const [lifetime, setLifetime] = useState<LifetimeStats>(EMPTY_LIFETIME);
   const [badgesMap, setBadgesMap] = useState<BadgeMap>({});
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [group, setGroupState] = useState<CustomGroup | null>(null);
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
+  const [premium, setPremiumState] = useState(false);
+  const [communityCreations, setCommunityCreationsState] = useState<CommunityCreations>({
+    month: '',
+    count: 0,
+  });
 
   useEffect(() => {
     (async () => {
       const state = await loadState();
       setGoal(state.goal);
       setMinutes(state.minutes);
+      setNotes(state.notes);
       setReminder(state.reminder);
       setLifetime(state.lifetime);
       setBadgesMap(state.badges);
       setProfile(state.profile);
       setGroupState(state.group);
       setTimerStartedAt(state.timerStartedAt);
+      setPremiumState(state.premium);
+      setCommunityCreationsState(state.communityCreations);
       setReady(true);
     })();
+  }, []);
+
+  const currentMonth = todayStr().slice(0, 7);
+  const communityCreationsThisMonth =
+    communityCreations.month === currentMonth ? communityCreations.count : 0;
+  const canCreateCommunity = premium && communityCreationsThisMonth < COMMUNITY_CREATE_LIMIT;
+
+  const setPremium = useCallback(async (v: boolean) => {
+    setPremiumState(v);
+    await savePremium(v);
+  }, []);
+
+  const recordCommunityCreation = useCallback(async () => {
+    const month = todayStr().slice(0, 7);
+    setCommunityCreationsState((prev) => {
+      const base = prev.month === month ? prev.count : 0;
+      const next = { month, count: base + 1 };
+      saveCommunityCreations(next);
+      return next;
+    });
   }, []);
 
   const progress = useMemo(() => buildProgress(goal, minutes, lifetime), [goal, minutes, lifetime]);
@@ -136,7 +188,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       perfectWeeks: seasonResult.perfectWeeks,
       seasonsCompleted: lifetime.seasonsCompleted,
       perfectSeasons: lifetime.perfectSeasons,
-      totalPaid: lifetime.totalPaid,
+      totalWaived: lifetime.totalWaived,
     });
     const additions = satisfied.filter((k) => !(k in badgesMap));
     if (additions.length === 0) return;
@@ -147,6 +199,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveBadges(next);
   }, [ready, progress, seasonResult, lifetime, badgesMap]);
 
+  /** 完了シーズンを通算へ畳み込む（課金/免除を反映・案C。お金は預からない） */
   const foldSeasonIntoLifetime = useCallback((): LifetimeStats => {
     const r = buildSeasonResult(goal, minutes);
     return {
@@ -156,17 +209,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       perfectSeasons: lifetime.perfectSeasons + (r.allPerfect ? 1 : 0),
       totalMinutes: lifetime.totalMinutes + r.minutes,
       totalCharged: lifetime.totalCharged + r.charged,
-      totalPaid: lifetime.totalPaid,
-      nextSeasonFree: r.allPerfect,
+      totalWaived: lifetime.totalWaived + r.waived,
     };
   }, [goal, minutes, lifetime, progress.bestStreak]);
 
-  const nextStartCharge = useMemo(() => {
-    if (goal && isSeasonComplete(goal) && seasonResult.allPerfect) return 0;
-    return lifetime.nextSeasonFree ? 0 : MONTHLY_STAKE;
-  }, [goal, seasonResult.allPerfect, lifetime.nextSeasonFree]);
-
-  const makeGoal = useCallback((input: NewGoalInput, startCharge: number): Goal => {
+  const makeGoal = useCallback((input: NewGoalInput): Goal => {
     return {
       id: `${Date.now()}`,
       name: input.name.trim(),
@@ -175,61 +222,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       weekdays: input.weekdays,
       weeklyTarget: input.weeklyTarget,
       dailyTargetMin: input.dailyTargetMin,
-      stakeAmount: MONTHLY_STAKE,
-      startCharge,
+      deposit: input.deposit,
       startDate: todayStr(),
       durationWeeks: input.durationWeeks,
       createdAt: new Date().toISOString(),
     };
   }, []);
 
-  const applyStartCharge = useCallback(
-    (base: LifetimeStats): { lifetime: LifetimeStats; charge: number } => {
-      const charge = base.nextSeasonFree ? 0 : MONTHLY_STAKE;
-      return {
-        charge,
-        lifetime: { ...base, totalPaid: base.totalPaid + charge, nextSeasonFree: false },
-      };
-    },
-    []
-  );
-
   const createGoal = useCallback(
     async (input: NewGoalInput) => {
       let base = lifetime;
       if (goal && isSeasonComplete(goal)) base = foldSeasonIntoLifetime();
-      const { lifetime: charged, charge } = applyStartCharge(base);
-      const newGoal = makeGoal(input, charge);
-      setLifetime(charged);
+      // 案C: 開始時は課金しない（カード登録＋コミットのみ）。お金は預からない
+      const nextLifetime = base;
+      const newGoal = makeGoal(input);
+      setLifetime(nextLifetime);
       setGoal(newGoal);
       setMinutes({});
-      await Promise.all([saveLifetime(charged), saveGoal(newGoal), saveMinutes({})]);
+      await Promise.all([saveLifetime(nextLifetime), saveGoal(newGoal), saveMinutes({})]);
       if (reminder.enabled) {
         await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
       }
     },
-    [goal, lifetime, foldSeasonIntoLifetime, applyStartCharge, makeGoal, reminder]
+    [goal, lifetime, foldSeasonIntoLifetime, makeGoal, reminder]
   );
 
   const startNextSeason = useCallback(async () => {
     if (!goal) return;
-    const folded = foldSeasonIntoLifetime();
-    const { lifetime: charged, charge } = applyStartCharge(folded);
+    // 案C: 次シーズン開始時も課金しない（お金は預からない）
+    const nextLifetime = foldSeasonIntoLifetime();
     const newGoal: Goal = {
       ...goal,
       id: `${Date.now()}`,
-      startCharge: charge,
       startDate: todayStr(),
       createdAt: new Date().toISOString(),
     };
-    setLifetime(charged);
+    setLifetime(nextLifetime);
     setGoal(newGoal);
     setMinutes({});
-    await Promise.all([saveLifetime(charged), saveGoal(newGoal), saveMinutes({})]);
+    await Promise.all([saveLifetime(nextLifetime), saveGoal(newGoal), saveMinutes({})]);
     if (reminder.enabled) {
       await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
     }
-  }, [goal, foldSeasonIntoLifetime, applyStartCharge, reminder]);
+  }, [goal, foldSeasonIntoLifetime, reminder]);
 
   const addStudyMinutes = useCallback(async (min: number) => {
     if (min <= 0) return;
@@ -237,6 +272,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMinutes((prev) => {
       const next = { ...prev, [today]: Math.round((prev[today] ?? 0) + min) };
       saveMinutes(next);
+      return next;
+    });
+  }, []);
+
+  const setNote = useCallback(async (date: string, text: string) => {
+    setNotes((prev) => {
+      const next = { ...prev };
+      const t = text.trim();
+      if (t) next[date] = t;
+      else delete next[date];
+      saveNotes(next);
       return next;
     });
   }, []);
@@ -290,6 +336,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const resetAll = useCallback(async () => {
     setGoal(null);
     setMinutes({});
+    setNotes({});
     setTimerStartedAt(null);
     await saveTimer(null);
     setReminder({ enabled: false, hour: 20, minute: 0 });
@@ -297,6 +344,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBadgesMap({});
     setProfile(DEFAULT_PROFILE);
     setGroupState(null);
+    setPremiumState(false);
+    setCommunityCreationsState({ month: '', count: 0 });
     await cancelReminders();
     await clearAll();
   }, []);
@@ -330,6 +379,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ready,
     goal,
     minutes,
+    notes,
+    setNote,
     reminder,
     lifetime,
     profile,
@@ -339,7 +390,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     seasonResult,
     seasonNumber: lifetime.seasonsCompleted + 1,
     seasonComplete,
-    nextStartCharge,
     isTodayScheduled,
     todayStatus,
     badges,
@@ -353,6 +403,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateReminder,
     updateProfile,
     setGroup,
+    premium,
+    setPremium,
+    communityLimit: COMMUNITY_CREATE_LIMIT,
+    communityCreationsThisMonth,
+    canCreateCommunity,
+    recordCommunityCreation,
     resetAll,
   };
 

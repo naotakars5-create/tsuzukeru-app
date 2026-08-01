@@ -15,7 +15,7 @@ export interface BadgeContext {
   perfectWeeks: number; // これまでの完全達成した週の数
   seasonsCompleted: number; // 完走シーズン数
   perfectSeasons: number; // 完全達成で完走したシーズン数
-  totalPaid: number; // 通算支払い額
+  totalWaived: number; // 通算免除額（達成して課金ゼロで済んだ額）
 }
 
 interface BadgeDefWithTest extends BadgeDef {
@@ -72,12 +72,20 @@ export const BADGES: BadgeDefWithTest[] = [
     test: (c) => c.perfectWeeks >= 1,
   },
   {
-    key: 'free_month',
-    label: '無料月を獲得',
-    description: '未達ゼロで翌月無料を達成',
+    key: 'full_return',
+    label: '課金ゼロ',
+    description: '一度も課金されずシーズン完走',
     icon: 'wallet',
     color: '#A78BFA',
     test: (c) => c.perfectSeasons >= 1,
+  },
+  {
+    key: 'returned_3000',
+    label: '免除の達人',
+    description: '通算 ¥3,000 以上を免除',
+    icon: 'cash',
+    color: '#4ADE80',
+    test: (c) => c.totalWaived >= 3000,
   },
   {
     key: 'done_50',

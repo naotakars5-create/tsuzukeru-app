@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { confirmAsync } from '@/logic/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,10 +16,13 @@ import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { AchievementGrid } from '@/components/AchievementGrid';
+import { Logo } from '@/components/Logo';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import { frequencyLabel } from '@/logic/schedule';
+import { todayStr } from '@/logic/date';
 import { formatMinutes, formatMinutesShort } from '@/logic/time';
+import { randomHotQuote } from '@/logic/quotes';
 import { IconName } from '@/types';
 
 /** 時間帯に合わせた挨拶 */
@@ -36,6 +39,7 @@ export default function HomeScreen() {
     ready,
     goal,
     minutes,
+    notes,
     progress,
     weeks,
     seasonResult,
@@ -45,6 +49,14 @@ export default function HomeScreen() {
     isTodayScheduled,
     todayStatus,
   } = useApp();
+
+  // 毎回変わる“熱い格言”（ホームを開くたびに選び直す）
+  const [quote, setQuote] = React.useState(() => randomHotQuote());
+  useFocusEffect(
+    React.useCallback(() => {
+      setQuote(randomHotQuote());
+    }, [])
+  );
 
   if (!ready) {
     return (
@@ -59,19 +71,18 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <ScrollView contentContainerStyle={styles.welcomeWrap} showsVerticalScrollIndicator={false}>
-          <ProgressRing ratio={0} size={128} strokeWidth={14} glow={false}>
-            <Ionicons name="flame" size={40} color={colors.primary} />
-          </ProgressRing>
+          <Logo size={132} />
+          <Text style={styles.brandName}>覚悟の勉強</Text>
           <Text style={styles.emptyTitle}>心を燃やせ。</Text>
           <Text style={styles.welcomeLead}>
             意志じゃなく、仕組みで勉強を続ける。{'\n'}資格合格を、続く人のものにする。
           </Text>
 
           <View style={styles.pillars}>
-            <Pillar icon="alert-circle" color={colors.danger} title="サボると、痛み" desc="未達の週は¥100没収（モック）。だから続く。" />
+            <Pillar icon="alert-circle" color={colors.danger} title="サボると、痛み" desc="未達の週だけ、後から課金。だから続く。" />
             <Pillar icon="gift" color={colors.success} title="続けると、報酬" desc="1ヶ月やり切れば翌月無料。ランクも上がる。" />
             <Pillar icon="people" color={colors.primary} title="仲間と、競う" desc="同じ資格を目指す人と月間ランキングで競争。" />
-            <Pillar icon="timer" color={colors.purple} title="時間で、記録" desc="ストップウォッチで勉強時間を計測して積み上げ。" />
+            <Pillar icon="timer" color={colors.silver} title="時間で、記録" desc="ストップウォッチで勉強時間を計測して積み上げ。" />
           </View>
 
           <PrimaryButton
@@ -95,13 +106,11 @@ export default function HomeScreen() {
         ? Math.round((seasonResult.done / seasonResult.scheduled) * 100)
         : 0;
 
-    const nextFree = seasonResult.allPerfect;
+    const allPerfect = seasonResult.allPerfect;
     const onNext = async () => {
       const ok = await confirmAsync(
         '次のシーズンを始める',
-        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\n${
-          nextFree ? '今月パーフェクト達成！次の月は無料です。' : '次の月も月額¥500の積立です（モック）。'
-        }`,
+        `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\nコミット額は ¥${goal.deposit.toLocaleString()}（お金は預かりません。未達の週だけ課金）。`,
         '始める'
       );
       if (ok) startNextSeason();
@@ -113,7 +122,9 @@ export default function HomeScreen() {
           <View style={styles.completeHeadRow}>
             <View>
               <Text style={styles.sectionLabel}>シーズン {seasonNumber} 完了</Text>
-              <Text style={styles.completeTitle}>4週間、走りきった。</Text>
+              <Text style={styles.completeTitle}>
+                {allPerfect ? '完全達成、あっぱれ！' : '4週間、走りきった。'}
+              </Text>
             </View>
             <View style={styles.completeTrophy}>
               <Ionicons name="trophy" size={26} color={colors.primary} />
@@ -143,14 +154,19 @@ export default function HomeScreen() {
                   value={`${seasonResult.perfectWeeks}`}
                   unit="/ 4"
                 />
-                {nextFree ? (
-                  <StatChip icon="gift" accent={colors.success} label="ごほうび" value="翌月無料" />
+                {allPerfect ? (
+                  <StatChip
+                    icon="checkmark-circle"
+                    accent={colors.success}
+                    label="課金ゼロ"
+                    value="¥0"
+                  />
                 ) : (
                   <StatChip
-                    icon="wallet"
-                    accent={colors.warning}
-                    label="積立の残り"
-                    value={`¥${seasonResult.poolRemaining.toLocaleString()}`}
+                    icon="card"
+                    accent={seasonResult.charged > 0 ? colors.danger : colors.success}
+                    label="課金"
+                    value={`¥${seasonResult.charged.toLocaleString()}`}
                   />
                 )}
               </View>
@@ -185,17 +201,24 @@ export default function HomeScreen() {
   const currentWeek = weeks.find((w) => w.isCurrent) ?? weeks[0];
   const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
   const weekPct = Math.round(weekRatio * 100);
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 挨拶ヘッダー */}
+        {/* 挨拶ヘッダー（毎回変わる“熱い格言”） */}
         <View style={styles.greetRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.greetSub}>
               {greeting()} ・ シーズン {seasonNumber}
             </Text>
-            <Text style={styles.greetMain}>今日の1歩、行こう。</Text>
+            <View style={styles.quoteRow}>
+              <Ionicons name="flame" size={16} color={colors.primary} style={{ marginTop: 3 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.greetQuote} numberOfLines={6}>
+                  {quote.text}
+                </Text>
+                {quote.author ? <Text style={styles.greetAuthor}>— {quote.author}</Text> : null}
+              </View>
+            </View>
           </View>
           <Pressable style={styles.bell} onPress={() => router.push('/settings')}>
             <Ionicons name="notifications-outline" size={20} color={colors.textSub} />
@@ -232,10 +255,10 @@ export default function HomeScreen() {
             </ProgressRing>
 
             <View style={styles.chipCol}>
-              <StatChip icon="flame" accent={colors.orange} label="連続" value={progress.streak} unit="日" />
+              <StatChip icon="flame" accent={colors.primary} label="連続" value={progress.streak} unit="日" />
               <StatChip
                 icon="time"
-                accent={colors.purple}
+                accent={colors.silver}
                 label="今月の勉強"
                 value={formatMinutesShort(progress.studyMinutes)}
               />
@@ -297,6 +320,26 @@ export default function HomeScreen() {
             />
           )}
         </Card>
+
+        {/* 学習メモ（記録帳）への入口 */}
+        <Pressable onPress={() => router.push('/journal')}>
+          <Card>
+            <View style={styles.memoRow}>
+              <View style={styles.memoIcon}>
+                <Ionicons name="create" size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.memoTitle}>学習メモ</Text>
+                <Text style={styles.memoPreview} numberOfLines={1}>
+                  {notes[todayStr()]?.trim()
+                    ? notes[todayStr()]
+                    : '今日やったこと・気づきを残そう'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </Card>
+        </Pressable>
 
         {/* 達成グリッド（ヒートマップ） */}
         <Card style={styles.gridCard}>
@@ -392,7 +435,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.lg },
+  emptyTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.lg, letterSpacing: -0.6 },
   emptyText: {
     fontSize: font.body,
     color: colors.textSub,
@@ -424,6 +467,25 @@ const styles = StyleSheet.create({
   pillarTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
   pillarDesc: { fontSize: font.small, color: colors.textSub, marginTop: 2, lineHeight: 16 },
   welcomeNote: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.md },
+  brandName: {
+    fontSize: font.small,
+    fontWeight: '900',
+    color: colors.primary,
+    letterSpacing: 3,
+    marginTop: spacing.lg,
+  },
+
+  memoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  memoIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memoTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
+  memoPreview: { fontSize: font.small, color: colors.textSub, marginTop: 2 },
 
   riskCard: {
     flexDirection: 'row',
@@ -445,8 +507,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.sm,
   },
-  greetSub: { fontSize: 14, color: colors.textSub },
-  greetMain: { fontSize: 19, fontWeight: '700', color: colors.text, marginTop: 2 },
+  greetLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, marginRight: spacing.sm },
+  greetSub: { fontSize: 13, color: colors.textSub },
+  greetMain: { fontSize: 17, fontWeight: '800', color: colors.text, marginTop: 2 },
+  quoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 },
+  greetQuote: { fontSize: 15, fontWeight: '800', color: colors.text, lineHeight: 21 },
+  greetAuthor: { fontSize: 12, fontWeight: '700', color: colors.primary, marginTop: 4, textAlign: 'right' },
   bell: {
     width: 40,
     height: 40,
@@ -457,13 +523,14 @@ const styles = StyleSheet.create({
   },
 
   // シーズン完了
+  celebrateHead: { alignItems: 'center', marginTop: spacing.sm, gap: 2 },
   completeHeadRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: spacing.sm,
   },
-  completeTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: 4 },
+  completeTitle: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: 4, letterSpacing: -0.6 },
   completeTrophy: {
     width: 48,
     height: 48,

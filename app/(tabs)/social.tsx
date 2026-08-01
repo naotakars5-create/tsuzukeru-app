@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,13 +10,11 @@ import {
   buildLeaderboard,
   monthlyRankDelta,
   rankIndexOf,
-  generateGroupCode,
   communityCount,
 } from '@/logic/social';
 import { POINTS_PER_DONE } from '@/logic/rank';
 import { formatMinutesShort } from '@/logic/time';
 import { LeaderboardEntry } from '@/types';
-import { promptAsync, confirmAsync, notifyAsync } from '@/logic/confirm';
 
 /**
  * 仲間タブ: 月間ランキング。自分の順位を主役に、近しいランクの相手と競う。
@@ -25,7 +23,7 @@ import { promptAsync, confirmAsync, notifyAsync } from '@/logic/confirm';
  */
 export default function SocialScreen() {
   const router = useRouter();
-  const { goal, progress, seasonResult, group, setGroup, profile } = useApp();
+  const { goal, progress, seasonResult, group, profile } = useApp();
 
   const category = categoryOf(goal?.category);
   const myRankIndex = rankIndexOf(progress.points);
@@ -62,27 +60,16 @@ export default function SocialScreen() {
   const above = myIndex > 0 ? leaderboard[myIndex - 1] : null;
   const delta = monthlyRankDelta(category.key);
 
-  const onCreateGroup = async () => {
-    const name = await promptAsync('グループを作成', 'グループ名を入力', `${category.label}仲間`);
-    if (!name) return;
-    const code = generateGroupCode(name + Date.now());
-    await setGroup({ code, name: name.trim(), owner: true });
-    notifyAsync('グループを作成しました', `参加コード: ${code}\n※ 共有機能は今後追加予定です`);
-  };
-  const onJoinGroup = async () => {
-    const code = await promptAsync('グループに参加', '参加コードを入力', '');
-    if (!code) return;
-    await setGroup({ code: code.trim().toUpperCase(), name: `グループ ${code.trim().toUpperCase()}`, owner: false });
-  };
-  const onLeaveGroup = async () => {
-    const ok = await confirmAsync('グループを抜けますか？', undefined, '抜ける');
-    if (ok) await setGroup(null);
-  };
-
   const openProfile = (e: LeaderboardEntry) => {
     if (e.isMe) router.push('/profile-edit');
     else router.push({ pathname: '/rival/[id]', params: { id: e.id, category: category.key } });
   };
+
+  const myPhoto = profile.photo ?? null;
+
+  const top3 = leaderboard.slice(0, 3);
+  const rest = leaderboard.slice(3);
+  const maxPoints = leaderboard[0]?.points || 1;
 
   return (
     <ScrollView
@@ -105,6 +92,9 @@ export default function SocialScreen() {
           </View>
         </View>
       </View>
+
+      {/* トップ3の表彰台（視覚的なランキングの主役） */}
+      <Podium entries={top3} myPhoto={myPhoto} onPress={openProfile} />
 
       {/* 自分の順位ヒーロー */}
       <LinearGradient
@@ -148,48 +138,61 @@ export default function SocialScreen() {
         </Text>
       </LinearGradient>
 
-      {/* グループ */}
+      {/* コミュニティ（テーマ別・任意参加） */}
       {group ? (
-        <View style={styles.groupCard}>
+        <Pressable style={styles.groupCard} onPress={() => router.push('/communities')}>
           <View style={styles.groupHead}>
             <View style={styles.titleRow}>
               <Ionicons name="people-circle" size={18} color={colors.primary} />
               <Text style={styles.groupName}>{group.name}</Text>
+              {group.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
             </View>
-            <Pressable onPress={onLeaveGroup} hitSlop={8}>
-              <Text style={styles.leaveText}>抜ける</Text>
-            </Pressable>
+            <View style={styles.titleRow}>
+              <Text style={styles.changeText}>探す/変更</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textSub} />
+            </View>
           </View>
+          {group.tagline ? <Text style={styles.groupTagline}>{group.tagline}</Text> : null}
           <View style={styles.codeRow}>
             <Text style={styles.codeLabel}>参加コード</Text>
             <Text style={styles.codeValue}>{group.code}</Text>
+            {typeof group.members === 'number' ? (
+              <Text style={styles.codeLabel}>・{group.members}人</Text>
+            ) : null}
           </View>
-        </View>
+        </Pressable>
       ) : (
         <View style={styles.groupJoin}>
-          <Text style={styles.groupJoinText}>仲間だけのグループで競うこともできます</Text>
+          <Text style={styles.groupJoinText}>
+            資格ランキングに加えて、テーマ別コミュニティにも参加できます（朝活・社会人など）。
+          </Text>
           <View style={styles.groupBtnRow}>
-            <Pressable style={styles.groupBtn} onPress={onCreateGroup}>
-              <Ionicons name="add-circle" size={16} color={colors.primary} />
-              <Text style={styles.groupBtnText}>グループを作る</Text>
-            </Pressable>
-            <Pressable style={styles.groupBtn} onPress={onJoinGroup}>
-              <Ionicons name="enter" size={16} color={colors.primary} />
-              <Text style={styles.groupBtnText}>コードで参加</Text>
+            <Pressable style={styles.discoverBtn} onPress={() => router.push('/communities')}>
+              <Ionicons name="search" size={16} color={colors.onAccent} />
+              <Text style={styles.discoverBtnText}>コミュニティを探す・作る</Text>
             </Pressable>
           </View>
         </View>
       )}
 
-      {/* ランキング */}
+      {/* ランキング（4位以下） */}
       <View style={styles.rankHead}>
-        <Text style={styles.sectionLabel}>月間ランキング</Text>
+        <Text style={styles.sectionLabel}>
+          {rest.length > 0 ? '4位以下' : '月間ランキング'}
+        </Text>
         <Text style={styles.rankPeriod}>今月</Text>
       </View>
 
       <View style={styles.list}>
-        {leaderboard.map((e, i) => (
-          <RankRow key={e.id} entry={e} position={i + 1} onPress={() => openProfile(e)} />
+        {(rest.length > 0 ? rest : leaderboard).map((e, i) => (
+          <RankRow
+            key={e.id}
+            entry={e}
+            position={rest.length > 0 ? i + 4 : i + 1}
+            photo={e.isMe ? myPhoto : null}
+            maxPoints={maxPoints}
+            onPress={() => openProfile(e)}
+          />
         ))}
       </View>
 
@@ -203,16 +206,103 @@ export default function SocialScreen() {
 
 const MEDAL_COLORS = [colors.gold, colors.silver, colors.bronze];
 
-function RankRow({
+/** トップ3の表彰台 */
+function Podium({
+  entries,
+  myPhoto,
+  onPress,
+}: {
+  entries: LeaderboardEntry[];
+  myPhoto: string | null;
+  onPress: (e: LeaderboardEntry) => void;
+}) {
+  if (entries.length < 3) return null;
+  const order = [entries[1], entries[0], entries[2]]; // 表示は 2位・1位・3位
+  const positions = [2, 1, 3];
+  const heights = [58, 84, 46];
+  return (
+    <View style={styles.podium}>
+      {order.map((e, idx) => (
+        <PodiumCol
+          key={e.id}
+          entry={e}
+          position={positions[idx]}
+          height={heights[idx]}
+          photo={e.isMe ? myPhoto : null}
+          onPress={() => onPress(e)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function PodiumCol({
   entry,
   position,
+  height,
+  photo,
   onPress,
 }: {
   entry: LeaderboardEntry;
   position: number;
+  height: number;
+  photo: string | null;
+  onPress: () => void;
+}) {
+  const medal = MEDAL_COLORS[position - 1];
+  const first = position === 1;
+  const av = first ? 62 : 52;
+  return (
+    <Pressable style={styles.podCol} onPress={onPress}>
+      {first ? (
+        <Ionicons name="trophy" size={20} color={medal} style={{ marginBottom: 2 }} />
+      ) : (
+        <View style={{ height: 22 }} />
+      )}
+      <View
+        style={[
+          styles.podAvatar,
+          { width: av, height: av, borderRadius: av / 2, borderColor: medal },
+          entry.isMe && { borderColor: colors.primary },
+        ]}
+      >
+        {entry.isMe && photo ? (
+          <Image source={{ uri: photo }} style={styles.podAvatarImg} />
+        ) : entry.isMe ? (
+          <Ionicons name="person" size={first ? 26 : 22} color={colors.primary} />
+        ) : (
+          <Text style={[styles.podInitial, first && { fontSize: 22 }]}>{entry.name.slice(0, 1)}</Text>
+        )}
+      </View>
+      <Text style={[styles.podName, entry.isMe && { color: colors.primary }]} numberOfLines={1}>
+        {entry.isMe ? 'あなた' : entry.name}
+      </Text>
+      <Text style={styles.podPts}>
+        {entry.points.toLocaleString()}
+        <Text style={styles.podPtsUnit}> pt</Text>
+      </Text>
+      <View style={[styles.podBar, { height, backgroundColor: `${medal}22`, borderColor: `${medal}66` }]}>
+        <Text style={[styles.podRank, { color: medal }]}>{position}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function RankRow({
+  entry,
+  position,
+  photo,
+  maxPoints,
+  onPress,
+}: {
+  entry: LeaderboardEntry;
+  position: number;
+  photo?: string | null;
+  maxPoints: number;
   onPress: () => void;
 }) {
   const isTop3 = position <= 3;
+  const barPct = Math.max(6, Math.round((entry.points / maxPoints) * 100));
   return (
     <Pressable
       onPress={onPress}
@@ -231,7 +321,9 @@ function RankRow({
         )}
       </View>
 
-      {entry.isMe ? (
+      {entry.isMe && photo ? (
+        <Image source={{ uri: photo }} style={styles.avatar} />
+      ) : entry.isMe ? (
         <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
           <Ionicons name="person" size={20} color={colors.onAccent} />
         </View>
@@ -251,10 +343,15 @@ function RankRow({
           <Text style={styles.streakText}>{formatMinutesShort(entry.studyMinutes)}</Text>
           {entry.broken && <Text style={styles.brokenText}>・連続0日</Text>}
         </View>
-        {/* 意気込み */}
-        <Text style={styles.motto} numberOfLines={1}>
-          “{entry.motivation}”
-        </Text>
+        {/* ポイントの相対バー（1位比） */}
+        <View style={styles.ptBarTrack}>
+          <View
+            style={[
+              styles.ptBarFill,
+              { width: `${barPct}%`, backgroundColor: entry.isMe ? colors.primary : '#3A4450' },
+            ]}
+          />
+        </View>
       </View>
 
       <View style={styles.rightCol}>
@@ -306,7 +403,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 66,
     letterSpacing: -2,
-    color: colors.orange,
+    color: colors.primary,
     fontVariant: ['tabular-nums'],
   },
   heroNumUnit: { fontSize: 26, fontWeight: '700', color: colors.textSub, marginBottom: 4 },
@@ -329,6 +426,18 @@ const styles = StyleSheet.create({
   groupHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   groupName: { fontSize: 15, fontWeight: '800', color: colors.text },
+  ownerTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.onAccent,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  changeText: { fontSize: 12, color: colors.textSub, fontWeight: '700' },
+  groupTagline: { fontSize: 12, color: colors.textSub, marginTop: 6 },
   leaveText: { fontSize: 13, color: colors.danger, fontWeight: '700' },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   codeLabel: { fontSize: 12, color: colors.textSub, fontWeight: '600' },
@@ -348,19 +457,19 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
   },
-  groupJoinText: { fontSize: 13, color: colors.textSub, fontWeight: '600' },
+  groupJoinText: { fontSize: 13, color: colors.textSub, fontWeight: '600', lineHeight: 19 },
   groupBtnRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  groupBtn: {
+  discoverBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.surfaceAlt,
+    gap: 8,
+    backgroundColor: colors.primary,
     borderRadius: radius.full,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
-  groupBtnText: { fontSize: 13, fontWeight: '800', color: colors.text },
+  discoverBtnText: { fontSize: 14, fontWeight: '800', color: colors.onAccent },
 
   rankHead: {
     flexDirection: 'row',
@@ -372,6 +481,43 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { ...labelStyle },
   rankPeriod: { fontSize: 12, color: colors.textSub },
+
+  // 表彰台
+  podium: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 4, paddingHorizontal: 4 },
+  podCol: { flex: 1, alignItems: 'center' },
+  podAvatar: {
+    borderWidth: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  podAvatarImg: { width: '100%', height: '100%' },
+  podInitial: { fontSize: 18, fontWeight: '900', color: colors.textSub },
+  podName: { fontSize: 12, fontWeight: '800', color: colors.text, maxWidth: '100%' },
+  podPts: { fontSize: 14, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'], marginTop: 1 },
+  podPtsUnit: { fontSize: 10, color: colors.textSub, fontWeight: '700' },
+  podBar: {
+    width: '100%',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    marginTop: 8,
+    alignItems: 'center',
+    paddingTop: 6,
+  },
+  podRank: { fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
+
+  ptBarTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.surfaceAlt,
+    marginTop: 7,
+    overflow: 'hidden',
+  },
+  ptBarFill: { height: '100%', borderRadius: 3 },
 
   list: { gap: 8 },
   row: {

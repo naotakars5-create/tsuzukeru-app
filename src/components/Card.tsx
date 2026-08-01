@@ -16,8 +16,8 @@ export function Card({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
+    borderRadius: radius.card,
+    padding: spacing.lg + 2,
     borderWidth: 1,
     borderColor: colors.border,
     ...shadow.card,

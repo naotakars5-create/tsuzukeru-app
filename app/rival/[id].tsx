@@ -58,9 +58,9 @@ export default function RivalProfileScreen() {
       <Card>
         <Text style={styles.label}>これまでの記録</Text>
         <View style={styles.statsRow}>
-          <Stat value={profile.streak} label="連続達成" icon="flame" color={colors.orange} />
-          <Stat value={profile.bestStreak} label="最高連続" icon="medal" color={colors.warning} />
-          <Stat value={profile.totalDone} label="通算達成" icon="layers" color={colors.purple} />
+          <Stat value={profile.streak} label="連続達成" icon="flame" color={colors.primary} />
+          <Stat value={profile.bestStreak} label="最高連続" icon="medal" color={colors.silver} />
+          <Stat value={profile.totalDone} label="通算達成" icon="layers" color={colors.primary} />
         </View>
         <View style={styles.totalMinRow}>
           <Ionicons name="time" size={16} color={colors.primary} />

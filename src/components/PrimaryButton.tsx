@@ -64,13 +64,13 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   base: {
-    height: 54,
+    height: 56,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
-  contentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  contentRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   primary: { backgroundColor: colors.primary },
   secondary: {
     backgroundColor: colors.surfaceAlt,
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   ghost: { backgroundColor: 'transparent' },
-  pressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
   disabled: { opacity: 0.45 },
-  label: { fontSize: font.body, fontWeight: '800' },
+  label: { fontSize: font.body, fontWeight: '800', letterSpacing: 0.2 },
 });

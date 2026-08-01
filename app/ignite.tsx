@@ -1,30 +1,32 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
-import { MatchIgnite } from '@/components/MatchIgnite';
-import { colors, font, spacing } from '@/theme';
+import { colors, font, radius, spacing } from '@/theme';
 
 const { width } = Dimensions.get('window');
 
 /**
  * 目標作成直後の「火がつく」演出（最初の60秒の体験を強くする）。
- * マッチが現れ、先端に炎が灯り、火の粉が舞い、コピーが浮かび上がる。数秒後にホームへ。
+ * ヒノコが弾けるように現れ、光の輪が広がり、火の粉が舞い上がる。数秒後にホームへ。
  */
 export default function IgniteScreen() {
   const router = useRouter();
   const { goal } = useApp();
 
-  const matchOp = useRef(new Animated.Value(0)).current;
-  const matchY = useRef(new Animated.Value(24)).current;
-  const flameScale = useRef(new Animated.Value(0)).current;
+  const mascotScale = useRef(new Animated.Value(0)).current;
+  const burst = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0)).current;
   const textOp = useRef(new Animated.Value(0)).current;
-  const textY = useRef(new Animated.Value(16)).current;
+  const textY = useRef(new Animated.Value(18)).current;
   const sparks = useRef(
-    Array.from({ length: 14 }, () => ({
-      x: (Math.random() - 0.5) * width * 0.7,
-      delay: Math.random() * 500,
+    Array.from({ length: 20 }, (_, i) => ({
+      x: (Math.random() - 0.5) * width * 0.82,
+      delay: Math.random() * 700,
+      rise: 240 + Math.random() * 160,
+      size: 5 + Math.random() * 6,
+      warm: i % 3 === 0,
       progress: new Animated.Value(0),
     }))
   ).current;
@@ -32,10 +34,9 @@ export default function IgniteScreen() {
   useEffect(() => {
     Animated.sequence([
       Animated.parallel([
-        Animated.timing(matchOp, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(matchY, { toValue: 0, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(mascotScale, { toValue: 1, friction: 5, tension: 90, useNativeDriver: true }),
+        Animated.timing(burst, { toValue: 1, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]),
-      Animated.spring(flameScale, { toValue: 1, friction: 4, tension: 80, useNativeDriver: true }),
       Animated.parallel([
         Animated.timing(textOp, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.timing(textY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -44,8 +45,8 @@ export default function IgniteScreen() {
 
     Animated.loop(
       Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0, duration: 700, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 1, duration: 750, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 750, useNativeDriver: true }),
       ])
     ).start();
 
@@ -55,7 +56,7 @@ export default function IgniteScreen() {
           Animated.delay(s.delay),
           Animated.timing(s.progress, {
             toValue: 1,
-            duration: 1400,
+            duration: 1500,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
@@ -64,17 +65,24 @@ export default function IgniteScreen() {
       ).start();
     });
 
-    const t = setTimeout(() => router.replace('/'), 2800);
+    const t = setTimeout(() => router.replace('/'), 3000);
     return () => clearTimeout(t);
   }, []);
 
   const glowStyle = {
-    opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.55] }),
-    transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] }) }],
+    opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0.5] }),
+    transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) }],
+  };
+  const burstStyle = {
+    opacity: burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.5, 0.3, 0] }),
+    transform: [{ scale: burst.interpolate({ inputRange: [0, 1], outputRange: [0.2, 3.2] }) }],
   };
 
   return (
     <View style={styles.screen}>
+      {/* 光の輪の広がり（一度だけ） */}
+      <Animated.View style={[styles.burstRing, burstStyle]} pointerEvents="none" />
+
       {/* 火の粉 */}
       {sparks.map((s, i) => (
         <Animated.View
@@ -82,23 +90,27 @@ export default function IgniteScreen() {
           style={[
             styles.spark,
             {
+              width: s.size,
+              height: s.size,
+              borderRadius: s.size / 2,
+              backgroundColor: s.warm ? colors.orange : colors.ember,
               transform: [
                 { translateX: s.x },
-                { translateY: s.progress.interpolate({ inputRange: [0, 1], outputRange: [40, -260] }) },
-                { scale: s.progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0.2] }) },
+                { translateY: s.progress.interpolate({ inputRange: [0, 1], outputRange: [60, -s.rise] }) },
+                { scale: s.progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0.15] }) },
               ],
-              opacity: s.progress.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 0.8, 0] }),
+              opacity: s.progress.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 0.85, 0] }),
             },
           ]}
         />
       ))}
 
-      {/* 光 */}
-      <Animated.View style={[styles.glow, glowStyle]} />
+      {/* 発光 */}
+      <Animated.View style={[styles.glow, glowStyle]} pointerEvents="none" />
 
-      {/* マッチ点火 */}
-      <Animated.View style={{ opacity: matchOp, transform: [{ translateY: matchY }] }}>
-        <MatchIgnite flameScale={flameScale} />
+      {/* 炎が弾けるように燃え上がる */}
+      <Animated.View style={{ transform: [{ scale: mascotScale }] }}>
+        <Ionicons name="flame" size={150} color={colors.primary} />
       </Animated.View>
 
       {/* コピー */}
@@ -115,22 +127,25 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   glow: {
     position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
     backgroundColor: colors.primary,
     top: '50%',
-    marginTop: -190,
+    marginTop: -210,
   },
-  spark: {
+  burstRing: {
     position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.ember,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 3,
+    borderColor: colors.primary,
     top: '50%',
+    marginTop: -170,
   },
-  title: { fontSize: font.hero - 6, fontWeight: '900', color: colors.text, marginTop: spacing.xl },
+  spark: { position: 'absolute', top: '50%' },
+  title: { fontSize: font.hero - 6, fontWeight: '900', color: colors.text, marginTop: spacing.xl, letterSpacing: -1 },
   goal: { fontSize: font.heading, fontWeight: '800', color: colors.primary, marginTop: spacing.sm },
-  sub: { fontSize: font.body, color: colors.textSub, marginTop: spacing.md, fontWeight: '600' },
+  sub: { fontSize: font.body, color: colors.textSub, marginTop: spacing.md, fontWeight: '700' },
 });

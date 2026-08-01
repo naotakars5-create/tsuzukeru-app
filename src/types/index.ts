@@ -12,19 +12,11 @@ export type IconName = ComponentProps<typeof Ionicons>['name'];
 /** 目標の頻度: 毎日 / 特定曜日 / 週N回（曜日は自由） */
 export type Frequency = 'daily' | 'weekdays' | 'weekly_count';
 
-/** 資格・試験コミュニティ（仲間・ランキングのグループ分けに使う） */
-export type GoalCategory =
-  | 'univ'
-  | 'highschool'
-  | 'gyosei'
-  | 'takken'
-  | 'boki'
-  | 'shindanshi'
-  | 'sharoushi'
-  | 'fp'
-  | 'toeic'
-  | 'komuin'
-  | 'other';
+/**
+ * 資格・試験コミュニティのキー（仲間・ランキングのグループ分けに使う）。
+ * 種類が多いので固定の直和ではなく文字列ID。定義は src/logic/category.ts。
+ */
+export type GoalCategory = string;
 
 /** その日の達成状態 */
 export type DayStatus = 'done' | 'missed' | 'pending';
@@ -44,10 +36,8 @@ export interface Goal {
   weeklyTarget: number;
   /** 1日の目標勉強時間（分）。この時間に届いた日が「達成」 */
   dailyTargetMin: number;
-  /** 積立額（数値のみ。実決済はしない） */
-  stakeAmount: number;
-  /** このシーズン開始時に実際に課金した額（0=無料月・モック） */
-  startCharge: number;
+  /** コミット額（達成すれば¥0、未達の週ぶんだけ課金・モック。お金は預からない） */
+  deposit: number;
   /** 開始日 'YYYY-MM-DD' */
   startDate: string;
   /** 期間（週）: MVPは4週固定 */
@@ -61,6 +51,9 @@ export type RecordMap = Record<string, DayStatus>;
 
 /** 日付をキーにした勉強時間（分） { '2026-07-21': 125 } */
 export type MinutesMap = Record<string, number>;
+
+/** 日付をキーにした学習メモ { '2026-07-21': '英単語50個、過去問大問3' } */
+export type NotesMap = Record<string, string>;
 
 /** リマインド通知の設定（端末内のローカル通知） */
 export interface ReminderSettings {
@@ -81,12 +74,10 @@ export interface LifetimeStats {
   perfectSeasons: number;
   /** 通算勉強時間（分・全シーズン） */
   totalMinutes: number;
-  /** 通算で没収された額（モック） */
+  /** 通算で課金された額（未達の週ぶん・モック） */
   totalCharged: number;
-  /** 通算で支払った額（モック） */
-  totalPaid: number;
-  /** 次のシーズンを無料にする権利（前月パーフェクトで付与） */
-  nextSeasonFree: boolean;
+  /** 通算で免除された額（達成した週ぶん・モック） */
+  totalWaived: number;
 }
 
 /** 自分のプロフィール */
@@ -99,19 +90,35 @@ export interface Profile {
   color: string;
   /** 意気込み（ひとこと） */
   motivation: string;
+  /** プロフィール写真（切り抜き済みのdata URI）。未設定ならアイコンを使う */
+  photo?: string | null;
 }
 
 /** バッジの解除状態: key -> 解除日 'YYYY-MM-DD' */
 export type BadgeMap = Record<string, string>;
 
-/** 任意で作る/参加するグループ（モック） */
+/** 任意で作る/参加するコミュニティ（モック） */
 export interface CustomGroup {
   /** 参加コード（共有用・モック） */
   code: string;
-  /** グループ名 */
+  /** コミュニティ名 */
   name: string;
   /** 自分が作成者か */
   owner: boolean;
+  /** 関連する資格カテゴリ（任意） */
+  category?: GoalCategory;
+  /** 参加人数（モック表示用） */
+  members?: number;
+  /** ひとこと説明（任意） */
+  tagline?: string;
+}
+
+/** コミュニティ作成の月間カウント（プレミアム限定・月3個まで） */
+export interface CommunityCreations {
+  /** 対象の月 'YYYY-MM' */
+  month: string;
+  /** その月に作成した数 */
+  count: number;
 }
 
 /** 保存されるアプリの状態のスナップショット */
@@ -119,6 +126,8 @@ export interface PersistedState {
   goal: Goal | null;
   /** 日ごとの勉強時間（分） */
   minutes: MinutesMap;
+  /** 日ごとの学習メモ */
+  notes: NotesMap;
   /** ストップウォッチ計測開始時刻(ms)。null=計測していない */
   timerStartedAt: number | null;
   reminder: ReminderSettings;
@@ -126,6 +135,10 @@ export interface PersistedState {
   badges: BadgeMap;
   profile: Profile;
   group: CustomGroup | null;
+  /** 有料会員（プレミアム）か（モック） */
+  premium: boolean;
+  /** コミュニティ作成の月間カウント */
+  communityCreations: CommunityCreations;
 }
 
 /** ランク（称号）の定義 */
@@ -180,9 +193,9 @@ export interface WeekSummary {
   done: number;
   missed: number;
   pending: number;
-  /** この週で確定した課金（モック・未達があると週¥100没収） */
+  /** この週で確定した課金（モック・未達があると週ぶんを課金） */
   chargedAmount: number;
-  /** この週で返金された額（モック・週の予定を完全達成で¥100返金） */
+  /** この週で免除された額（モック・週の予定を完全達成で¥0） */
   refundedAmount: number;
   isCurrent: boolean;
 }

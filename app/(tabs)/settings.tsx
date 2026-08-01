@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -18,7 +18,27 @@ const REMINDER_MINUTES = [0, 15, 30, 45];
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { goal, reminder, updateReminder, resetAll, profile } = useApp();
+  const {
+    goal,
+    reminder,
+    updateReminder,
+    resetAll,
+    profile,
+    premium,
+    setPremium,
+    communityLimit,
+    communityCreationsThisMonth,
+  } = useApp();
+
+  const onTogglePremium = async (v: boolean) => {
+    if (v) {
+      await setPremium(true);
+      notifyAsync('プレミアムに登録しました', `コミュニティを毎月${communityLimit}個まで作成できます（モック）。`);
+    } else {
+      const ok = await confirmAsync('プレミアムを解約', 'コミュニティの作成ができなくなります（参加は引き続き無料）。解約しますか？', '解約する');
+      if (ok) await setPremium(false);
+    }
+  };
 
   const category = categoryOf(goal?.category);
 
@@ -64,7 +84,7 @@ export default function SettingsScreen() {
               <Text style={styles.goalName}>{goal.name}</Text>
             </View>
             <Text style={styles.goalMeta}>
-              {category.label}・{frequencyLabel(goal)}・4週間・月¥500積立（モック）
+              {category.label}・{frequencyLabel(goal)}・4週間・コミット¥{goal.deposit.toLocaleString()}
             </Text>
             <Text style={styles.goalMeta}>開始日: {formatDisplay(goal.startDate)}</Text>
             <PrimaryButton
@@ -90,9 +110,13 @@ export default function SettingsScreen() {
       <Card>
         <Text style={styles.sectionLabel}>プロフィール</Text>
         <Pressable style={styles.profileRow} onPress={() => router.push('/profile-edit')}>
-          <View style={[styles.profileIcon, { backgroundColor: `${profile.color}22`, borderColor: profile.color }]}>
-            <Ionicons name={profile.icon} size={22} color={profile.color} />
-          </View>
+          {profile.photo ? (
+            <Image source={{ uri: profile.photo }} style={[styles.profilePhoto, { borderColor: profile.color }]} />
+          ) : (
+            <View style={[styles.profileIcon, { backgroundColor: `${profile.color}22`, borderColor: profile.color }]}>
+              <Ionicons name={profile.icon} size={22} color={profile.color} />
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={styles.profileName}>{profile.name}</Text>
             <Text style={styles.profileMotto} numberOfLines={1}>
@@ -166,10 +190,32 @@ export default function SettingsScreen() {
         )}
       </Card>
 
+      {/* プレミアム会員（モック） */}
+      <Card>
+        <View style={styles.rowBetween}>
+          <View style={styles.titleRow}>
+            <Ionicons name="star" size={18} color={colors.primary} />
+            <Text style={styles.sectionTitle}>プレミアム会員</Text>
+          </View>
+          <Switch
+            value={premium}
+            onValueChange={onTogglePremium}
+            trackColor={{ false: colors.surfaceAlt, true: colors.primary }}
+            thumbColor="#ffffff"
+          />
+        </View>
+        <Text style={styles.goalMeta}>
+          {premium
+            ? `加入中 ・ コミュニティを毎月${communityLimit}個まで作成できます（今月 ${communityCreationsThisMonth}/${communityLimit} 個）。`
+            : `コミュニティの作成はプレミアム限定です（月${communityLimit}個まで）。参加は誰でも無料。`}
+        </Text>
+        <Text style={styles.helperNote}>※ 課金はすべてモックです。実際の決済はしません。</Text>
+      </Card>
+
       {/* 将来の機能 — 実決済のみ残す */}
       <Card>
         <Text style={styles.sectionLabel}>これからの機能</Text>
-        <FutureRow icon="card" title="実際の積立・返還" desc="本番の決済連携（今後追加予定）" />
+        <FutureRow icon="card" title="実際のカード登録・課金" desc="本番の決済連携（達成すれば¥0・今後追加予定）" />
         <FutureRow icon="share-social" title="友だち招待" desc="本物の仲間との連携（今後追加予定）" />
       </Card>
 
@@ -185,7 +231,7 @@ export default function SettingsScreen() {
         />
       </Card>
 
-      <Text style={styles.version}>継続 つづける — MVP v1.1.0</Text>
+      <Text style={styles.version}>覚悟の勉強 — MVP v1.2.0</Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
   );
@@ -233,6 +279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
   },
+  profilePhoto: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, backgroundColor: colors.surfaceAlt },
   profileName: { fontSize: font.body, fontWeight: '800', color: colors.text },
   profileMotto: { fontSize: font.small, color: colors.textSub, marginTop: 2 },
   goalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },

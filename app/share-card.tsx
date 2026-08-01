@@ -35,10 +35,10 @@ export default function ShareCardScreen() {
 
   const onShare = async () => {
     const message =
-      `【継続】${category.label}を勉強中！\n` +
+      `【覚悟の勉強】${category.label}を勉強中！\n` +
       `🔥 ${progress.streak}日連続 ・ 総勉強 ${formatMinutes(progress.totalMinutes)} ・ ${category.label}で上位${topPct}%\n` +
       `サボると課金、続けると報酬で継続する勉強アプリ。\n` +
-      `#継続 #${category.label} #勉強垢\n${APP_URL}`;
+      `#覚悟の勉強 #${category.label} #勉強垢\n${APP_URL}`;
     try {
       await Share.share(Platform.OS === 'ios' ? { message, url: APP_URL } : { message });
     } catch {
@@ -66,7 +66,7 @@ export default function ShareCardScreen() {
         <View style={styles.cardTop}>
           <View style={styles.brand}>
             <Ionicons name="flame" size={18} color={colors.primary} />
-            <Text style={styles.brandText}>継続 つづける</Text>
+            <Text style={styles.brandText}>覚悟の勉強</Text>
           </View>
           <View style={styles.commBadge}>
             <Ionicons name={category.icon} size={12} color={category.color} />
@@ -90,8 +90,8 @@ export default function ShareCardScreen() {
         {/* スタッツ3つ */}
         <View style={styles.statsRow}>
           <Stat icon={progress.rank.icon} color={progress.rank.color} value={progress.rank.label} label="ランク" />
-          <Stat icon="podium" color={colors.orange} value={`上位${topPct}%`} label={category.label} />
-          <Stat icon="time" color={colors.purple} value={formatMinutesShort(progress.totalMinutes)} label="総勉強" />
+          <Stat icon="podium" color={colors.primary} value={`上位${topPct}%`} label={category.label} />
+          <Stat icon="time" color={colors.silver} value={formatMinutesShort(progress.totalMinutes)} label="総勉強" />
         </View>
 
         <Text style={styles.tagline}>サボると課金、続けると報酬。</Text>

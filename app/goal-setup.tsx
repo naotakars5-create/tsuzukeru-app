@@ -16,10 +16,11 @@ import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { Frequency, GoalCategory, IconName } from '@/types';
-import { CATEGORIES, DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
-import { MONTHLY_STAKE, WEEKLY_PENALTY } from '@/logic/billing';
-import { quoteOfToday } from '@/logic/quotes';
-import { todayStr } from '@/logic/date';
+import { DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
+import { CategoryPicker } from '@/components/CategoryPicker';
+import { communityCount } from '@/logic/social';
+import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
+import { randomHotQuote } from '@/logic/quotes';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
 import { DAILY_TARGET_OPTIONS, formatMinutes } from '@/logic/time';
 
@@ -29,7 +30,7 @@ const WEEKLY_COUNT_OPTIONS = [2, 3, 4, 5];
 
 export default function GoalSetupScreen() {
   const router = useRouter();
-  const { goal, createGoal, nextStartCharge } = useApp();
+  const { goal, createGoal } = useApp();
 
   const [name, setName] = useState(goal?.name ?? '');
   const [category, setCategory] = useState<GoalCategory>(goal?.category ?? DEFAULT_CATEGORY);
@@ -37,9 +38,11 @@ export default function GoalSetupScreen() {
   const [weekdays, setWeekdays] = useState<number[]>(goal?.weekdays ?? [1, 2, 3, 4, 5]);
   const [weeklyTarget, setWeeklyTarget] = useState<number>(goal?.weeklyTarget ?? 3);
   const [dailyTargetMin, setDailyTargetMin] = useState<number>(goal?.dailyTargetMin ?? 120);
+  const [deposit, setDeposit] = useState<number>(goal?.deposit ?? DEFAULT_DEPOSIT);
 
-  const quote = quoteOfToday(todayStr());
-  const isFree = nextStartCharge === 0;
+  const [quote] = useState(() => randomHotQuote());
+  const perWeekStake = weekStake(deposit, 4);
+  const challengerCount = communityCount(category, 8);
 
   const toggleWeekday = (d: number) => {
     setWeekdays((prev) =>
@@ -68,17 +71,17 @@ export default function GoalSetupScreen() {
       return;
     }
 
-    const chargeMsg = isFree
-      ? '今月は無料で始めます（前月パーフェクト達成の特典）。'
-      : `開始すると月額 ¥${MONTHLY_STAKE}（モック）を積立てます。1ヶ月パーフェクトで翌月無料。`;
+    const depositMsg =
+      `コミット額 ¥${deposit.toLocaleString()} で始めます（モック・実際の決済はしません）。\n` +
+      `お金は預かりません。達成すれば¥0、サボった週ぶん（¥${perWeekStake.toLocaleString()}/週）だけ後から課金されます。`;
     const confirmMsg = goal
-      ? `これまでの記録はリセットされ、新しい4週間が始まります。\n${chargeMsg}`
-      : chargeMsg;
+      ? `これまでの記録はリセットされ、新しい4週間が始まります。\n${depositMsg}`
+      : depositMsg;
 
     const ok = await confirmAsync(
-      goal ? '目標を作り直しますか？' : 'この目標で始めますか？',
+      goal ? '目標を作り直しますか？' : `コミット ¥${deposit.toLocaleString()} で始めますか？`,
       confirmMsg,
-      goal ? '作り直す' : '始める'
+      goal ? '作り直す' : 'この覚悟で始める'
     );
     if (!ok) return;
 
@@ -89,6 +92,7 @@ export default function GoalSetupScreen() {
       weekdays: frequency === 'weekdays' ? weekdays : [],
       weeklyTarget,
       dailyTargetMin,
+      deposit,
       durationWeeks: DURATION_WEEKS,
     });
     // 「火がつく」演出を挟んでホームへ
@@ -101,12 +105,12 @@ export default function GoalSetupScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* やる気の格言 */}
+        {/* やる気の格言（毎回変わる・偉人の名言は作者つき） */}
         <View style={styles.quoteCard}>
           <Ionicons name="flame" size={18} color={colors.primary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.quoteText}>{quote.text}</Text>
-            {quote.sub ? <Text style={styles.quoteSub}>{quote.sub}</Text> : null}
+            {quote.author ? <Text style={styles.quoteSub}>— {quote.author}</Text> : null}
           </View>
         </View>
 
@@ -151,24 +155,16 @@ export default function GoalSetupScreen() {
         {/* コミュニティ（目指す資格） */}
         <Card>
           <Text style={styles.label}>目指す資格・試験（コミュニティ）</Text>
-          <Text style={styles.helper}>同じ資格を目指す仲間と月間ランキングで競えます。</Text>
-          <View style={styles.catRow}>
-            {CATEGORIES.map((c) => {
-              const active = category === c.key;
-              return (
-                <Pressable
-                  key={c.key}
-                  onPress={() => setCategory(c.key)}
-                  style={[
-                    styles.catChip,
-                    active && { backgroundColor: `${c.color}26`, borderColor: c.color },
-                  ]}
-                >
-                  <Ionicons name={c.icon} size={16} color={active ? c.color : colors.textSub} />
-                  <Text style={[styles.catChipText, active && { color: c.color }]}>{c.label}</Text>
-                </Pressable>
-              );
-            })}
+          <Text style={styles.helper}>
+            ジャンルから選ぶか、検索できます。同じ資格を目指す仲間と月間ランキングで競えます。
+          </Text>
+          <CategoryPicker value={category} onChange={setCategory} />
+          <View style={styles.rivalTeaser}>
+            <Ionicons name="flame" size={15} color={colors.primary} />
+            <Text style={styles.rivalTeaserText}>
+              <Text style={styles.rivalTeaserNum}>{challengerCount}</Text>人が
+              「{categoryOf(category).label}」に挑戦中。あなたも競える。
+            </Text>
           </View>
         </Card>
 
@@ -266,42 +262,59 @@ export default function GoalSetupScreen() {
           <Text style={styles.helper}>1ヶ月ごとにシーズンが区切られ、仲間と競います。</Text>
         </Card>
 
-        {/* 課金（月¥500プール制・モック） */}
-        <Card style={isFree ? { borderColor: colors.success } : undefined}>
-          <Text style={styles.label}>積立（モック・実際の決済はしません）</Text>
-          <View style={styles.stakeRow}>
-            <View style={styles.stakeIcon}>
-              <Ionicons name={isFree ? 'gift' : 'card'} size={20} color={isFree ? colors.success : colors.warning} />
-            </View>
-            <View style={{ flex: 1 }}>
-              {isFree ? (
-                <>
-                  <Text style={[styles.stakeValue, { color: colors.success }]}>今月は無料</Text>
-                  <Text style={styles.stakeSub}>前月パーフェクト達成の特典</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.stakeValue}>月額 ¥{MONTHLY_STAKE}</Text>
-                  <Text style={styles.stakeSub}>開始時に積立（プール）します</Text>
-                </>
-              )}
-            </View>
+        {/* コミット額（案C・モック。お金は預からない） */}
+        <Card>
+          <Text style={styles.label}>コミット額を決める</Text>
+          <Text style={styles.helper}>
+            お金は預かりません。達成すれば¥0、サボった週ぶんだけ後からカードに課金される方式です。
+          </Text>
+          <View style={styles.countRow}>
+            {DEPOSIT_OPTIONS.map((d) => {
+              const active = deposit === d;
+              return (
+                <Pressable
+                  key={d}
+                  onPress={() => setDeposit(d)}
+                  style={[styles.timeChip, active && styles.countChipActive]}
+                >
+                  <Text
+                    style={[styles.countValue, { fontSize: 15 }, active && styles.countValueActive]}
+                    numberOfLines={1}
+                  >
+                    ¥{d.toLocaleString()}
+                  </Text>
+                  <Text style={[styles.countUnit, active && styles.countValueActive]}>
+                    週¥{weekStake(d, 4).toLocaleString()}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
-          <View style={styles.stakeRules}>
-            <View style={styles.stakeRule}>
-              <Ionicons name="close-circle" size={15} color={colors.danger} />
-              <Text style={styles.stakeRuleText}>未達がある週ごとに ¥{WEEKLY_PENALTY} 没収</Text>
+          {/* 2つの結末を視覚的に対比 */}
+          <View style={styles.outcomeRow}>
+            <View style={[styles.outcomeCard, styles.outcomeGood]}>
+              <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+              <Text style={styles.outcomeLabel}>続けたら</Text>
+              <Text style={[styles.outcomeAmount, { color: colors.success }]}>¥0</Text>
+              <Text style={styles.outcomeSub}>達成した週は無料</Text>
             </View>
-            <View style={styles.stakeRule}>
-              <Ionicons name="gift" size={15} color={colors.success} />
-              <Text style={styles.stakeRuleText}>1ヶ月パーフェクトなら、翌月が無料</Text>
+            <View style={styles.outcomeVs}>
+              <Text style={styles.outcomeVsText}>VS</Text>
+            </View>
+            <View style={[styles.outcomeCard, styles.outcomeBad]}>
+              <Ionicons name="card" size={22} color={colors.danger} />
+              <Text style={styles.outcomeLabel}>サボったら</Text>
+              <Text style={[styles.outcomeAmount, { color: colors.danger }]}>
+                ¥{perWeekStake.toLocaleString()}
+              </Text>
+              <Text style={styles.outcomeSub}>その週ぶんだけ課金</Text>
             </View>
           </View>
         </Card>
 
         <PrimaryButton
-          label={goal ? '目標を作り直す' : 'この目標で始める'}
-          icon={isFree ? 'gift' : 'flame'}
+          label={goal ? '目標を作り直す' : `コミット ¥${deposit.toLocaleString()} で始める`}
+          icon="flame"
           onPress={onSave}
           style={{ marginTop: spacing.sm }}
         />
@@ -477,4 +490,35 @@ const styles = StyleSheet.create({
   stakeRules: { marginTop: spacing.md, gap: spacing.sm },
   stakeRule: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stakeRuleText: { fontSize: font.sub, color: colors.textSub, fontWeight: '600', flex: 1 },
+
+  outcomeRow: { flexDirection: 'row', alignItems: 'stretch', marginTop: spacing.lg, gap: spacing.sm },
+  outcomeCard: {
+    flex: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    gap: 3,
+  },
+  outcomeGood: { backgroundColor: colors.successBg, borderColor: 'rgba(74,222,128,0.4)' },
+  outcomeBad: { backgroundColor: colors.surfaceDanger, borderColor: colors.borderDanger },
+  outcomeLabel: { fontSize: font.small, color: colors.textSub, fontWeight: '800', marginTop: 2 },
+  outcomeAmount: { fontSize: 30, fontWeight: '900', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  outcomeSub: { fontSize: font.small, color: colors.textMuted, fontWeight: '600' },
+  outcomeVs: { justifyContent: 'center', alignItems: 'center', width: 24 },
+  outcomeVsText: { fontSize: font.small, fontWeight: '900', color: colors.textMuted },
+
+  rivalTeaser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  rivalTeaserText: { flex: 1, fontSize: font.small, color: colors.textSub, fontWeight: '600', lineHeight: 17 },
+  rivalTeaserNum: { color: colors.primary, fontWeight: '900', fontVariant: ['tabular-nums'] },
 });
