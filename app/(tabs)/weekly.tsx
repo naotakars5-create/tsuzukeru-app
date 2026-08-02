@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { ProgressBar } from '@/components/ProgressBar';
-import { Art } from '@/components/Art';
 import { colors, font, labelStyle, spacing } from '@/theme';
 import { compareDate, todayStr } from '@/logic/date';
 import { buildStudyStats } from '@/logic/stats';
@@ -42,7 +41,6 @@ export default function WeeklyScreen() {
     >
       {/* コミット額（案C: お金は預からない） */}
       <View style={styles.poolCard}>
-        <Art name="bgStairs" size={130} style={styles.poolArt} opacity={0.13} />
         <View style={styles.poolHead}>
           <Ionicons name="flag" size={18} color={colors.primary} />
           <Text style={styles.poolLabel}>コミット額（お金は預かりません）</Text>
@@ -72,10 +70,7 @@ export default function WeeklyScreen() {
       {/* 勉強時間の推移（直近14日） */}
       <View style={styles.statCard}>
         <View style={styles.statHead}>
-          <View style={styles.statTitleRow}>
-            <Art name="books" size={26} />
-            <Text style={styles.statTitle}>勉強時間の推移</Text>
-          </View>
+          <Text style={styles.statTitle}>勉強時間の推移</Text>
           <Text style={styles.statSub}>直近14日</Text>
         </View>
 
@@ -129,10 +124,7 @@ export default function WeeklyScreen() {
       {/* 曜日別の分析 */}
       <View style={styles.statCard}>
         <View style={styles.statHead}>
-          <View style={styles.statTitleRow}>
-            <Art name="chain" size={26} />
-            <Text style={styles.statTitle}>曜日別の平均</Text>
-          </View>
+          <Text style={styles.statTitle}>曜日別の平均</Text>
           <Text style={styles.statSub}>クセを知る</Text>
         </View>
 
@@ -265,17 +257,14 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: font.body, color: colors.textSub },
 
-  poolArt: { position: 'absolute', right: -14, top: -10, zIndex: 0 },
-  statTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   poolCard: {
-    overflow: 'hidden',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 20,
     padding: 18,
   },
-  poolHead: { flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 1 },
+  poolHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   poolLabel: { ...labelStyle, color: colors.textSub },
   poolAmountRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 8 },
   poolRemaining: {
