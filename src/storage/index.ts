@@ -17,6 +17,7 @@ import {
   CommunityCreations,
   ChatMap,
   ChatReadMap,
+  SubjectLog,
 } from '@/types';
 import { EMPTY_LIFETIME } from '@/logic/summary';
 import { DEFAULT_DEPOSIT } from '@/logic/billing';
@@ -24,6 +25,7 @@ import { DEFAULT_DEPOSIT } from '@/logic/billing';
 const KEY_GOAL = 'tsuzukeru.goal.v1';
 const KEY_MINUTES = 'tsuzukeru.minutes.v1';
 const KEY_NOTES = 'tsuzukeru.notes.v1';
+const KEY_SUBJECTS = 'tsuzukeru.subjects.v1';
 const KEY_TIMER = 'tsuzukeru.timer.v1';
 const KEY_REMINDER = 'tsuzukeru.reminder.v1';
 const KEY_LIFETIME = 'tsuzukeru.lifetime.v1';
@@ -62,6 +64,7 @@ export async function loadState(): Promise<PersistedState> {
       creationsRaw,
       chatsRaw,
       chatReadsRaw,
+      subjectsRaw,
     ] = await Promise.all([
       AsyncStorage.getItem(KEY_GOAL),
       AsyncStorage.getItem(KEY_MINUTES),
@@ -76,6 +79,7 @@ export async function loadState(): Promise<PersistedState> {
       AsyncStorage.getItem(KEY_COMMUNITY_CREATIONS),
       AsyncStorage.getItem(KEY_CHATS),
       AsyncStorage.getItem(KEY_CHAT_READS),
+      AsyncStorage.getItem(KEY_SUBJECTS),
     ]);
     const goal: Goal | null = goalRaw ? JSON.parse(goalRaw) : null;
     // 旧バージョン互換
@@ -110,10 +114,12 @@ export async function loadState(): Promise<PersistedState> {
       : DEFAULT_COMMUNITY_CREATIONS;
     const chats: ChatMap = chatsRaw ? JSON.parse(chatsRaw) : {};
     const chatReads: ChatReadMap = chatReadsRaw ? JSON.parse(chatReadsRaw) : {};
+    const subjectLogs: SubjectLog[] = subjectsRaw ? JSON.parse(subjectsRaw) : [];
     return {
       goal,
       minutes,
       notes,
+      subjectLogs,
       timerStartedAt,
       reminder,
       lifetime,
@@ -131,6 +137,7 @@ export async function loadState(): Promise<PersistedState> {
       goal: null,
       minutes: {},
       notes: {},
+      subjectLogs: [],
       timerStartedAt: null,
       reminder: DEFAULT_REMINDER,
       lifetime: EMPTY_LIFETIME,
@@ -156,6 +163,10 @@ export async function saveMinutes(minutes: MinutesMap): Promise<void> {
 
 export async function saveNotes(notes: NotesMap): Promise<void> {
   await AsyncStorage.setItem(KEY_NOTES, JSON.stringify(notes));
+}
+
+export async function saveSubjectLogs(logs: SubjectLog[]): Promise<void> {
+  await AsyncStorage.setItem(KEY_SUBJECTS, JSON.stringify(logs));
 }
 
 export async function saveTimer(startedAt: number | null): Promise<void> {
@@ -199,11 +210,48 @@ export async function saveChatReads(reads: ChatReadMap): Promise<void> {
   await AsyncStorage.setItem(KEY_CHAT_READS, JSON.stringify(reads));
 }
 
+/** 全データを1つのオブジェクトに書き出す（バックアップ用） */
+export async function exportAll(): Promise<string> {
+  const state = await loadState();
+  return JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), state }, null, 2);
+}
+
+/**
+ * バックアップJSONから復元する。形式が違えば false。
+ * 復元後はアプリの再読み込みが必要（呼び出し側で loadState し直す）。
+ */
+export async function importAll(json: string): Promise<boolean> {
+  try {
+    const parsed = JSON.parse(json);
+    const st = parsed?.state;
+    if (!st || typeof st !== 'object') return false;
+    const writes: Array<Promise<void>> = [];
+    if (st.goal !== undefined) writes.push(saveGoal(st.goal));
+    if (st.minutes) writes.push(saveMinutes(st.minutes));
+    if (st.notes) writes.push(saveNotes(st.notes));
+    if (st.subjectLogs) writes.push(saveSubjectLogs(st.subjectLogs));
+    if (st.reminder) writes.push(saveReminder(st.reminder));
+    if (st.lifetime) writes.push(saveLifetime(st.lifetime));
+    if (st.badges) writes.push(saveBadges(st.badges));
+    if (st.profile) writes.push(saveProfile(st.profile));
+    if (st.groups) writes.push(saveGroups(st.groups));
+    if (typeof st.premium === 'boolean') writes.push(savePremium(st.premium));
+    if (st.communityCreations) writes.push(saveCommunityCreations(st.communityCreations));
+    if (st.chats) writes.push(saveChats(st.chats));
+    if (st.chatReads) writes.push(saveChatReads(st.chatReads));
+    await Promise.all(writes);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function clearAll(): Promise<void> {
   await AsyncStorage.multiRemove([
     KEY_GOAL,
     KEY_MINUTES,
     KEY_NOTES,
+    KEY_SUBJECTS,
     KEY_TIMER,
     KEY_REMINDER,
     KEY_LIFETIME,

@@ -39,6 +39,13 @@ export function compareDate(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/** from から to までの日数（to が未来なら正・同日なら0） */
+export function daysBetween(from: string, to: string): number {
+  const a = fromDateStr(from);
+  const b = fromDateStr(to);
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
 /** 今日から当日の終わり(23:59:59.999)までの残りミリ秒 */
 export function msUntilEndOfDay(now: Date = new Date()): number {
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);

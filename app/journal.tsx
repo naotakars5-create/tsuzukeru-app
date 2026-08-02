@@ -32,7 +32,7 @@ function weekdayOf(date: string): string {
  * その日の勉強時間（分）も一緒に表示する。
  */
 export default function JournalScreen() {
-  const { minutes, notes, setNote } = useApp();
+  const { minutes, notes, setNote, subjectLogs } = useApp();
   const today = todayStr();
   const [selected, setSelected] = useState(today);
   const [text, setText] = useState(notes[today] ?? '');
@@ -54,6 +54,12 @@ export default function JournalScreen() {
 
   const selMin = minutes[selected] ?? 0;
   const isToday = selected === today;
+
+  // 選択日の科目別内訳
+  const daySubjects = useMemo(
+    () => subjectLogs.filter((l) => l.date === selected).sort((a, b) => b.minutes - a.minutes),
+    [subjectLogs, selected]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -90,6 +96,28 @@ export default function JournalScreen() {
             textAlignVertical="top"
             maxLength={1000}
           />
+          {daySubjects.length > 0 && (
+            <View style={styles.subjBox}>
+              <Text style={styles.subjTitle}>科目の内訳</Text>
+              {daySubjects.map((l) => {
+                const max = Math.max(...daySubjects.map((x) => x.minutes), 1);
+                return (
+                  <View key={l.subject} style={styles.subjRow}>
+                    <Text style={styles.subjName} numberOfLines={1}>
+                      {l.subject}
+                    </Text>
+                    <View style={styles.subjTrack}>
+                      <View
+                        style={[styles.subjFill, { width: `${Math.round((l.minutes / max) * 100)}%` }]}
+                      />
+                    </View>
+                    <Text style={styles.subjMin}>{formatMinutes(l.minutes)}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
           <View style={styles.editorFoot}>
             <Text style={styles.count}>{text.length} / 1000</Text>
             <PrimaryButton label="保存" icon="checkmark" onPress={save} style={styles.saveBtn} />
@@ -183,6 +211,27 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     lineHeight: 22,
   },
+  subjBox: {
+    marginTop: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: 8,
+  },
+  subjTitle: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
+  subjRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  subjName: { width: 84, fontSize: font.small, color: colors.text, fontWeight: '700' },
+  subjTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' },
+  subjFill: { height: '100%', borderRadius: 3, backgroundColor: colors.primary },
+  subjMin: {
+    width: 58,
+    textAlign: 'right',
+    fontSize: font.small,
+    color: colors.textSub,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+
   editorFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
   count: { fontSize: font.small, color: colors.textMuted, fontVariant: ['tabular-nums'] },
   saveBtn: { height: 44, paddingHorizontal: spacing.xl },

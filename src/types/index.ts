@@ -38,6 +38,10 @@ export interface Goal {
   dailyTargetMin: number;
   /** コミット額（達成すれば¥0、未達の週ぶんだけ課金・モック。お金は預からない） */
   deposit: number;
+  /** 試験日 'YYYY-MM-DD'（任意。設定するとカウントダウンと逆算を表示） */
+  examDate?: string | null;
+  /** 合格までに必要と見込む総勉強時間（時間）。逆算に使う（任意） */
+  targetTotalHours?: number | null;
   /** 開始日 'YYYY-MM-DD' */
   startDate: string;
   /** 期間（週）: MVPは4週固定 */
@@ -54,6 +58,16 @@ export type MinutesMap = Record<string, number>;
 
 /** 日付をキーにした学習メモ { '2026-07-21': '英単語50個、過去問大問3' } */
 export type NotesMap = Record<string, string>;
+
+/** 科目別の勉強記録の1件 */
+export interface SubjectLog {
+  /** 'YYYY-MM-DD' */
+  date: string;
+  /** 科目名（自由入力・プリセット） */
+  subject: string;
+  /** 勉強時間（分） */
+  minutes: number;
+}
 
 /** リマインド通知の設定（端末内のローカル通知） */
 export interface ReminderSettings {
@@ -146,6 +160,8 @@ export interface PersistedState {
   minutes: MinutesMap;
   /** 日ごとの学習メモ */
   notes: NotesMap;
+  /** 科目別の勉強記録 */
+  subjectLogs: SubjectLog[];
   /** ストップウォッチ計測開始時刻(ms)。null=計測していない */
   timerStartedAt: number | null;
   reminder: ReminderSettings;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Platform, Image, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -9,7 +9,9 @@ import { colors, font, radius, spacing } from '@/theme';
 import { formatDisplay } from '@/logic/date';
 import { frequencyLabel } from '@/logic/schedule';
 import { categoryOf } from '@/logic/category';
-import { confirmAsync, notifyAsync } from '@/logic/confirm';
+import { confirmAsync, notifyAsync, promptAsync } from '@/logic/confirm';
+import { exportAll, importAll } from '@/storage';
+import { todayStr } from '@/logic/date';
 
 /** リマインドで選べる時刻（時） */
 const REMINDER_HOURS = [6, 7, 8, 9, 12, 17, 18, 19, 20, 21, 22, 23];
@@ -28,7 +30,47 @@ export default function SettingsScreen() {
     setPremium,
     communityLimit,
     communityCreationsThisMonth,
+    reloadAll,
   } = useApp();
+
+  // バックアップ: JSONを書き出す（Webはダウンロード、ネイティブは共有）
+  const onBackup = async () => {
+    try {
+      const json = await exportAll();
+      const filename = `kakugo-backup-${todayStr()}.json`;
+      if (Platform.OS === 'web') {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        notifyAsync('バックアップを書き出しました', `${filename} をダウンロードしました。`);
+      } else {
+        await Share.share({ message: json, title: filename });
+      }
+    } catch {
+      notifyAsync('書き出しに失敗しました', 'もう一度お試しください。');
+    }
+  };
+
+  // 復元: JSONを貼り付けて読み込む
+  const onRestore = async () => {
+    const json = await promptAsync(
+      'バックアップから復元',
+      'バックアップJSONの中身を貼り付けてください（現在のデータは上書きされます）',
+      ''
+    );
+    if (!json) return;
+    const ok = await importAll(json);
+    if (!ok) {
+      notifyAsync('復元できませんでした', 'バックアップの形式が正しくないようです。');
+      return;
+    }
+    await reloadAll();
+    notifyAsync('復元しました', '記録を読み込みました。');
+  };
 
   const onTogglePremium = async (v: boolean) => {
     if (v) {
@@ -222,7 +264,28 @@ export default function SettingsScreen() {
       {/* データ管理 */}
       <Card>
         <Text style={styles.sectionLabel}>データ管理</Text>
-        <Text style={styles.goalMeta}>データはこの端末内にのみ保存されます（サーバーなし）。</Text>
+        <Text style={styles.goalMeta}>
+          データはこの端末内にのみ保存されます（サーバーなし）。
+          <Text style={{ color: colors.warning }}>
+            {' '}機種変更やキャッシュ削除で消えるため、ときどきバックアップしてください。
+          </Text>
+        </Text>
+        <View style={styles.backupRow}>
+          <PrimaryButton
+            label="バックアップを書き出す"
+            icon="download"
+            variant="secondary"
+            onPress={onBackup}
+            style={{ flex: 1, height: 46 }}
+          />
+          <PrimaryButton
+            label="復元する"
+            icon="cloud-upload"
+            variant="secondary"
+            onPress={onRestore}
+            style={{ flex: 1, height: 46 }}
+          />
+        </View>
         <PrimaryButton
           label="すべてのデータをリセット"
           variant="ghost"
@@ -325,5 +388,6 @@ const styles = StyleSheet.create({
   },
   soonText: { fontSize: 10, color: colors.textSub, fontWeight: '700' },
 
+  backupRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   version: { textAlign: 'center', fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm },
 });

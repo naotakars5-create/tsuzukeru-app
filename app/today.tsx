@@ -8,6 +8,11 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { colors, font, spacing, radius } from '@/theme';
 import { formatStopwatch, formatMinutes } from '@/logic/time';
 import { weekStake } from '@/logic/billing';
+import { subjectsForCategory } from '@/logic/subjects';
+import { notifyAsync, promptAsync } from '@/logic/confirm';
+
+/** 集中モード1セットの長さ（分） */
+const POMODORO_MIN = 25;
 
 /**
  * 勉強タイマー画面。グローバルなストップウォッチで勉強時間を計測し、
@@ -16,12 +21,26 @@ import { weekStake } from '@/logic/billing';
  */
 export default function TodayScreen() {
   const router = useRouter();
-  const { goal, progress, weeks, isTodayScheduled, addStudyMinutes, timerStartedAt, startTimer, stopTimer } =
-    useApp();
+  const {
+    goal,
+    progress,
+    weeks,
+    isTodayScheduled,
+    addStudyMinutes,
+    addSubjectMinutes,
+    timerStartedAt,
+    startTimer,
+    stopTimer,
+  } = useApp();
 
   const running = timerStartedAt != null;
   const [now, setNow] = useState(Date.now());
   const pulse = useRef(new Animated.Value(1)).current;
+  // 集中モード（ポモドーロ）と科目
+  const [pomodoro, setPomodoro] = useState(false);
+  const [onBreak, setOnBreak] = useState(false);
+  const [subject, setSubject] = useState<string>('');
+  const notified = useRef(false);
 
   const targetMin = goal?.dailyTargetMin ?? 120;
   const doneMin = progress.todayMinutes;
@@ -54,6 +73,38 @@ export default function TodayScreen() {
   const quickAdd = async (m: number) => {
     if (running) return;
     await addStudyMinutes(m);
+    if (subject) await addSubjectMinutes(subject, m);
+  };
+
+  // 計測を止めて、科目にも記録する
+  const onStop = async () => {
+    const min = await stopTimer();
+    if (min > 0 && subject) await addSubjectMinutes(subject, min);
+    setOnBreak(false);
+    notified.current = false;
+  };
+
+  // ポモドーロ: 25分たったら知らせる（計測は続けられる）
+  const pomoElapsedSec = running ? sessionSec : 0;
+  const pomoLeftSec = Math.max(0, POMODORO_MIN * 60 - pomoElapsedSec);
+  useEffect(() => {
+    if (!pomodoro || !running || notified.current) return;
+    if (pomoLeftSec === 0) {
+      notified.current = true;
+      notifyAsync('25分たちました', '5分休憩して、もう1セット行こう。');
+    }
+  }, [pomodoro, running, pomoLeftSec]);
+
+  // 科目の候補（資格ごとのプリセット＋自分で足したもの）
+  const [extraSubjects, setExtraSubjects] = useState<string[]>([]);
+  const subjectOptions = [...subjectsForCategory(goal?.category), ...extraSubjects];
+
+  const onAddSubject = async () => {
+    const v = await promptAsync('科目を追加', '科目名を入力（例: 民法）', '');
+    const t = v?.trim();
+    if (!t) return;
+    if (!subjectOptions.includes(t)) setExtraSubjects((prev) => [...prev, t]);
+    setSubject(t);
   };
 
   const currentWeek = weeks.find((w) => w.isCurrent);
@@ -105,13 +156,53 @@ export default function TodayScreen() {
             )}
           </View>
 
+          {/* 科目と集中モード */}
+          <View style={styles.optionArea}>
+            <View style={styles.optRow}>
+              <Text style={styles.optLabel}>科目</Text>
+              <View style={styles.subjWrap}>
+                {subjectOptions.map((sName) => {
+                  const active = subject === sName;
+                  return (
+                    <Pressable
+                      key={sName}
+                      onPress={() => setSubject(active ? '' : sName)}
+                      style={[styles.subjChip, active && styles.subjChipActive]}
+                    >
+                      <Text style={[styles.subjText, active && styles.subjTextActive]}>{sName}</Text>
+                    </Pressable>
+                  );
+                })}
+                <Pressable onPress={onAddSubject} style={styles.subjChip}>
+                  <Ionicons name="add" size={13} color={colors.textSub} />
+                </Pressable>
+              </View>
+            </View>
+
+            <Pressable style={styles.pomoRow} onPress={() => setPomodoro((v) => !v)}>
+              <Ionicons
+                name={pomodoro ? 'checkbox' : 'square-outline'}
+                size={18}
+                color={pomodoro ? colors.primary : colors.textMuted}
+              />
+              <Text style={[styles.pomoText, pomodoro && { color: colors.text }]}>
+                集中モード（{POMODORO_MIN}分ごとに休憩の合図）
+              </Text>
+              {pomodoro && running && (
+                <Text style={styles.pomoLeft}>
+                  あと {Math.floor(pomoLeftSec / 60)}:{String(pomoLeftSec % 60).padStart(2, '0')}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+
           <View style={styles.controls}>
             <Animated.View style={{ transform: [{ scale: pulse }], alignSelf: 'stretch' }}>
               {running ? (
                 <PrimaryButton
                   label="ストップ（記録する）"
                   icon="stop"
-                  onPress={() => stopTimer()}
+                  onPress={onStop}
                   style={styles.bigBtn}
                 />
               ) : (
@@ -194,6 +285,33 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   doneTagText: { fontSize: font.sub, fontWeight: '800', color: colors.success },
+
+  optionArea: { gap: spacing.md, marginBottom: spacing.md },
+  optRow: { gap: spacing.sm },
+  optLabel: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
+  subjWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  subjChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  subjChipActive: { backgroundColor: 'rgba(198,244,50,0.14)', borderColor: colors.primary },
+  subjText: { fontSize: font.small, fontWeight: '700', color: colors.textSub },
+  subjTextActive: { color: colors.primary, fontWeight: '900' },
+  pomoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pomoText: { fontSize: font.small, color: colors.textSub, fontWeight: '700', flex: 1 },
+  pomoLeft: {
+    fontSize: font.small,
+    fontWeight: '900',
+    color: colors.primary,
+    fontVariant: ['tabular-nums'],
+  },
 
   cheerRow: {
     flexDirection: 'row',
