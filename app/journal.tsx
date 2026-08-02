@@ -13,6 +13,7 @@ import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { Art } from '@/components/Art';
 import { colors, font, radius, spacing } from '@/theme';
 import { todayStr, formatDisplay } from '@/logic/date';
 import { formatMinutes } from '@/logic/time';
@@ -80,9 +81,7 @@ export default function JournalScreen() {
                 {!isToday ? ` ・ ${formatDisplay(selected)}` : ''}
               </Text>
             </View>
-            <View style={styles.penBadge}>
-              <Ionicons name="create" size={18} color={colors.primary} />
-            </View>
+            <Art name="candle" size={46} />
           </View>
 
           <TextInput
@@ -128,7 +127,7 @@ export default function JournalScreen() {
         <Text style={styles.sectionLabel}>これまでの記録</Text>
         {history.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="book-outline" size={40} color={colors.textMuted} />
+            <Art name="ember" size={120} opacity={0.9} />
             <Text style={styles.emptyText}>
               まだ記録がありません。{'\n'}勉強したら、その日のメモを残そう。
             </Text>
