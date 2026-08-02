@@ -23,10 +23,21 @@ import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
 import { randomHotQuote } from '@/logic/quotes';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
 import { DAILY_TARGET_OPTIONS, formatMinutes } from '@/logic/time';
+import { addDays, todayStr, daysBetween, formatDisplay } from '@/logic/date';
+import { promptAsync } from '@/logic/confirm';
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const DURATION_WEEKS = 4;
 const WEEKLY_COUNT_OPTIONS = [2, 3, 4, 5];
+/** 試験日のクイック選択 */
+const EXAM_PRESETS = [
+  { label: '1ヶ月後', days: 30 },
+  { label: '3ヶ月後', days: 90 },
+  { label: '半年後', days: 180 },
+  { label: '1年後', days: 365 },
+];
+/** 合格までの目安総時間 */
+const TARGET_HOURS_PRESETS = [100, 300, 500, 1000];
 
 export default function GoalSetupScreen() {
   const router = useRouter();
@@ -39,10 +50,23 @@ export default function GoalSetupScreen() {
   const [weeklyTarget, setWeeklyTarget] = useState<number>(goal?.weeklyTarget ?? 3);
   const [dailyTargetMin, setDailyTargetMin] = useState<number>(goal?.dailyTargetMin ?? 120);
   const [deposit, setDeposit] = useState<number>(goal?.deposit ?? DEFAULT_DEPOSIT);
+  const [examDate, setExamDate] = useState<string | null>(goal?.examDate ?? null);
+  const [targetHours, setTargetHours] = useState<number | null>(goal?.targetTotalHours ?? null);
 
   const [quote] = useState(() => randomHotQuote());
   const perWeekStake = weekStake(deposit, 4);
-  const challengerCount = communityCount(category, 8);
+  const challengerCount = communityCount(category);
+
+  const pickExamDate = async () => {
+    const v = await promptAsync('試験日を入力', 'YYYY-MM-DD の形式（例: 2026-10-18）', examDate ?? '');
+    if (!v) return;
+    const t = v.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+      notifyAsync('日付の形式が正しくありません', 'YYYY-MM-DD の形式で入力してください（例: 2026-10-18）');
+      return;
+    }
+    setExamDate(t);
+  };
 
   const toggleWeekday = (d: number) => {
     setWeekdays((prev) =>
@@ -93,6 +117,8 @@ export default function GoalSetupScreen() {
       weeklyTarget,
       dailyTargetMin,
       deposit,
+      examDate,
+      targetTotalHours: targetHours,
       durationWeeks: DURATION_WEEKS,
     });
     // 「火がつく」演出を挟んでホームへ
@@ -166,6 +192,73 @@ export default function GoalSetupScreen() {
               「{categoryOf(category).label}」に挑戦中。あなたも競える。
             </Text>
           </View>
+        </Card>
+
+        {/* 試験日（任意） */}
+        <Card>
+          <Text style={styles.label}>試験日（任意）</Text>
+          <Text style={styles.helper}>
+            設定すると、ホームに「試験まであと◯日」と、間に合わせるための1日あたりの
+            必要時間が出ます。
+          </Text>
+          <View style={styles.examRow}>
+            {EXAM_PRESETS.map((p) => {
+              const d = addDays(todayStr(), p.days);
+              const active = examDate === d;
+              return (
+                <Pressable
+                  key={p.days}
+                  onPress={() => setExamDate(active ? null : d)}
+                  style={[styles.examChip, active && styles.examChipActive]}
+                >
+                  <Text style={[styles.examChipText, active && styles.examChipTextActive]}>
+                    {p.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <Pressable onPress={pickExamDate} style={styles.examChip}>
+              <Ionicons name="calendar" size={14} color={colors.textSub} />
+              <Text style={styles.examChipText}>日付を入力</Text>
+            </Pressable>
+          </View>
+          {examDate ? (
+            <View style={styles.examPicked}>
+              <Ionicons name="flag" size={15} color={colors.primary} />
+              <Text style={styles.examPickedText}>
+                {formatDisplay(examDate)} まで あと{' '}
+                <Text style={styles.examPickedNum}>{daysBetween(todayStr(), examDate)}</Text> 日
+              </Text>
+              <Pressable onPress={() => setExamDate(null)} hitSlop={8} style={{ marginLeft: 'auto' }}>
+                <Text style={styles.examClear}>クリア</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {examDate ? (
+            <>
+              <Text style={[styles.label, { marginTop: spacing.lg }]}>
+                合格までに必要な総勉強時間（任意）
+              </Text>
+              <Text style={styles.helper}>逆算して「1日あたり◯時間」を出します。</Text>
+              <View style={styles.examRow}>
+                {TARGET_HOURS_PRESETS.map((h) => {
+                  const active = targetHours === h;
+                  return (
+                    <Pressable
+                      key={h}
+                      onPress={() => setTargetHours(active ? null : h)}
+                      style={[styles.examChip, active && styles.examChipActive]}
+                    >
+                      <Text style={[styles.examChipText, active && styles.examChipTextActive]}>
+                        {h}h
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
         </Card>
 
         {/* 頻度 */}
@@ -521,4 +614,33 @@ const styles = StyleSheet.create({
   },
   rivalTeaserText: { flex: 1, fontSize: font.small, color: colors.textSub, fontWeight: '600', lineHeight: 17 },
   rivalTeaserNum: { color: colors.primary, fontWeight: '900', fontVariant: ['tabular-nums'] },
+
+  examRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  examChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  examChipActive: { backgroundColor: 'rgba(198,244,50,0.14)', borderColor: colors.primary },
+  examChipText: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
+  examChipTextActive: { color: colors.primary },
+  examPicked: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  examPickedText: { fontSize: font.small, color: colors.textSub, fontWeight: '700' },
+  examPickedNum: { color: colors.primary, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  examClear: { fontSize: font.small, color: colors.danger, fontWeight: '800' },
 });

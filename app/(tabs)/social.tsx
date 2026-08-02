@@ -45,7 +45,7 @@ export default function SocialScreen() {
       ),
     [category.key, myRankIndex, myMonthPoints, progress.streak, myMonthMinutes, profile.motivation]
   );
-  const commCount = communityCount(category.key, leaderboard.length);
+  const commCount = communityCount(category.key);
 
   if (!goal) {
     return (

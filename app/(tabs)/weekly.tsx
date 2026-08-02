@@ -5,6 +5,8 @@ import { useApp } from '@/context/AppContext';
 import { ProgressBar } from '@/components/ProgressBar';
 import { colors, font, labelStyle, spacing } from '@/theme';
 import { compareDate, todayStr } from '@/logic/date';
+import { buildStudyStats } from '@/logic/stats';
+import { formatMinutes, formatMinutesShort } from '@/logic/time';
 import { WeekSummary } from '@/types';
 
 type WeekState = 'done' | 'missed' | 'current' | 'future';
@@ -17,7 +19,8 @@ function stateOf(week: WeekSummary): WeekState {
 
 /** 週次レポート: 4週の達成状況と、コミット額の課金/免除（案C）を表示。 */
 export default function WeeklyScreen() {
-  const { goal, weeks, seasonResult } = useApp();
+  const { goal, weeks, seasonResult, minutes } = useApp();
+  const stats = buildStudyStats(goal, minutes);
 
   if (!goal) {
     return (
@@ -62,6 +65,107 @@ export default function WeeklyScreen() {
         {weeks.map((w) => (
           <WeekCard key={w.weekIndex} week={w} />
         ))}
+      </View>
+
+      {/* 勉強時間の推移（直近14日） */}
+      <View style={styles.statCard}>
+        <View style={styles.statHead}>
+          <Text style={styles.statTitle}>勉強時間の推移</Text>
+          <Text style={styles.statSub}>直近14日</Text>
+        </View>
+
+        <View style={styles.chart}>
+          {stats.recent.map((d) => {
+            const h = Math.max(3, Math.round((d.minutes / stats.recentMax) * 92));
+            return (
+              <View key={d.date} style={styles.chartCol}>
+                <View
+                  style={[
+                    styles.chartBar,
+                    { height: h },
+                    d.minutes === 0 && styles.chartBarEmpty,
+                    d.isToday && styles.chartBarToday,
+                  ]}
+                />
+                <Text style={[styles.chartLabel, d.isToday && styles.chartLabelToday]}>
+                  {d.date.slice(8)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={styles.compareRow}>
+          <View style={styles.compareItem}>
+            <Text style={styles.compareLabel}>直近7日</Text>
+            <Text style={styles.compareValue}>{formatMinutesShort(stats.last7)}</Text>
+          </View>
+          <View style={styles.compareItem}>
+            <Text style={styles.compareLabel}>その前の7日</Text>
+            <Text style={[styles.compareValue, { color: colors.textSub }]}>
+              {formatMinutesShort(stats.prev7)}
+            </Text>
+          </View>
+          <View style={styles.compareItem}>
+            <Text style={styles.compareLabel}>増減</Text>
+            <Text
+              style={[
+                styles.compareValue,
+                { color: stats.delta7 >= 0 ? colors.success : colors.danger },
+              ]}
+            >
+              {stats.delta7 >= 0 ? '+' : '−'}
+              {formatMinutesShort(Math.abs(stats.delta7))}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 曜日別の分析 */}
+      <View style={styles.statCard}>
+        <View style={styles.statHead}>
+          <Text style={styles.statTitle}>曜日別の平均</Text>
+          <Text style={styles.statSub}>クセを知る</Text>
+        </View>
+
+        <View style={styles.wdRow}>
+          {stats.byWeekday.map((w) => {
+            const max = Math.max(1, ...stats.byWeekday.map((x) => x.avgMinutes));
+            const h = Math.max(3, Math.round((w.avgMinutes / max) * 72));
+            const isWorst = stats.worst?.weekday === w.weekday && w.avgMinutes > 0;
+            const isBest = stats.best?.weekday === w.weekday && w.avgMinutes > 0;
+            return (
+              <View key={w.weekday} style={styles.wdCol}>
+                <Text style={styles.wdMin}>{w.avgMinutes > 0 ? w.avgMinutes : '—'}</Text>
+                <View
+                  style={[
+                    styles.wdBar,
+                    { height: h },
+                    isBest && styles.wdBarBest,
+                    isWorst && styles.wdBarWorst,
+                  ]}
+                />
+                <Text style={[styles.wdLabel, isWorst && { color: colors.danger }]}>{w.label}</Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {stats.worst && stats.best && stats.worst.weekday !== stats.best.weekday ? (
+          <View style={styles.insight}>
+            <Ionicons name="bulb" size={15} color={colors.warning} />
+            <Text style={styles.insightText}>
+              あなたは<Text style={styles.insightStrong}>{stats.worst.label}曜が弱い</Text>
+              （平均{stats.worst.avgMinutes}分）。いちばん強いのは
+              <Text style={styles.insightStrong}>{stats.best.label}曜</Text>
+              （平均{stats.best.avgMinutes}分）。弱い曜日は、目標を軽くするか前日に前倒しを。
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.insightMuted}>
+            記録が増えると、曜日ごとのクセが見えてきます。
+          </Text>
+        )}
       </View>
 
       <Text style={styles.note}>
@@ -233,4 +337,74 @@ const styles = StyleSheet.create({
   breakLabel: { fontSize: 10, color: colors.textSub, fontWeight: '600', marginTop: 2 },
 
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18 },
+
+  statCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 20,
+    padding: 18,
+  },
+  statHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statTitle: { fontSize: 15, fontWeight: '900', color: colors.text },
+  statSub: { fontSize: 11, color: colors.textSub, fontWeight: '700' },
+
+  chart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 110,
+    marginTop: 14,
+    gap: 3,
+  },
+  chartCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+  chartBar: { width: '100%', borderRadius: 3, backgroundColor: colors.primary, opacity: 0.85 },
+  chartBarEmpty: { backgroundColor: colors.surfaceAlt, opacity: 1 },
+  chartBarToday: { backgroundColor: colors.ember, opacity: 1 },
+  chartLabel: { fontSize: 9, color: colors.textMuted, marginTop: 5, fontVariant: ['tabular-nums'] },
+  chartLabelToday: { color: colors.primary, fontWeight: '900' },
+
+  compareRow: {
+    flexDirection: 'row',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  compareItem: { flex: 1, alignItems: 'center' },
+  compareLabel: { fontSize: 10, color: colors.textSub, fontWeight: '700' },
+  compareValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.text,
+    marginTop: 3,
+    fontVariant: ['tabular-nums'],
+  },
+
+  wdRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    gap: 6,
+  },
+  wdCol: { flex: 1, alignItems: 'center' },
+  wdMin: { fontSize: 10, color: colors.textMuted, marginBottom: 4, fontVariant: ['tabular-nums'] },
+  wdBar: { width: '100%', borderRadius: 4, backgroundColor: '#3A4450' },
+  wdBarBest: { backgroundColor: colors.primary },
+  wdBarWorst: { backgroundColor: colors.danger, opacity: 0.7 },
+  wdLabel: { fontSize: 11, color: colors.textSub, fontWeight: '800', marginTop: 6 },
+
+  insight: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 14,
+  },
+  insightText: { flex: 1, fontSize: 12, color: colors.textSub, lineHeight: 18 },
+  insightStrong: { color: colors.text, fontWeight: '900' },
+  insightMuted: { fontSize: 12, color: colors.textMuted, marginTop: 12 },
 });

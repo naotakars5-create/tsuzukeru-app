@@ -20,9 +20,10 @@ import { Logo } from '@/components/Logo';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import { frequencyLabel } from '@/logic/schedule';
-import { todayStr } from '@/logic/date';
+import { todayStr, formatDisplay } from '@/logic/date';
 import { formatMinutes, formatMinutesShort } from '@/logic/time';
 import { randomHotQuote } from '@/logic/quotes';
+import { buildExamCountdown, countdownTone } from '@/logic/exam';
 import { IconName } from '@/types';
 
 /** 時間帯に合わせた挨拶 */
@@ -198,6 +199,7 @@ export default function HomeScreen() {
   }
 
   // ─────────── 通常（シーズン進行中） ───────────
+  const exam = buildExamCountdown(goal, progress.totalMinutes);
   const currentWeek = weeks.find((w) => w.isCurrent) ?? weeks[0];
   const weekRatio = currentWeek.scheduled ? currentWeek.done / currentWeek.scheduled : 0;
   const weekPct = Math.round(weekRatio * 100);
@@ -224,6 +226,45 @@ export default function HomeScreen() {
             <Ionicons name="notifications-outline" size={20} color={colors.textSub} />
           </Pressable>
         </View>
+
+        {/* 試験日カウントダウン */}
+        {exam && !exam.passed && (
+          <Pressable onPress={() => router.push('/goal-setup')}>
+            <Card style={styles.examCard}>
+              <View style={styles.examTop}>
+                <View style={styles.examLeft}>
+                  <Text style={styles.examLabel}>{categoryOf(goal.category).label} まで</Text>
+                  <View style={styles.examNumRow}>
+                    <Text style={styles.examNum}>{exam.daysLeft}</Text>
+                    <Text style={styles.examUnit}>日</Text>
+                  </View>
+                </View>
+                <View style={styles.examRight}>
+                  <Ionicons name="flag" size={18} color={colors.primary} />
+                  <Text style={styles.examDate}>{formatDisplay(exam.date)}</Text>
+                </View>
+              </View>
+
+              {exam.perDayMinutes != null ? (
+                <>
+                  <View style={styles.examBarTrack}>
+                    <View
+                      style={[styles.examBarFill, { width: `${Math.round((exam.ratio ?? 0) * 100)}%` }]}
+                    />
+                  </View>
+                  <Text style={styles.examPace}>
+                    合格ラインまで残り {formatMinutes(exam.remainingMinutes ?? 0)} ・ ペース{' '}
+                    <Text style={styles.examPaceNum}>
+                      1日 {formatMinutes(exam.perDayMinutes)}
+                    </Text>
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.examPace}>{countdownTone(exam.daysLeft)}</Text>
+              )}
+            </Card>
+          </Pressable>
+        )}
 
         {/* 連続が途切れる危機のナッジ */}
         {isTodayScheduled && todayStatus !== 'done' && progress.streak > 0 && (
@@ -474,6 +515,33 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginTop: spacing.lg,
   },
+
+  examCard: { paddingVertical: spacing.lg },
+  examTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  examLeft: {},
+  examLabel: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
+  examNumRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: 2 },
+  examNum: {
+    fontSize: 46,
+    fontWeight: '900',
+    color: colors.primary,
+    lineHeight: 48,
+    letterSpacing: -2,
+    fontVariant: ['tabular-nums'],
+  },
+  examUnit: { fontSize: 18, fontWeight: '800', color: colors.textSub, marginBottom: 6 },
+  examRight: { alignItems: 'flex-end', gap: 2 },
+  examDate: { fontSize: font.small, color: colors.textSub, fontWeight: '700' },
+  examBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  examBarFill: { height: '100%', borderRadius: 3, backgroundColor: colors.primary },
+  examPace: { fontSize: font.small, color: colors.textSub, marginTop: spacing.sm, lineHeight: 17 },
+  examPaceNum: { color: colors.text, fontWeight: '900' },
 
   memoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   memoIcon: {

@@ -26,12 +26,14 @@ import {
   ChatMap,
   ChatMessage,
   ChatReadMap,
+  SubjectLog,
 } from '@/types';
 import {
   loadState,
   saveGoal,
   saveMinutes,
   saveNotes,
+  saveSubjectLogs,
   saveTimer,
   saveReminder,
   saveLifetime,
@@ -49,7 +51,7 @@ import {
 /** コミュニティ作成の月間上限（プレミアム限定） */
 export const COMMUNITY_CREATE_LIMIT = 3;
 import { isScheduledDay, statusOf } from '@/logic/schedule';
-import { todayStr } from '@/logic/date';
+import { todayStr, daysBetween } from '@/logic/date';
 import {
   buildProgress,
   buildWeeks,
@@ -57,8 +59,9 @@ import {
   isSeasonComplete,
   EMPTY_LIFETIME,
 } from '@/logic/summary';
-import { scheduleDailyReminder, cancelReminders } from '@/logic/reminder';
+import { scheduleDailyReminder, cancelReminders, scheduleSmartReminders } from '@/logic/reminder';
 import { BADGES, satisfiedBadgeKeys } from '@/logic/badges';
+import { weekStake } from '@/logic/billing';
 
 interface AppContextValue {
   ready: boolean;
@@ -68,6 +71,10 @@ interface AppContextValue {
   notes: NotesMap;
   /** ある日のメモを保存（空文字ならその日のメモを削除） */
   setNote: (date: string, text: string) => Promise<void>;
+  /** 科目別の勉強記録 */
+  subjectLogs: SubjectLog[];
+  /** 科目に勉強時間を記録する */
+  addSubjectMinutes: (subject: string, minutes: number) => Promise<void>;
   reminder: ReminderSettings;
   lifetime: LifetimeStats;
   profile: Profile;
@@ -124,6 +131,8 @@ interface AppContextValue {
   groupUnreadCount: number;
   /** コミュニティごとの未読数（参加中のみ） */
   unreadByCode: Record<string, number>;
+  /** 保存済みデータを読み直す（バックアップ復元後に使う） */
+  reloadAll: () => Promise<void>;
   resetAll: () => Promise<void>;
 }
 
@@ -135,6 +144,8 @@ export interface NewGoalInput {
   weeklyTarget: number;
   dailyTargetMin: number;
   deposit: number;
+  examDate?: string | null;
+  targetTotalHours?: number | null;
   durationWeeks: number;
 }
 
@@ -145,6 +156,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [minutes, setMinutes] = useState<MinutesMap>({});
   const [notes, setNotes] = useState<NotesMap>({});
+  const [subjectLogs, setSubjectLogs] = useState<SubjectLog[]>([]);
   const [reminder, setReminder] = useState<ReminderSettings>({ enabled: false, hour: 20, minute: 0 });
   const [lifetime, setLifetime] = useState<LifetimeStats>(EMPTY_LIFETIME);
   const [badgesMap, setBadgesMap] = useState<BadgeMap>({});
@@ -159,25 +171,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [chats, setChats] = useState<ChatMap>({});
   const [chatReads, setChatReads] = useState<ChatReadMap>({});
 
+  const applyState = useCallback((state: Awaited<ReturnType<typeof loadState>>) => {
+    setGoal(state.goal);
+    setMinutes(state.minutes);
+    setNotes(state.notes);
+    setSubjectLogs(state.subjectLogs);
+    setReminder(state.reminder);
+    setLifetime(state.lifetime);
+    setBadgesMap(state.badges);
+    setProfile(state.profile);
+    setGroupsState(state.groups);
+    setTimerStartedAt(state.timerStartedAt);
+    setPremiumState(state.premium);
+    setCommunityCreationsState(state.communityCreations);
+    setChats(state.chats);
+    setChatReads(state.chatReads);
+  }, []);
+
   useEffect(() => {
     (async () => {
-      const state = await loadState();
-      setGoal(state.goal);
-      setMinutes(state.minutes);
-      setNotes(state.notes);
-      setReminder(state.reminder);
-      setLifetime(state.lifetime);
-      setBadgesMap(state.badges);
-      setProfile(state.profile);
-      setGroupsState(state.groups);
-      setTimerStartedAt(state.timerStartedAt);
-      setPremiumState(state.premium);
-      setCommunityCreationsState(state.communityCreations);
-      setChats(state.chats);
-      setChatReads(state.chatReads);
+      applyState(await loadState());
       setReady(true);
     })();
-  }, []);
+  }, [applyState]);
+
+  const reloadAll = useCallback(async () => {
+    applyState(await loadState());
+  }, [applyState]);
 
   const currentMonth = todayStr().slice(0, 7);
   const communityCreationsThisMonth =
@@ -292,6 +312,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveBadges(next);
   }, [ready, progress, seasonResult, lifetime, badgesMap]);
 
+  // 記録や設定が変わるたびに、状況に応じた通知を組み直す
+  useEffect(() => {
+    if (!ready || !goal) return;
+    const currentWeek = weeks.find((w) => w.isCurrent);
+    const weekRemaining = currentWeek?.pending ?? 0;
+    const daysLeftInWeek = currentWeek
+      ? Math.max(0, daysBetween(todayStr(), currentWeek.endDate) + 1)
+      : 0;
+    const examDaysLeft = goal.examDate ? daysBetween(todayStr(), goal.examDate) : null;
+    scheduleSmartReminders({
+      reminder,
+      goalName: goal.name,
+      isTodayScheduled: isScheduledDay(goal, todayStr()),
+      todayDone: statusOf(goal, minutes, todayStr()) === 'done',
+      todayMinutes: progress.todayMinutes,
+      dailyTargetMin: goal.dailyTargetMin,
+      streak: progress.streak,
+      weekRemaining,
+      daysLeftInWeek,
+      weekStakeAmount: weekStake(goal.deposit, goal.durationWeeks),
+      examDaysLeft,
+    });
+  }, [ready, goal, minutes, reminder, weeks, progress.todayMinutes, progress.streak]);
+
   /** 完了シーズンを通算へ畳み込む（課金/免除を反映・案C。お金は預からない） */
   const foldSeasonIntoLifetime = useCallback((): LifetimeStats => {
     const r = buildSeasonResult(goal, minutes);
@@ -316,6 +360,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       weeklyTarget: input.weeklyTarget,
       dailyTargetMin: input.dailyTargetMin,
       deposit: input.deposit,
+      examDate: input.examDate ?? null,
+      targetTotalHours: input.targetTotalHours ?? null,
       startDate: todayStr(),
       durationWeeks: input.durationWeeks,
       createdAt: new Date().toISOString(),
@@ -365,6 +411,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMinutes((prev) => {
       const next = { ...prev, [today]: Math.round((prev[today] ?? 0) + min) };
       saveMinutes(next);
+      return next;
+    });
+  }, []);
+
+  const addSubjectMinutes = useCallback(async (subject: string, min: number) => {
+    const name = subject.trim();
+    if (!name || min <= 0) return;
+    const date = todayStr();
+    setSubjectLogs((prev) => {
+      // 同じ日・同じ科目はまとめる
+      const idx = prev.findIndex((l) => l.date === date && l.subject === name);
+      const next =
+        idx >= 0
+          ? prev.map((l, i) => (i === idx ? { ...l, minutes: Math.round(l.minutes + min) } : l))
+          : [...prev, { date, subject: name, minutes: Math.round(min) }];
+      saveSubjectLogs(next);
       return next;
     });
   }, []);
@@ -451,6 +513,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setGoal(null);
     setMinutes({});
     setNotes({});
+    setSubjectLogs([]);
     setTimerStartedAt(null);
     await saveTimer(null);
     setReminder({ enabled: false, hour: 20, minute: 0 });
@@ -497,6 +560,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     minutes,
     notes,
     setNote,
+    subjectLogs,
+    addSubjectMinutes,
     reminder,
     lifetime,
     profile,
@@ -533,6 +598,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     markChatRead,
     groupUnreadCount,
     unreadByCode,
+    reloadAll,
     resetAll,
   };
 
