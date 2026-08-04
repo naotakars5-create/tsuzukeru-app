@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApp } from '@/context/AppContext';
-import { Art } from '@/components/Art';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import {
@@ -51,7 +50,7 @@ export default function SocialScreen() {
   if (!goal) {
     return (
       <View style={styles.center}>
-        <Art name="chain" size={130} />
+        <Ionicons name="people-outline" size={48} color={colors.textMuted} />
         <Text style={styles.emptyText}>
           目標を設定すると、同じカテゴリの{'\n'}仲間と月間ランキングで競えます。
         </Text>

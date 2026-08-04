@@ -9,7 +9,6 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { StatTile } from '@/components/StatTile';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { RankMedal } from '@/components/RankMedal';
-import { Art } from '@/components/Art';
 import { colors, font, radius, spacing } from '@/theme';
 import {
   RANK_TIERS,
@@ -49,7 +48,7 @@ export default function RankScreen() {
     >
       {/* 現在ランクのヒーロー */}
       <FlameHero icon={null} style={styles.hero}>
-        <Art name="medal" size={150} />
+        <RankMedal rank={progress.rank} size={112} />
         <Text style={styles.heroLabel}>{progress.rank.label}</Text>
         <Text style={styles.heroPoints}>{progress.points} pt</Text>
 

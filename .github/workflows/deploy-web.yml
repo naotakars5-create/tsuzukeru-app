@@ -40,6 +40,10 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+      # ホーム画面に追加したときにロゴが出るよう、apple-touch-icon 等を注入する
+      - name: ホーム画面アイコンの設定を注入
+        run: node scripts/inject-web-icons.mjs
+
       - name: 本番へデプロイ（EAS Hosting）
         run: npx eas-cli@latest deploy --prod --non-interactive
         env:

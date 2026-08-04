@@ -17,7 +17,6 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { AchievementGrid } from '@/components/AchievementGrid';
 import { Logo } from '@/components/Logo';
-import { Art } from '@/components/Art';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import { frequencyLabel } from '@/logic/schedule';
@@ -73,7 +72,7 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <ScrollView contentContainerStyle={styles.welcomeWrap} showsVerticalScrollIndicator={false}>
-          <Art name="book" size={190} />
+          <Logo size={132} />
           <Text style={styles.brandName}>覚悟の勉強</Text>
           <Text style={styles.emptyTitle}>心を燃やせ。</Text>
           <Text style={styles.welcomeLead}>
@@ -128,7 +127,9 @@ export default function HomeScreen() {
                 {allPerfect ? '完全達成、あっぱれ！' : '4週間、走りきった。'}
               </Text>
             </View>
-            <Art name="summit" size={72} />
+            <View style={styles.completeTrophy}>
+              <Ionicons name="trophy" size={26} color={colors.primary} />
+            </View>
           </View>
 
           {/* 成績サマリー */}
@@ -239,7 +240,7 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <View style={styles.examRight}>
-                  <Art name="hourglass" size={44} />
+                  <Ionicons name="flag" size={18} color={colors.primary} />
                   <Text style={styles.examDate}>{formatDisplay(exam.date)}</Text>
                 </View>
               </View>
@@ -365,7 +366,9 @@ export default function HomeScreen() {
         <Pressable onPress={() => router.push('/journal')}>
           <Card>
             <View style={styles.memoRow}>
-              <Art name="candle" size={42} />
+              <View style={styles.memoIcon}>
+                <Ionicons name="create" size={20} color={colors.primary} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.memoTitle}>学習メモ</Text>
                 <Text style={styles.memoPreview} numberOfLines={1}>
