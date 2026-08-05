@@ -29,8 +29,7 @@ export default function ShareCardScreen() {
       seasonResult.minutes,
       profile.motivation
     );
-    const pos = board.findIndex((e) => e.isMe) + 1;
-    return Math.max(1, Math.round((pos / board.length) * 100));
+    return Math.max(1, Math.round((board.me.position / board.total) * 100));
   }, [category.key, progress.points, progress.streak, seasonResult.done, seasonResult.minutes, profile.motivation]);
 
   const onShare = async () => {

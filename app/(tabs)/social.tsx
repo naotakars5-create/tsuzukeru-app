@@ -11,7 +11,6 @@ import {
   monthlyRankDelta,
   rankIndexOf,
   communityCount,
-  myRankInSample,
   RIVAL_SAMPLE_SIZE,
   LEADERBOARD_TOP_N,
 } from '@/logic/social';
@@ -58,11 +57,9 @@ export default function SocialScreen() {
     );
   }
 
-  const myIndex = leaderboard.findIndex((e) => e.isMe);
-  // 表示は上位10人＋自分だが、順位は抽出母数（30人＋自分）での本当の順位を出す
-  const sample = myRankInSample(category.key, myRankIndex, myMonthPoints);
-  const myPosition = sample.position;
-  const above = myIndex > 0 ? leaderboard[myIndex - 1] : null;
+  // 順位は抽出母数（30人＋自分）での本当の順位。表示は上位10人＋（圏外なら）自分。
+  const myPosition = leaderboard.me.position;
+  const above = leaderboard.above;
   const delta = monthlyRankDelta(category.key);
 
   const openProfile = (e: LeaderboardEntry) => {
@@ -85,9 +82,13 @@ export default function SocialScreen() {
     });
   };
 
-  const top3 = leaderboard.slice(0, 3);
-  const rest = leaderboard.slice(3);
-  const maxPoints = leaderboard[0]?.points || 1;
+  const top3 = leaderboard.top.slice(0, 3);
+  // 4位以下。自分が上位10人に入っていなければ、リストの末尾に本当の順位で自分を足す
+  const rest = [
+    ...leaderboard.top.slice(3),
+    ...(leaderboard.myInTop ? [] : [leaderboard.me]),
+  ];
+  const maxPoints = leaderboard.top[0]?.points || 1;
 
   return (
     <ScrollView
@@ -129,7 +130,7 @@ export default function SocialScreen() {
             <Text style={styles.heroNum}>{myPosition}</Text>
             <Text style={styles.heroNumUnit}>位</Text>
           </View>
-          <Text style={styles.heroTotal}>/ {sample.total}人中</Text>
+          <Text style={styles.heroTotal}>/ {leaderboard.total}人中</Text>
           <View style={styles.deltaWrap}>
             {delta > 0 ? (
               <View style={styles.deltaRow}>
@@ -221,24 +222,29 @@ export default function SocialScreen() {
       </View>
 
       <View style={styles.list}>
-        {(rest.length > 0 ? rest : leaderboard).map((e, i) => (
-          <RankRow
-            key={e.id}
-            entry={e}
-            position={rest.length > 0 ? i + 4 : i + 1}
-            photo={e.isMe ? myPhoto : null}
-            maxPoints={maxPoints}
-            onPress={() => openProfile(e)}
-          />
+        {(rest.length > 0 ? rest : leaderboard.top).map((e) => (
+          <React.Fragment key={e.id}>
+            {/* 自分が上位圏外のときは、間が飛んでいることを示す */}
+            {!leaderboard.myInTop && e.isMe && <Text style={styles.gapLabel}>・・・</Text>}
+            <RankRow
+              entry={e}
+              position={e.position}
+              photo={e.isMe ? myPhoto : null}
+              maxPoints={maxPoints}
+              onPress={() => openProfile(e)}
+            />
+          </React.Fragment>
         ))}
       </View>
 
       <Text style={styles.note}>
         ※ 対戦相手は毎日、同じ資格の挑戦者から
         <Text style={styles.noteStrong}>ランダムに{RIVAL_SAMPLE_SIZE}人</Text>
-        が選ばれます（近しいランクの相手が集まります）。ランキングにはそのうち
+        が選ばれます（近しいランクの相手が集まります）。順位はあなたを含めた
+        <Text style={styles.noteStrong}>{leaderboard.total}人全員</Text>
+        の中での本当の順位で、表示は
         <Text style={styles.noteStrong}>上位{LEADERBOARD_TOP_N}人とあなた</Text>
-        を表示しています。試作用のダミーデータで、実際の友だち連携は今後追加予定です。
+        だけに絞っています。試作用のダミーデータで、実際の友だち連携は今後追加予定です。
       </Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
@@ -574,6 +580,13 @@ const styles = StyleSheet.create({
   ptBarFill: { height: '100%', borderRadius: 3 },
 
   list: { gap: 8 },
+  gapLabel: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: font.body,
+    letterSpacing: 4,
+    marginTop: 2,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -243,6 +243,8 @@ export interface WeekSummary {
 export interface LeaderboardEntry {
   id: string;
   name: string;
+  /** 抽出母数（ライバル全員＋自分）の中での本当の順位（1始まり） */
+  position: number;
   /** 今月のポイント（月間ランキング用） */
   points: number;
   streak: number;
