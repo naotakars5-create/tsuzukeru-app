@@ -1,17 +1,23 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import { AppProvider } from '@/context/AppContext';
 import { TimerBar } from '@/components/TimerBar';
 import { colors } from '@/theme';
 
+const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+
 /**
  * アプリ全体のルートレイアウト。
  * AppProvider で状態を全画面に供給し、画面スタックを定義する。
+ * StripeProvider はカード登録・課金のUI（PaymentSheet）に必要。
+ * Web版はネイティブモジュールが無いため素通しする。
  */
 export default function RootLayout() {
-  return (
+  const content = (
     <SafeAreaProvider>
       <AppProvider>
         <StatusBar style="light" />
@@ -60,4 +66,7 @@ export default function RootLayout() {
       </AppProvider>
     </SafeAreaProvider>
   );
+
+  if (Platform.OS === 'web' || !stripePublishableKey) return content;
+  return <StripeProvider publishableKey={stripePublishableKey}>{content}</StripeProvider>;
 }

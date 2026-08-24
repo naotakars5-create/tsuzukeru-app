@@ -43,6 +43,12 @@
         {
           "photosPermission": "プロフィール写真を選ぶために写真ライブラリへのアクセスを許可してください。"
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "enableGooglePay": false
+        }
       ]
     ],
     "experiments": {
