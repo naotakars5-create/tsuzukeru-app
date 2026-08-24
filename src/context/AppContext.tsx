@@ -62,6 +62,7 @@ import {
 import { scheduleDailyReminder, cancelReminders, scheduleSmartReminders } from '@/logic/reminder';
 import { BADGES, satisfiedBadgeKeys } from '@/logic/badges';
 import { weekStake } from '@/logic/billing';
+import { syncGoalToServer, syncDailyMinutes } from '@/lib/sync';
 
 interface AppContextValue {
   ready: boolean;
@@ -382,6 +383,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (reminder.enabled) {
         await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
       }
+      void syncGoalToServer(newGoal);
     },
     [goal, lifetime, foldSeasonIntoLifetime, makeGoal, reminder]
   );
@@ -403,14 +405,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (reminder.enabled) {
       await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
     }
+    void syncGoalToServer(newGoal);
   }, [goal, foldSeasonIntoLifetime, reminder]);
 
   const addStudyMinutes = useCallback(async (min: number) => {
     if (min <= 0) return;
     const today = todayStr();
     setMinutes((prev) => {
-      const next = { ...prev, [today]: Math.round((prev[today] ?? 0) + min) };
+      const todayTotal = Math.round((prev[today] ?? 0) + min);
+      const next = { ...prev, [today]: todayTotal };
       saveMinutes(next);
+      void syncDailyMinutes(today, todayTotal);
       return next;
     });
   }, []);

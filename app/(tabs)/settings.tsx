@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Platform, Image,
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
     communityCreationsThisMonth,
     reloadAll,
   } = useApp();
+  const { session, signOut } = useAuth();
 
   // バックアップ: JSONを書き出す（Webはダウンロード、ネイティブは共有）
   const onBackup = async () => {
@@ -254,10 +256,38 @@ export default function SettingsScreen() {
         <Text style={styles.helperNote}>※ 課金はすべてモックです。実際の決済はしません。</Text>
       </Card>
 
-      {/* 将来の機能 — 実決済のみ残す */}
+      {/* 支払い方法（実際のカード登録・課金） */}
+      <Card>
+        <Pressable style={styles.rowBetween} onPress={() => router.push('/card-setup')}>
+          <View style={styles.titleRow}>
+            <Ionicons name="card" size={18} color={colors.primary} />
+            <Text style={styles.sectionTitle}>支払い方法</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
+        <Text style={styles.goalMeta}>
+          達成した週は¥0。未達の週だけ、登録したカードから自動で引き落とされます。
+        </Text>
+      </Card>
+
+      {/* アカウント */}
+      <Card>
+        <Text style={styles.sectionLabel}>アカウント</Text>
+        <Text style={styles.goalMeta}>{session?.user.email}</Text>
+        <PrimaryButton
+          label="ログアウト"
+          variant="ghost"
+          onPress={async () => {
+            const ok = await confirmAsync('ログアウト', 'ログアウトしますか？', 'ログアウト');
+            if (ok) await signOut();
+          }}
+          style={{ marginTop: spacing.sm }}
+        />
+      </Card>
+
+      {/* 将来の機能 */}
       <Card>
         <Text style={styles.sectionLabel}>これからの機能</Text>
-        <FutureRow icon="card" title="実際のカード登録・課金" desc="本番の決済連携（達成すれば¥0・今後追加予定）" />
         <FutureRow icon="share-social" title="友だち招待" desc="本物の仲間との連携（今後追加予定）" />
       </Card>
 

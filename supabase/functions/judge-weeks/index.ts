@@ -16,7 +16,7 @@ Deno.serve(async (_req) => {
   // 終了しているのにまだ判定していない週をすべて取得
   const { data: pendingWeeks, error } = await supabase
     .from('weeks')
-    .select('id, goal_id, user_id, start_date, end_date, scheduled_days, stake_amount')
+    .select('id, goal_id, user_id, start_date, end_date, scheduled_days, stake_amount, daily_target_min')
     .eq('outcome', 'pending')
     .lt('end_date', today);
 
@@ -35,7 +35,9 @@ Deno.serve(async (_req) => {
       .gte('date', week.start_date)
       .lte('date', week.end_date);
 
-    const doneDays = (logs ?? []).filter((l) => l.minutes > 0).length;
+    // その日の勉強時間が「1日の目標時間」に届いた日だけを達成日として数える
+    // （アプリ側 buildWeeks の isDayDone と同じ基準）
+    const doneDays = (logs ?? []).filter((l) => l.minutes >= week.daily_target_min).length;
     const achieved = doneDays >= week.scheduled_days;
 
     if (achieved) {

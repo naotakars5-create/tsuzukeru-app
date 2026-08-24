@@ -1,13 +1,16 @@
 # Stripe課金サーバー（Supabase）セットアップ手順
 
 案C（開始時は課金しない・達成週は¥0・未達週だけ後から自動課金）を実現するための
-バックエンド一式です。`migrations/` がDBスキーマ、`functions/` が3つのEdge Function。
+バックエンド一式です。`migrations/` がDBスキーマ、`functions/` が4つのEdge Function。
 
 ## 全体の流れ
 
-1. カード登録: `create-setup-intent` が Stripe の SetupIntent を発行 → アプリの PaymentSheet でカードを保存（¥0）
-2. 毎週月曜: `judge-weeks` が先週分を判定し、未達週だけ自動課金
-3. `stripe-webhook` が Stripe からの結果（成功/失敗）を正として DB に反映
+1. ログイン（メール＋パスワード、Supabase Auth）
+2. 目標を作る: `create-goal` が目標と週ごとの判定データ（`weeks`）をサーバーに作る
+3. カード登録: `create-setup-intent` が Stripe の SetupIntent を発行 → アプリの PaymentSheet でカードを保存（¥0）
+4. 毎日の記録: 勉強時間を `daily_logs` にも同期
+5. 毎週月曜: `judge-weeks` が先週分を判定し、未達週だけ自動課金
+6. `stripe-webhook` が Stripe からの結果（成功/失敗）を正として DB に反映
 
 ## あなたがやること（アカウント作成・鍵の設定）
 
@@ -36,11 +39,17 @@
 
 ### 3. Edge Functions をデプロイ
 ```
+npx supabase functions deploy create-goal
 npx supabase functions deploy create-setup-intent
 npx supabase functions deploy judge-weeks --no-verify-jwt
 npx supabase functions deploy stripe-webhook --no-verify-jwt
 ```
 （`judge-weeks` は定期実行、`stripe-webhook` はStripeから直接呼ばれるため JWT検証を無効化）
+
+スキーマを更新した場合（`0002_weeks_daily_target.sql` を追加済み）は、先に反映してください：
+```
+npx supabase db push
+```
 
 ### 4. Stripe Webhook を設定
 1. Stripeダッシュボード > 開発者 > Webhook > エンドポイントを追加
@@ -64,8 +73,16 @@ Supabase ダッシュボード > Edge Functions > `judge-weeks` > Cron のトリ
    npx supabase functions invoke judge-weeks
    ```
 
-## 未実装（次のフェーズ）
-- ログイン画面（メール＋パスワード、Supabase Auth）
-- カード登録画面（PaymentSheetを開くUI）
-- `AppContext` のローカルデータ（目標・毎日の分数）を `goals` / `daily_logs` に同期する処理
+## 実装済み
+- ログイン/新規登録画面（`src/components/AuthScreen.tsx`、メール確認が必要な場合は案内表示）
+- 未ログイン時はアプリ全体をログイン画面に差し替え（`app/_layout.tsx`）
+- カード登録画面（`app/card-setup.tsx`、設定タブから遷移。Web版は非対応の案内のみ）
+- 目標を作る/次シーズンを始めるたびに `create-goal` を呼び、`goals`/`weeks` をサーバーに同期
+- 毎日の勉強時間を `daily_logs` に同期（`addStudyMinutes` のたびに）
+
+## 未実装・既知の制約（次のフェーズ）
 - 課金失敗（カード期限切れ等）をアプリ内で通知し、再登録を促すUI
+- この機能を追加する前から使っていたローカルデータ（目標・記録）は、
+  次に目標を作成/次シーズンを始めるまでサーバーに同期されません
+- `judge-weeks` は「その週の期間内で目標時間に届いた日数」で判定するため、
+  曜日指定の目標で予定日以外に勉強した日もカウントされます（＝課金には有利な方向のみ）
