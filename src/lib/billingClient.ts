@@ -1,10 +1,14 @@
-import { supabase } from './supabase';
+import { supabase, isBackendConfigured } from './supabase';
+
+const NOT_CONFIGURED =
+  'サーバーが未設定のため、カード登録は利用できません（.env に Supabase の鍵を設定してください）。';
 
 /**
  * カード登録用の SetupIntent をサーバー（Edge Function）に発行してもらう。
  * ここでは¥0。実際のカード入力・保存は呼び出し側で PaymentSheet を開いて行う。
  */
 export async function requestCardSetup(): Promise<{ clientSecret: string; customerId: string }> {
+  if (!isBackendConfigured) throw new Error(NOT_CONFIGURED);
   const { data: session } = await supabase.auth.getSession();
   const token = session.session?.access_token;
   if (!token) throw new Error('ログインが必要です');
@@ -27,6 +31,7 @@ export interface CardOnFile {
 
 /** 登録済みカードの情報（ブランド・下4桁）を取得。未登録なら null。 */
 export async function fetchCardOnFile(): Promise<CardOnFile | null> {
+  if (!isBackendConfigured) return null;
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return null;
 

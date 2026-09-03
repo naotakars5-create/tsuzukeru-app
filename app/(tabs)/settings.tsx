@@ -33,7 +33,7 @@ export default function SettingsScreen() {
     communityCreationsThisMonth,
     reloadAll,
   } = useApp();
-  const { session, signOut } = useAuth();
+  const { session, signOut, backendEnabled } = useAuth();
 
   // バックアップ: JSONを書き出す（Webはダウンロード、ネイティブは共有）
   const onBackup = async () => {
@@ -266,24 +266,28 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </Pressable>
         <Text style={styles.goalMeta}>
-          達成した週は¥0。未達の週だけ、登録したカードから自動で引き落とされます。
+          {backendEnabled
+            ? '達成した週は¥0。未達の週だけ、登録したカードから自動で引き落とされます。'
+            : 'サーバー未設定のため、いまはカード登録を利用できません（課金は行われません）。'}
         </Text>
       </Card>
 
-      {/* アカウント */}
-      <Card>
-        <Text style={styles.sectionLabel}>アカウント</Text>
-        <Text style={styles.goalMeta}>{session?.user.email}</Text>
-        <PrimaryButton
-          label="ログアウト"
-          variant="ghost"
-          onPress={async () => {
-            const ok = await confirmAsync('ログアウト', 'ログアウトしますか？', 'ログアウト');
-            if (ok) await signOut();
-          }}
-          style={{ marginTop: spacing.sm }}
-        />
-      </Card>
+      {/* アカウント（サーバー未設定のローカル専用モードでは表示しない） */}
+      {session && (
+        <Card>
+          <Text style={styles.sectionLabel}>アカウント</Text>
+          <Text style={styles.goalMeta}>{session.user.email}</Text>
+          <PrimaryButton
+            label="ログアウト"
+            variant="ghost"
+            onPress={async () => {
+              const ok = await confirmAsync('ログアウト', 'ログアウトしますか？', 'ログアウト');
+              if (ok) await signOut();
+            }}
+            style={{ marginTop: spacing.sm }}
+          />
+        </Card>
+      )}
 
       {/* 将来の機能 */}
       <Card>

@@ -2,14 +2,18 @@
  * ログイン状態（Supabase Auth）を管理する Context。
  * 課金（カード登録・週次の自動判定）にはアカウントが必須なため、
  * アプリ全体をこの状態でゲートする（未ログインならログイン画面のみ表示）。
+ * ただし Supabase の鍵が未設定のときはゲートせず、ログイン不要の
+ * ローカル専用モードで使えるようにする（backendEnabled = false）。
  */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, isBackendConfigured } from '@/lib/supabase';
 
 interface AuthContextValue {
   session: Session | null;
   loading: boolean;
+  /** サーバー（Supabase）が設定されているか。false ならログイン不要のローカル専用モード。 */
+  backendEnabled: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -31,6 +35,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 鍵が未設定のときは認証を行わない（ローカル専用モード）
+    if (!isBackendConfigured) {
+      setLoading(false);
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
@@ -61,7 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ session, loading, backendEnabled: isBackendConfigured, signIn, signUp, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

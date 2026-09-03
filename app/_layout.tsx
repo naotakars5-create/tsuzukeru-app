@@ -14,6 +14,7 @@ import { colors } from '@/theme';
  * アプリ全体のルートレイアウト。
  * ログイン状態でゲートし、未ログインなら AuthScreen のみを表示する
  * （カード登録・週次の自動課金判定にはアカウントが必須なため）。
+ * Supabase の鍵が未設定のビルドではゲートせず、ローカル専用モードで起動する。
  */
 export default function RootLayout() {
   return (
@@ -27,7 +28,7 @@ export default function RootLayout() {
 }
 
 function Gate() {
-  const { session, loading } = useAuth();
+  const { session, loading, backendEnabled } = useAuth();
 
   if (loading) {
     return (
@@ -37,7 +38,8 @@ function Gate() {
     );
   }
 
-  if (!session) return <AuthScreen />;
+  // サーバー未設定のときはログインを求めず、そのままローカル専用モードで使えるようにする
+  if (!session && backendEnabled) return <AuthScreen />;
 
   return <AppContent />;
 }
