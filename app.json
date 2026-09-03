@@ -22,14 +22,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tsuzukeru.app"
+      "bundleIdentifier": "com.naotaka0131.kakugo"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0D12"
       },
-      "package": "com.tsuzukeru.app"
+      "package": "com.naotaka0131.kakugo"
     },
     "web": {
       "bundler": "metro",
@@ -42,6 +42,12 @@
         "expo-image-picker",
         {
           "photosPermission": "プロフィール写真を選ぶために写真ライブラリへのアクセスを許可してください。"
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "enableGooglePay": false
         }
       ]
     ],

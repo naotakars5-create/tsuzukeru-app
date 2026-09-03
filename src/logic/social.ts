@@ -91,9 +91,27 @@ function monthPointsForRank(rankIndex: number, seed: number): number {
   return base + noise;
 }
 
+/** 月間ランキングの表示用データ */
+export interface Leaderboard {
+  /** 表示する上位 LEADERBOARD_TOP_N 人（自分が上位なら自分の行もここに入る） */
+  top: LeaderboardEntry[];
+  /** 自分の行（順位は抽出母数での本当の順位） */
+  me: LeaderboardEntry;
+  /** 自分が上位 LEADERBOARD_TOP_N 人に入っているか */
+  myInTop: boolean;
+  /** 自分のすぐ上の人（1位なら null） */
+  above: LeaderboardEntry | null;
+  /** 抽出母数の人数（ライバル＋自分） */
+  total: number;
+}
+
 /**
- * 同カテゴリの月間ランキング（自分を含む・ポイント降順）。
- * その日ランダムに選ばれた RIVAL_SAMPLE_SIZE 人から、上位 LEADERBOARD_TOP_N 人＋自分を返す。
+ * 同カテゴリの月間ランキング。
+ *
+ * その日ランダムに選ばれた RIVAL_SAMPLE_SIZE 人＋自分の「全員」でまず順位を確定させ、
+ * そのうえで表示用に上位 LEADERBOARD_TOP_N 人を切り出す。
+ * 順位は必ず抽出母数の中での本当の順位なので、
+ * 自分が上位に入っていなければ 11 位ではなく本来の順位（例: 31 位）になる。
  */
 export function buildLeaderboard(
   category: GoalCategory,
@@ -102,7 +120,7 @@ export function buildLeaderboard(
   myStreak: number,
   myMonthMinutes: number,
   myMotivation: string
-): LeaderboardEntry[] {
+): Leaderboard {
   const names = rivalNames(category);
   const minMonthOfRank = monthPointsForRank(0, 0);
   const rivals: LeaderboardEntry[] = names.map((name, i) => {
@@ -112,6 +130,7 @@ export function buildLeaderboard(
     return {
       id: name,
       name,
+      position: 0, // 全員を並べたあとで確定させる
       points: mp,
       streak: broken ? 0 : (hash('s' + name + todayStr()) % 18) + 1,
       studyMinutes: mp * 6 + (hash('m' + name) % 120),
@@ -124,6 +143,7 @@ export function buildLeaderboard(
   const me: LeaderboardEntry = {
     id: 'me',
     name: 'あなた',
+    position: 0,
     points: myMonthPoints,
     streak: myStreak,
     studyMinutes: myMonthMinutes,
@@ -131,25 +151,22 @@ export function buildLeaderboard(
     rank: RANK_TIERS[myRankIndex],
     isMe: true,
   };
-  const sorted = [...rivals].sort((a, b) => b.points - a.points);
-  const top = sorted.slice(0, LEADERBOARD_TOP_N);
-  // 自分が上位に入っていない場合も、自分の行は必ず表示する
-  const merged = [...top, me].sort((a, b) => b.points - a.points);
-  return merged;
-}
 
-/** 抽出母数における自分の順位（全 RIVAL_SAMPLE_SIZE +1 人の中での位置） */
-export function myRankInSample(
-  category: GoalCategory,
-  myRankIndex: number,
-  myMonthPoints: number
-): { position: number; total: number } {
-  const names = rivalNames(category);
-  const rivalPoints = names.map((name, i) =>
-    monthPointsForRank(rivalRankIndex(myRankIndex, i), hash(name + todayStr()))
-  );
-  const above = rivalPoints.filter((p) => p > myMonthPoints).length;
-  return { position: above + 1, total: names.length + 1 };
+  // 抽出母数の全員で順位を確定（同点なら自分が上）
+  const all = [me, ...rivals].sort((a, b) => b.points - a.points);
+  all.forEach((e, i) => {
+    e.position = i + 1;
+  });
+
+  const top = all.slice(0, LEADERBOARD_TOP_N);
+  const myIdx = all.findIndex((e) => e.isMe);
+  return {
+    top,
+    me,
+    myInTop: me.position <= LEADERBOARD_TOP_N,
+    above: myIdx > 0 ? all[myIdx - 1] : null,
+    total: all.length,
+  };
 }
 
 /**
