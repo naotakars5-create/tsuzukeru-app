@@ -44,3 +44,25 @@ export async function fetchCardOnFile(): Promise<CardOnFile | null> {
   if (error || !data || !data.card_last4) return null;
   return { cardBrand: data.card_brand, cardLast4: data.card_last4 };
 }
+
+/**
+ * アカウントを完全に削除する（App Store ガイドライン 5.1.1(v) の必須要件）。
+ * 成功したら null、失敗したらエラーメッセージを返す。
+ */
+export async function deleteAccount(): Promise<string | null> {
+  if (!isBackendConfigured) return 'サーバーが未設定のため、削除できません。';
+  const { data: session } = await supabase.auth.getSession();
+  const token = session.session?.access_token;
+  if (!token) return 'ログインが必要です';
+
+  const { data, error } = await supabase.functions.invoke<{ deleted?: boolean; error?: string }>(
+    'delete-account',
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (data?.error) return data.error;
+  if (error) return error.message;
+  if (!data?.deleted) return '削除できませんでした。時間をおいてお試しください。';
+  await supabase.auth.signOut();
+  return null;
+}

@@ -12,6 +12,7 @@ import { frequencyLabel } from '@/logic/schedule';
 import { categoryOf } from '@/logic/category';
 import { confirmAsync, notifyAsync, promptAsync } from '@/logic/confirm';
 import { exportAll, importAll } from '@/storage';
+import { deleteAccount } from '@/lib/billingClient';
 import { todayStr } from '@/logic/date';
 
 /** リマインドで選べる時刻（時） */
@@ -86,6 +87,22 @@ export default function SettingsScreen() {
 
   const onPickHour = (hour: number) => updateReminder({ ...reminder, hour });
   const onPickMinute = (minute: number) => updateReminder({ ...reminder, minute });
+
+  const onDeleteAccount = async () => {
+    const ok = await confirmAsync(
+      'アカウントを削除しますか？',
+      '学習記録・コミュニティの参加状況・登録したカード情報がすべて削除されます。この操作は取り消せません。',
+      '完全に削除する'
+    );
+    if (!ok) return;
+    const error = await deleteAccount();
+    if (error) {
+      notifyAsync('削除できませんでした', error);
+      return;
+    }
+    await resetAll();
+    notifyAsync('アカウントを削除しました', 'ご利用ありがとうございました。');
+  };
 
   const onReset = async () => {
     const ok = await confirmAsync(
@@ -257,13 +274,23 @@ export default function SettingsScreen() {
           <Text style={styles.goalMeta}>{session.user.email}</Text>
           <PrimaryButton
             label="ログアウト"
-            variant="ghost"
+            variant="secondary"
             onPress={async () => {
               const ok = await confirmAsync('ログアウト', 'ログアウトしますか？', 'ログアウト');
               if (ok) await signOut();
             }}
-            style={{ marginTop: spacing.sm }}
+            style={{ marginTop: spacing.md }}
           />
+          <PrimaryButton
+            label="アカウントを削除"
+            variant="ghost"
+            onPress={onDeleteAccount}
+            style={{ marginTop: spacing.xs }}
+          />
+          <Text style={styles.helperNote}>
+            ※ アカウントを削除すると、学習記録・コミュニティの参加状況・登録したカード情報が
+            すべて完全に削除されます。この操作は取り消せません。
+          </Text>
         </Card>
       )}
 
