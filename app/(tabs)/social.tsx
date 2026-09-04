@@ -1,94 +1,147 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Image,
+  ActivityIndicator,
+  Share,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { colors, font, labelStyle, radius, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
 import {
-  buildLeaderboard,
-  monthlyRankDelta,
-  rankIndexOf,
-  communityCount,
-  RIVAL_SAMPLE_SIZE,
+  fetchLeaderboard,
+  fetchCategoryCount,
+  fetchMyCommunities,
+  fetchUnreadCounts,
   LEADERBOARD_TOP_N,
-} from '@/logic/social';
-import { POINTS_PER_DONE } from '@/logic/rank';
+  Leaderboard,
+  Community,
+} from '@/lib/socialApi';
 import { formatMinutesShort } from '@/logic/time';
 import { LeaderboardEntry } from '@/types';
 
+const APP_URL = 'https://tsuzukeru-app.expo.app';
+
 /**
- * 仲間タブ: 月間ランキング。自分の順位を主役に、近しいランクの相手と競う。
- * 「みんな（自動マッチング）」と「マイグループ」を切り替えられる。
- * サーバーが無いため仲間はダミー。将来API連携に差し替える。
+ * 仲間タブ: 同じ資格を目指す実ユーザーとの月間ランキング。
+ * データはすべて Supabase の user_stats / communities から取得する。
  */
 export default function SocialScreen() {
   const router = useRouter();
-  const { goal, progress, seasonResult, groups, profile, unreadByCode } = useApp();
+  const { goal, profile } = useApp();
+  const { session, backendEnabled } = useAuth();
 
   const category = categoryOf(goal?.category);
-  const myRankIndex = rankIndexOf(progress.points);
-  const myMonthPoints = seasonResult.done * POINTS_PER_DONE;
-  const myMonthMinutes = seasonResult.minutes;
+  const [board, setBoard] = useState<Leaderboard | null>(null);
+  const [commCount, setCommCount] = useState(0);
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [unread, setUnread] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
 
-  const leaderboard = useMemo(
-    () =>
-      buildLeaderboard(
-        category.key,
-        myRankIndex,
-        myMonthPoints,
-        progress.streak,
-        myMonthMinutes,
-        profile.motivation
-      ),
-    [category.key, myRankIndex, myMonthPoints, progress.streak, myMonthMinutes, profile.motivation]
+  const canUseSocial = backendEnabled && !!session && !!goal;
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        if (!canUseSocial || !goal) {
+          setLoading(false);
+          return;
+        }
+        setLoading(true);
+        const [b, c, comms] = await Promise.all([
+          fetchLeaderboard(goal.category),
+          fetchCategoryCount(goal.category),
+          fetchMyCommunities(),
+        ]);
+        if (!alive) return;
+        setBoard(b);
+        setCommCount(c);
+        setCommunities(comms);
+        const counts = await fetchUnreadCounts(comms.map((x) => x.id));
+        if (!alive) return;
+        setUnread(counts);
+        setLoading(false);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [canUseSocial, goal])
   );
-  const commCount = communityCount(category.key);
+
+  const onInvite = async () => {
+    const message =
+      `【覚悟の勉強】${category.label}を一緒に頑張りませんか？\n` +
+      `サボると課金、続けると報酬で継続する勉強アプリです。\n${APP_URL}`;
+    try {
+      await Share.share({ message });
+    } catch {
+      // 共有できない環境では何もしない
+    }
+  };
 
   if (!goal) {
     return (
       <View style={styles.center}>
         <Ionicons name="people-outline" size={48} color={colors.textMuted} />
         <Text style={styles.emptyText}>
-          目標を設定すると、同じカテゴリの{'\n'}仲間と月間ランキングで競えます。
+          目標を設定すると、同じ資格を目指す{'\n'}仲間と月間ランキングで競えます。
         </Text>
       </View>
     );
   }
 
-  // 順位は抽出母数（30人＋自分）での本当の順位。表示は上位10人＋（圏外なら）自分。
-  const myPosition = leaderboard.me.position;
-  const above = leaderboard.above;
-  const delta = monthlyRankDelta(category.key);
+  // サーバー未設定 or 未ログインのときは、この端末だけのモード
+  if (!canUseSocial) {
+    return (
+      <View style={styles.center}>
+        <Ionicons name="cloud-offline-outline" size={48} color={colors.textMuted} />
+        <Text style={styles.emptyText}>
+          この端末だけのモードで動いています。{'\n'}
+          ログインすると、同じ資格を目指す仲間と{'\n'}ランキングで競えます。
+        </Text>
+      </View>
+    );
+  }
+
+  if (loading || !board) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  const me = board.me;
+  const above = board.above;
+  const myPhoto = profile.photo ?? null;
 
   const openProfile = (e: LeaderboardEntry) => {
     if (e.isMe) router.push('/profile-edit');
-    else router.push({ pathname: '/rival/[id]', params: { id: e.id, category: category.key } });
+    else router.push({ pathname: '/rival/[id]', params: { id: e.id } });
   };
 
-  const myPhoto = profile.photo ?? null;
-
-  const openCommunity = (g: (typeof groups)[number]) => {
+  const openCommunity = (g: Community) => {
     router.push({
       pathname: '/community/[code]',
-      params: {
-        code: g.code,
-        name: g.name,
-        category: g.category ?? '',
-        tagline: g.tagline ?? '',
-        members: g.members != null ? String(g.members) : '',
-      },
+      params: { code: g.code },
     });
   };
 
-  const top3 = leaderboard.top.slice(0, 3);
+  const top3 = board.top.slice(0, 3);
   // 4位以下。自分が上位10人に入っていなければ、リストの末尾に本当の順位で自分を足す
-  const rest = [
-    ...leaderboard.top.slice(3),
-    ...(leaderboard.myInTop ? [] : [leaderboard.me]),
-  ];
-  const maxPoints = leaderboard.top[0]?.points || 1;
+  const rest = [...board.top.slice(3), ...(board.myInTop || !me ? [] : [me])];
+  const maxPoints = board.top[0]?.points || 1;
+  // 自分ひとりしかいない間は、順位よりも「仲間を呼ぶ」ことを主役にする
+  const isAlone = board.total <= 1;
 
   return (
     <ScrollView
@@ -112,65 +165,73 @@ export default function SocialScreen() {
         </View>
       </View>
 
-      {/* トップ3の表彰台（視覚的なランキングの主役） */}
-      <Podium entries={top3} myPhoto={myPhoto} onPress={openProfile} />
-
-      {/* 自分の順位ヒーロー */}
-      <LinearGradient
-        colors={['#1C232C', '#141920']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.6, y: 1 }}
-        style={styles.hero}
-      >
-        <Text style={styles.heroLabel}>
-          あなたの順位 ・ {category.label}・今月
-        </Text>
-        <View style={styles.heroRow}>
-          <View style={styles.heroNumRow}>
-            <Text style={styles.heroNum}>{myPosition}</Text>
-            <Text style={styles.heroNumUnit}>位</Text>
-          </View>
-          <Text style={styles.heroTotal}>/ {leaderboard.total}人中</Text>
-          <View style={styles.deltaWrap}>
-            {delta > 0 ? (
-              <View style={styles.deltaRow}>
-                <Ionicons name="arrow-up" size={14} color={colors.success} />
-                <Text style={styles.deltaText}>先月から{delta}つ上昇</Text>
-              </View>
-            ) : (
-              <Text style={styles.deltaSame}>先月と同じ順位</Text>
-            )}
-          </View>
+      {/* まだ仲間がいないときは、順位ではなく招待を主役にする */}
+      {isAlone ? (
+        <View style={styles.aloneCard}>
+          <Ionicons name="person-add-outline" size={36} color={colors.primary} />
+          <Text style={styles.aloneTitle}>まだ仲間がいません</Text>
+          <Text style={styles.aloneText}>
+            {category.label}を目指しているのは、いまのところあなただけです。{'\n'}
+            友だちを誘うと、この画面が月間ランキングになります。
+          </Text>
+          <Pressable style={styles.inviteBtn} onPress={onInvite}>
+            <Ionicons name="share-social" size={16} color={colors.onAccent} />
+            <Text style={styles.inviteBtnText}>友だちを誘う</Text>
+          </Pressable>
         </View>
-        <Text style={styles.heroNext}>
-          {above ? (
-            <>
-              {myPosition - 1}位まであと{' '}
-              <Text style={styles.heroNextNum}>
-                {(above.points - myMonthPoints).toLocaleString()} pt
-              </Text>
-              （今月）
-            </>
-          ) : (
-            '1位キープ中。今月も逃げ切ろう。'
-          )}
-        </Text>
-      </LinearGradient>
+      ) : (
+        <>
+          {/* トップ3の表彰台（視覚的なランキングの主役） */}
+          <Podium entries={top3} myPhoto={myPhoto} onPress={openProfile} />
+
+          {/* 自分の順位ヒーロー */}
+          <LinearGradient
+            colors={['#1C232C', '#141920']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.6, y: 1 }}
+            style={styles.hero}
+          >
+            <Text style={styles.heroLabel}>あなたの順位 ・ {category.label}・今月</Text>
+            <View style={styles.heroRow}>
+              <View style={styles.heroNumRow}>
+                <Text style={styles.heroNum}>{me ? me.position : '—'}</Text>
+                <Text style={styles.heroNumUnit}>位</Text>
+              </View>
+              <Text style={styles.heroTotal}>/ {board.total}人中</Text>
+            </View>
+            <Text style={styles.heroNext}>
+              {me && above ? (
+                <>
+                  {me.position - 1}位まであと{' '}
+                  <Text style={styles.heroNextNum}>
+                    {(above.points - me.points).toLocaleString()} pt
+                  </Text>
+                  （今月）
+                </>
+              ) : me ? (
+                '1位キープ中。今月も逃げ切ろう。'
+              ) : (
+                '勉強を記録すると、ランキングに載ります。'
+              )}
+            </Text>
+          </LinearGradient>
+        </>
+      )}
 
       {/* コミュニティ（テーマ別・最大3つまで参加） */}
-      {groups.length > 0 ? (
+      {communities.length > 0 ? (
         <View style={styles.groupsWrap}>
           <View style={styles.groupsHead}>
-            <Text style={styles.groupsTitle}>参加中のコミュニティ（{groups.length}/3）</Text>
+            <Text style={styles.groupsTitle}>参加中のコミュニティ（{communities.length}/3）</Text>
             <Pressable style={styles.titleRow} onPress={() => router.push('/communities')} hitSlop={8}>
               <Text style={styles.changeText}>探す/追加</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textSub} />
             </Pressable>
           </View>
-          {groups.map((g) => {
-            const unread = unreadByCode[g.code] ?? 0;
+          {communities.map((g) => {
+            const n = unread[g.id] ?? 0;
             return (
-              <Pressable key={g.code} style={styles.groupCard} onPress={() => openCommunity(g)}>
+              <Pressable key={g.id} style={styles.groupCard} onPress={() => openCommunity(g)}>
                 <View style={styles.groupHead}>
                   <View style={styles.titleRow}>
                     <Ionicons name="people-circle" size={18} color={colors.primary} />
@@ -179,9 +240,9 @@ export default function SocialScreen() {
                     </Text>
                     {g.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
                   </View>
-                  {unread > 0 ? (
+                  {n > 0 ? (
                     <View style={styles.unreadPill}>
-                      <Text style={styles.unreadPillText}>新着 {unread}件</Text>
+                      <Text style={styles.unreadPillText}>新着 {n}件</Text>
                     </View>
                   ) : (
                     <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
@@ -214,38 +275,38 @@ export default function SocialScreen() {
       )}
 
       {/* ランキング（4位以下） */}
-      <View style={styles.rankHead}>
-        <Text style={styles.sectionLabel}>
-          {rest.length > 0 ? '4位以下' : '月間ランキング'}
-        </Text>
-        <Text style={styles.rankPeriod}>今月 ・ 上位{LEADERBOARD_TOP_N}人＋あなた</Text>
-      </View>
+      {!isAlone && (
+        <>
+          <View style={styles.rankHead}>
+            <Text style={styles.sectionLabel}>{rest.length > 0 ? '4位以下' : '月間ランキング'}</Text>
+            <Text style={styles.rankPeriod}>今月 ・ 上位{LEADERBOARD_TOP_N}人＋あなた</Text>
+          </View>
 
-      <View style={styles.list}>
-        {(rest.length > 0 ? rest : leaderboard.top).map((e) => (
-          <React.Fragment key={e.id}>
-            {/* 自分が上位圏外のときは、間が飛んでいることを示す */}
-            {!leaderboard.myInTop && e.isMe && <Text style={styles.gapLabel}>・・・</Text>}
-            <RankRow
-              entry={e}
-              position={e.position}
-              photo={e.isMe ? myPhoto : null}
-              maxPoints={maxPoints}
-              onPress={() => openProfile(e)}
-            />
-          </React.Fragment>
-        ))}
-      </View>
+          <View style={styles.list}>
+            {(rest.length > 0 ? rest : board.top).map((e) => (
+              <React.Fragment key={e.id}>
+                {/* 自分が上位圏外のときは、間が飛んでいることを示す */}
+                {!board.myInTop && e.isMe && <Text style={styles.gapLabel}>・・・</Text>}
+                <RankRow
+                  entry={e}
+                  position={e.position}
+                  photo={e.isMe ? myPhoto : null}
+                  maxPoints={maxPoints}
+                  onPress={() => openProfile(e)}
+                />
+              </React.Fragment>
+            ))}
+          </View>
 
-      <Text style={styles.note}>
-        ※ 対戦相手は毎日、同じ資格の挑戦者から
-        <Text style={styles.noteStrong}>ランダムに{RIVAL_SAMPLE_SIZE}人</Text>
-        が選ばれます（近しいランクの相手が集まります）。順位はあなたを含めた
-        <Text style={styles.noteStrong}>{leaderboard.total}人全員</Text>
-        の中での本当の順位で、表示は
-        <Text style={styles.noteStrong}>上位{LEADERBOARD_TOP_N}人とあなた</Text>
-        だけに絞っています。試作用のダミーデータで、実際の友だち連携は今後追加予定です。
-      </Text>
+          <Text style={styles.note}>
+            ※ 順位は、同じ資格を目指している
+            <Text style={styles.noteStrong}>{board.total}人全員</Text>
+            の中での順位です。表示は
+            <Text style={styles.noteStrong}>上位{LEADERBOARD_TOP_N}人とあなた</Text>
+            だけに絞っています。集計は今月の記録にもとづきます。
+          </Text>
+        </>
+      )}
       <View style={{ height: spacing.xl }} />
     </ScrollView>
   );
@@ -620,6 +681,36 @@ const styles = StyleSheet.create({
   motto: { fontSize: 11, color: colors.textSub, marginTop: 2 },
   rightCol: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   points: { fontSize: 16, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+
+  // まだ仲間がいないとき（招待を主役にする）
+  aloneCard: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    padding: spacing.xl,
+    marginTop: spacing.md,
+  },
+  aloneTitle: { fontSize: font.heading, fontWeight: '900', color: colors.text },
+  aloneText: {
+    fontSize: font.sub,
+    color: colors.textSub,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  inviteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.xl,
+    height: 48,
+    marginTop: spacing.sm,
+  },
+  inviteBtnText: { color: colors.onAccent, fontWeight: '800', fontSize: font.sub },
 
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18, marginTop: 18 },
   noteStrong: { color: colors.textSub, fontWeight: '800' },
