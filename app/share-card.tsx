@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Share, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,8 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, spacing } from '@/theme';
 import { categoryOf } from '@/logic/category';
-import { buildLeaderboard, rankIndexOf } from '@/logic/social';
-import { POINTS_PER_DONE } from '@/logic/rank';
+import { fetchLeaderboard } from '@/lib/socialApi';
 import { formatMinutes, formatMinutesShort } from '@/logic/time';
 import { notifyAsync } from '@/logic/confirm';
 
@@ -18,24 +17,29 @@ export default function ShareCardScreen() {
   const { goal, progress, profile, seasonResult } = useApp();
   const category = categoryOf(goal?.category);
 
-  // 月間ランキングでの立ち位置 → 上位◯%
-  const topPct = useMemo(() => {
-    const myRankIndex = rankIndexOf(progress.points);
-    const board = buildLeaderboard(
-      category.key,
-      myRankIndex,
-      seasonResult.done * POINTS_PER_DONE,
-      progress.streak,
-      seasonResult.minutes,
-      profile.motivation
-    );
-    return Math.max(1, Math.round((board.me.position / board.total) * 100));
-  }, [category.key, progress.points, progress.streak, seasonResult.done, seasonResult.minutes, profile.motivation]);
+  // 月間ランキングでの立ち位置 → 上位◯%（仲間がいないときは出さない）
+  const [topPct, setTopPct] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchLeaderboard(category.key).then((board) => {
+      if (!alive) return;
+      if (!board.me || board.total <= 1) {
+        setTopPct(null);
+        return;
+      }
+      setTopPct(Math.max(1, Math.round((board.me.position / board.total) * 100)));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [category.key]);
 
   const onShare = async () => {
     const message =
       `【覚悟の勉強】${category.label}を勉強中！\n` +
-      `🔥 ${progress.streak}日連続 ・ 総勉強 ${formatMinutes(progress.totalMinutes)} ・ ${category.label}で上位${topPct}%\n` +
+      `🔥 ${progress.streak}日連続 ・ 総勉強 ${formatMinutes(progress.totalMinutes)}` +
+      (topPct != null ? ` ・ ${category.label}で上位${topPct}%` : '') +
+      '\n' +
       `サボると課金、続けると報酬で継続する勉強アプリ。\n` +
       `#覚悟の勉強 #${category.label} #勉強垢\n${APP_URL}`;
     try {
@@ -89,7 +93,12 @@ export default function ShareCardScreen() {
         {/* スタッツ3つ */}
         <View style={styles.statsRow}>
           <Stat icon={progress.rank.icon} color={progress.rank.color} value={progress.rank.label} label="ランク" />
-          <Stat icon="podium" color={colors.primary} value={`上位${topPct}%`} label={category.label} />
+          <Stat
+            icon="podium"
+            color={colors.primary}
+            value={topPct != null ? `上位${topPct}%` : "—"}
+            label={category.label}
+          />
           <Stat icon="time" color={colors.silver} value={formatMinutesShort(progress.totalMinutes)} label="総勉強" />
         </View>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { colors, font, radius, spacing } from '@/theme';
 import { Frequency, GoalCategory, IconName } from '@/types';
 import { DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
 import { CategoryPicker } from '@/components/CategoryPicker';
-import { communityCount } from '@/logic/social';
+import { fetchCategoryCount } from '@/lib/socialApi';
 import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
 import { randomHotQuote } from '@/logic/quotes';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
@@ -55,7 +55,17 @@ export default function GoalSetupScreen() {
 
   const [quote] = useState(() => randomHotQuote());
   const perWeekStake = weekStake(deposit, 4);
-  const challengerCount = communityCount(category);
+  // 同じ資格を目指している実際の人数（0人のときはあおらない）
+  const [challengerCount, setChallengerCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    fetchCategoryCount(category).then((n) => {
+      if (alive) setChallengerCount(n);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [category]);
 
   const pickExamDate = async () => {
     const v = await promptAsync('試験日を入力', 'YYYY-MM-DD の形式（例: 2026-10-18）', examDate ?? '');
@@ -185,13 +195,15 @@ export default function GoalSetupScreen() {
             ジャンルから選ぶか、検索できます。同じ資格を目指す仲間と月間ランキングで競えます。
           </Text>
           <CategoryPicker value={category} onChange={setCategory} />
-          <View style={styles.rivalTeaser}>
-            <Ionicons name="flame" size={15} color={colors.primary} />
-            <Text style={styles.rivalTeaserText}>
-              <Text style={styles.rivalTeaserNum}>{challengerCount}</Text>人が
-              「{categoryOf(category).label}」に挑戦中。あなたも競える。
-            </Text>
-          </View>
+          {challengerCount > 0 && (
+            <View style={styles.rivalTeaser}>
+              <Ionicons name="flame" size={15} color={colors.primary} />
+              <Text style={styles.rivalTeaserText}>
+                <Text style={styles.rivalTeaserNum}>{challengerCount}</Text>人が
+                「{categoryOf(category).label}」に挑戦中。あなたも競える。
+              </Text>
+            </View>
+          )}
         </Card>
 
         {/* 試験日（任意） */}
