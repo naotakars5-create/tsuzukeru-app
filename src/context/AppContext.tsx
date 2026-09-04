@@ -51,7 +51,7 @@ import {
 /** コミュニティ作成の月間上限（プレミアム限定） */
 export const COMMUNITY_CREATE_LIMIT = 3;
 import { isScheduledDay, statusOf } from '@/logic/schedule';
-import { todayStr, daysBetween } from '@/logic/date';
+import { todayStr, daysBetween, addDays } from '@/logic/date';
 import {
   buildProgress,
   buildWeeks,
@@ -63,6 +63,8 @@ import { scheduleDailyReminder, cancelReminders, scheduleSmartReminders } from '
 import { BADGES, satisfiedBadgeKeys } from '@/logic/badges';
 import { weekStake } from '@/logic/billing';
 import { syncGoalToServer, syncDailyMinutes } from '@/lib/sync';
+import { syncUserStats } from '@/lib/socialApi';
+import { POINTS_PER_DONE } from '@/logic/rank';
 
 interface AppContextValue {
   ready: boolean;
@@ -336,6 +338,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       examDaysLeft,
     });
   }, [ready, goal, minutes, reminder, weeks, progress.todayMinutes, progress.streak]);
+
+  // ランキングに載せる自分の集計値をサーバーへ同期する。
+  // 他人からは読めるが書けない（RLS）ので、各自が自分のぶんだけ書き込む。
+  useEffect(() => {
+    if (!ready) return;
+    const today = todayStr();
+    let weekMinutes = 0;
+    for (let i = 0; i < 7; i++) weekMinutes += minutes[addDays(today, -i)] ?? 0;
+
+    void syncUserStats({
+      displayName: profile.name,
+      icon: profile.icon,
+      color: profile.color,
+      motivation: profile.motivation,
+      // 写真はデータURIで重いため、サーバーには送らず端末内だけで持つ
+      photoUrl: null,
+      category: goal?.category ?? null,
+      points: progress.points,
+      monthPoints: seasonResult.done * POINTS_PER_DONE,
+      monthMinutes: seasonResult.minutes,
+      weekMinutes: Math.round(weekMinutes),
+      streak: progress.streak,
+    });
+  }, [
+    ready,
+    profile.name,
+    profile.icon,
+    profile.color,
+    profile.motivation,
+    goal?.category,
+    progress.points,
+    progress.streak,
+    seasonResult.done,
+    seasonResult.minutes,
+    minutes,
+  ]);
 
   /** 完了シーズンを通算へ畳み込む（課金/免除を反映・案C。お金は預からない） */
   const foldSeasonIntoLifetime = useCallback((): LifetimeStats => {
