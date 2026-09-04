@@ -306,9 +306,29 @@ export default function SettingsScreen() {
         />
       </Card>
 
+      {/* 規約・法務 */}
+      <Card>
+        <Text style={styles.sectionLabel}>規約・運営情報</Text>
+        <LegalLink label="利用規約" onPress={() => router.push('/legal/terms')} />
+        <LegalLink label="プライバシーポリシー" onPress={() => router.push('/legal/privacy')} />
+        <LegalLink
+          label="特定商取引法に基づく表記"
+          onPress={() => router.push('/legal/tokushoho')}
+        />
+      </Card>
+
       <Text style={styles.version}>覚悟の勉強 — MVP v1.2.0</Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
+  );
+}
+
+function LegalLink({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable style={styles.legalRow} onPress={onPress}>
+      <Text style={styles.legalText}>{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+    </Pressable>
   );
 }
 
@@ -343,6 +363,15 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
   sectionTitle: { fontSize: font.body, fontWeight: '900', color: colors.text },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  legalText: { fontSize: font.sub, color: colors.text, fontWeight: '600' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
