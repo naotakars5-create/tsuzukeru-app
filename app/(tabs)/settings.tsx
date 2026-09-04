@@ -27,8 +27,6 @@ export default function SettingsScreen() {
     updateReminder,
     resetAll,
     profile,
-    premium,
-    setPremium,
     communityLimit,
     communityCreationsThisMonth,
     reloadAll,
@@ -72,16 +70,6 @@ export default function SettingsScreen() {
     }
     await reloadAll();
     notifyAsync('復元しました', '記録を読み込みました。');
-  };
-
-  const onTogglePremium = async (v: boolean) => {
-    if (v) {
-      await setPremium(true);
-      notifyAsync('プレミアムに登録しました', `コミュニティを毎月${communityLimit}個まで作成できます（モック）。`);
-    } else {
-      const ok = await confirmAsync('プレミアムを解約', 'コミュニティの作成ができなくなります（参加は引き続き無料）。解約しますか？', '解約する');
-      if (ok) await setPremium(false);
-    }
   };
 
   const category = categoryOf(goal?.category);
@@ -234,26 +222,16 @@ export default function SettingsScreen() {
         )}
       </Card>
 
-      {/* プレミアム会員（モック） */}
+      {/* コミュニティ */}
       <Card>
-        <View style={styles.rowBetween}>
-          <View style={styles.titleRow}>
-            <Ionicons name="star" size={18} color={colors.primary} />
-            <Text style={styles.sectionTitle}>プレミアム会員</Text>
-          </View>
-          <Switch
-            value={premium}
-            onValueChange={onTogglePremium}
-            trackColor={{ false: colors.surfaceAlt, true: colors.primary }}
-            thumbColor="#ffffff"
-          />
+        <View style={styles.titleRow}>
+          <Ionicons name="people" size={18} color={colors.primary} />
+          <Text style={styles.sectionTitle}>コミュニティ</Text>
         </View>
         <Text style={styles.goalMeta}>
-          {premium
-            ? `加入中 ・ コミュニティを毎月${communityLimit}個まで作成できます（今月 ${communityCreationsThisMonth}/${communityLimit} 個）。`
-            : `コミュニティの作成はプレミアム限定です（月${communityLimit}個まで）。参加は誰でも無料。`}
+          今月あと {Math.max(0, communityLimit - communityCreationsThisMonth)}/{communityLimit} 個
+          作成できます。参加は無制限に無料です。
         </Text>
-        <Text style={styles.helperNote}>※ 課金はすべてモックです。実際の決済はしません。</Text>
       </Card>
 
       {/* 支払い方法（実際のカード登録・課金） */}

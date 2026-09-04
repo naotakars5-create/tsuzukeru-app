@@ -1,89 +1,101 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { colors, font, radius, spacing } from '@/theme';
-import { searchCommunities, generateCode, CommunityInfo, MAX_COMMUNITY_MEMBERS } from '@/logic/communities';
+import {
+  searchCommunities,
+  createCommunity,
+  joinCommunityById,
+  leaveCommunity,
+  findCommunityByCode,
+  fetchMyCommunities,
+  Community,
+  MAX_COMMUNITY_MEMBERS,
+} from '@/lib/socialApi';
 import { categoryOf } from '@/logic/category';
 import { promptAsync, notifyAsync, confirmAsync } from '@/logic/confirm';
+
+/** 同時に参加できるコミュニティ数 */
+const MAX_JOINED = 3;
 
 /**
  * コミュニティを探す・作る・参加する画面。
  * 資格ごとの自動ランキングとは別に、テーマ別コミュニティに参加できる。
+ * データはすべて Supabase の communities / community_members から取得する。
  */
 export default function CommunitiesScreen() {
   const router = useRouter();
-  const {
-    groups,
-    joinGroup,
-    leaveGroup,
-    goal,
-    premium,
-    setPremium,
-    communityLimit,
-    communityCreationsThisMonth,
-    canCreateCommunity,
-    recordCommunityCreation,
-  } = useApp();
+  const { goal, communityLimit, communityCreationsThisMonth, recordCommunityCreation } = useApp();
+  const { session, backendEnabled } = useAuth();
   const [query, setQuery] = useState('');
+  const [joined, setJoined] = useState<Community[]>([]);
+  const [results, setResults] = useState<Community[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const results = useMemo(() => searchCommunities(query), [query]);
   const createsLeft = Math.max(0, communityLimit - communityCreationsThisMonth);
+  const canUse = backendEnabled && !!session;
 
-  const openCommunity = (c: {
-    code: string;
-    name: string;
-    category?: string;
-    tagline?: string;
-    members?: number;
-  }) => {
-    router.push({
-      pathname: '/community/[code]',
-      params: {
-        code: c.code,
-        name: c.name,
-        category: c.category ?? '',
-        tagline: c.tagline ?? '',
-        members: c.members != null ? String(c.members) : '',
-      },
-    });
+  const reload = useCallback(async () => {
+    if (!canUse) {
+      setLoading(false);
+      return;
+    }
+    const [mine, found] = await Promise.all([fetchMyCommunities(), searchCommunities(query)]);
+    setJoined(mine);
+    setResults(found);
+    setLoading(false);
+  }, [canUse, query]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        await reload();
+        if (!alive) return;
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [reload])
+  );
+
+  const openCommunity = (c: { code: string }) => {
+    router.push({ pathname: '/community/[code]', params: { code: c.code } });
   };
 
-  const join = async (c: CommunityInfo) => {
-    // 定員チェック（上限500人）
+  const join = async (c: Community) => {
     if ((c.members ?? 0) >= MAX_COMMUNITY_MEMBERS) {
       notifyAsync('満員です', `このコミュニティは定員${MAX_COMMUNITY_MEMBERS}人に達しています。`);
       return;
     }
-    const ok = await joinGroup({
-      code: c.code,
-      name: c.name,
-      owner: false,
-      category: c.category,
-      members: c.members,
-      tagline: c.tagline,
-    });
-    if (!ok) {
-      notifyAsync('参加は3つまでです', 'コミュニティに同時に参加できるのは3つまでです。どれかを抜けてから参加してください。');
+    if (joined.length >= MAX_JOINED && !joined.some((g) => g.id === c.id)) {
+      notifyAsync(
+        `参加は${MAX_JOINED}つまでです`,
+        `同時に参加できるのは${MAX_JOINED}つまでです。どれかを抜けてから参加してください。`
+      );
       return;
     }
+    const error = await joinCommunityById(c.id);
+    if (error) {
+      notifyAsync('参加できませんでした', error);
+      return;
+    }
+    await reload();
     openCommunity(c);
   };
 
   const create = async () => {
-    // プレミアム限定
-    if (!premium) {
-      const ok = await confirmAsync(
-        'プレミアム限定の機能です',
-        'コミュニティの作成はプレミアム会員だけの機能です（月3個まで）。プレミアムに登録しますか？（モック・実際の決済はしません）',
-        'プレミアムに登録'
-      );
-      if (!ok) return;
-      await setPremium(true);
-      notifyAsync('プレミアムに登録しました', 'コミュニティを毎月3個まで作成できます（モック）。');
-    }
-    // 月間上限（プレミアムでも月3個まで）
     if (communityCreationsThisMonth >= communityLimit) {
       notifyAsync(
         '今月の作成上限に達しました',
@@ -91,35 +103,68 @@ export default function CommunitiesScreen() {
       );
       return;
     }
+    if (joined.length >= MAX_JOINED) {
+      notifyAsync(
+        `参加は${MAX_JOINED}つまでです`,
+        `作ったコミュニティにも参加することになるため、先にどれかを抜けてください。`
+      );
+      return;
+    }
 
     const name = await promptAsync('コミュニティを作る', '名前を入力（例: 朝5時起き部）', '');
-    if (!name) return;
+    if (!name?.trim()) return;
     const tagline = (await promptAsync('ひとこと説明（任意）', 'どんな仲間を集める？', '')) ?? '';
-    const code = generateCode(name + Date.now());
-    const ok = await joinGroup({
-      code,
-      name: name.trim(),
-      owner: true,
-      category: goal?.category,
-      members: 1,
-      tagline: tagline.trim() || 'あなたが作ったコミュニティ',
+
+    const { community, error } = await createCommunity({
+      name,
+      category: goal?.category ?? null,
+      tagline: tagline.trim() || null,
     });
-    if (!ok) {
-      notifyAsync('参加は3つまでです', '作成したコミュニティに入るには、参加中のどれかを抜けてください。');
+    if (error || !community) {
+      notifyAsync('作成できませんでした', error ?? 'もう一度お試しください。');
       return;
     }
     await recordCommunityCreation();
+    await reload();
     notifyAsync(
       '作成しました',
-      `参加コード: ${code}\n今月の残り作成数: ${Math.max(0, createsLeft - 1)}個\nこのコードを共有すると仲間が参加できます（共有機能は今後追加）。`
+      `参加コード: ${community.code}\n今月の残り作成数: ${Math.max(0, createsLeft - 1)}個\nこのコードを伝えると、仲間が参加できます。`
     );
-    openCommunity({ code, name: name.trim(), category: goal?.category, tagline: tagline.trim(), members: 1 });
+    openCommunity(community);
   };
 
-  const leave = async (code: string) => {
+  const leave = async (c: Community) => {
     const ok = await confirmAsync('このコミュニティを抜けますか？', undefined, '抜ける');
-    if (ok) await leaveGroup(code);
+    if (!ok) return;
+    await leaveCommunity(c.id);
+    await reload();
   };
+
+  const joinByCode = async () => {
+    const input = await promptAsync('コードで参加', '6桁の参加コードを入力', '');
+    if (!input?.trim()) return;
+    const c = await findCommunityByCode(input);
+    if (!c) {
+      notifyAsync('見つかりません', 'そのコードのコミュニティは見つかりませんでした。');
+      return;
+    }
+    await join(c);
+  };
+
+  if (!canUse) {
+    return (
+      <View style={styles.screen}>
+        <Stack.Screen options={{ title: 'コミュニティを探す' }} />
+        <View style={styles.centerBox}>
+          <Ionicons name="cloud-offline-outline" size={44} color={colors.textMuted} />
+          <Text style={styles.centerText}>
+            コミュニティを使うにはログインが必要です。{'\n'}
+            いまはこの端末だけのモードで動いています。
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -130,11 +175,13 @@ export default function CommunitiesScreen() {
         </Text>
 
         {/* 参加中（最大3つ・タップで入室） */}
-        {groups.length > 0 && (
+        {joined.length > 0 && (
           <View style={{ gap: spacing.sm }}>
-            <Text style={styles.joinedCount}>参加中 {groups.length}/3</Text>
-            {groups.map((g) => (
-              <Pressable key={g.code} style={styles.joinedCard} onPress={() => openCommunity(g)}>
+            <Text style={styles.joinedCount}>
+              参加中 {joined.length}/{MAX_JOINED}
+            </Text>
+            {joined.map((g) => (
+              <Pressable key={g.id} style={styles.joinedCard} onPress={() => openCommunity(g)}>
                 <View style={styles.joinedHead}>
                   <Ionicons name="people-circle" size={18} color={colors.primary} />
                   <Text style={styles.joinedTitle} numberOfLines={1}>
@@ -149,7 +196,7 @@ export default function CommunitiesScreen() {
                 <View style={styles.joinedMetaRow}>
                   <Text style={styles.joinedMeta}>コード {g.code}</Text>
                   {g.owner ? <Text style={styles.ownerTag}>作成者</Text> : null}
-                  <Pressable onPress={() => leave(g.code)} hitSlop={8} style={{ marginLeft: 'auto' }}>
+                  <Pressable onPress={() => leave(g)} hitSlop={8} style={{ marginLeft: 'auto' }}>
                     <Text style={styles.leaveText}>抜ける</Text>
                   </Pressable>
                 </View>
@@ -161,15 +208,10 @@ export default function CommunitiesScreen() {
         {/* 作る / コードで参加 */}
         <View style={styles.actionRow}>
           <Pressable style={styles.actionBtn} onPress={create}>
-            <Ionicons name={premium ? 'add-circle' : 'lock-closed'} size={18} color={colors.primary} />
+            <Ionicons name="add-circle" size={18} color={colors.primary} />
             <Text style={styles.actionText}>新しく作る</Text>
-            {!premium && (
-              <View style={styles.proTag}>
-                <Text style={styles.proTagText}>PRO</Text>
-              </View>
-            )}
           </Pressable>
-          <Pressable style={styles.actionBtn} onPress={joinByCode(joinGroup, router)}>
+          <Pressable style={styles.actionBtn} onPress={joinByCode}>
             <Ionicons name="enter" size={18} color={colors.primary} />
             <Text style={styles.actionText}>コードで参加</Text>
           </Pressable>
@@ -177,15 +219,9 @@ export default function CommunitiesScreen() {
 
         {/* 作成の可否ステータス */}
         <View style={styles.createStatus}>
-          <Ionicons
-            name={premium ? 'checkmark-circle' : 'information-circle'}
-            size={14}
-            color={premium ? colors.success : colors.textMuted}
-          />
+          <Ionicons name="information-circle" size={14} color={colors.textMuted} />
           <Text style={styles.createStatusText}>
-            {premium
-              ? `プレミアム会員 ・ 今月あと ${createsLeft}/${communityLimit} 個 作成できます`
-              : `コミュニティ作成はプレミアム限定（月${communityLimit}個まで）。参加は誰でも無料です`}
+            今月あと {createsLeft}/{communityLimit} 個 作成できます（参加は無制限に無料）
           </Text>
         </View>
 
@@ -211,16 +247,21 @@ export default function CommunitiesScreen() {
           {query ? `「${query}」の検索結果` : '人気のコミュニティ'}
         </Text>
 
-        {results.length === 0 ? (
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
+        ) : results.length === 0 ? (
           <Text style={styles.noResult}>
-            一致するコミュニティがありません。{'\n'}上の「新しく作る」で作ってみましょう。
+            {query
+              ? '一致するコミュニティがありません。'
+              : 'まだコミュニティがありません。'}
+            {'\n'}上の「新しく作る」で最初のひとつを作ってみましょう。
           </Text>
         ) : (
           results.map((c) => {
-            const joined = groups.some((g) => g.code === c.code);
+            const isJoined = joined.some((g) => g.id === c.id);
             const cat = c.category ? categoryOf(c.category) : null;
             return (
-              <View key={c.code} style={styles.row}>
+              <View key={c.id} style={styles.row}>
                 <View style={[styles.rowIcon, { backgroundColor: `${cat?.color ?? colors.primary}22` }]}>
                   <Ionicons name={cat?.icon ?? 'people'} size={20} color={cat?.color ?? colors.primary} />
                 </View>
@@ -235,7 +276,7 @@ export default function CommunitiesScreen() {
                     {cat ? <Text style={[styles.rowCat, { color: cat.color }]}>・{cat.label}</Text> : null}
                   </View>
                 </View>
-                {joined ? (
+                {isJoined ? (
                   <Pressable style={styles.joinedPill} onPress={() => openCommunity(c)}>
                     <Ionicons name="checkmark" size={14} color={colors.success} />
                     <Text style={styles.joinedPillText}>参加中</Text>
@@ -251,35 +292,13 @@ export default function CommunitiesScreen() {
         )}
 
         <Text style={styles.note}>
-          ※ コミュニティは試作用のモックです。参加できるのは1つずつで、切り替えると前のコミュニティからは抜けます。実際の共有・メンバー同期は今後追加予定です。
+          ※ 同時に参加できるのは{MAX_JOINED}つまで、1コミュニティの上限は
+          {MAX_COMMUNITY_MEMBERS}人です。参加コードを伝えると、仲間が同じコミュニティに入れます。
         </Text>
         <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   );
-}
-
-/** コードで参加（ハンドラを生成） */
-function joinByCode(
-  joinGroup: (g: any) => Promise<boolean>,
-  router: ReturnType<typeof useRouter>
-) {
-  return async () => {
-    const code = await promptAsync('コードで参加', '6桁の参加コードを入力', '');
-    if (!code) return;
-    const c = code.trim().toUpperCase();
-    const name = `コミュニティ ${c}`;
-    const ok = await joinGroup({ code: c, name, owner: false, members: undefined, tagline: 'コードで参加' });
-    if (!ok) {
-      notifyAsync('参加は3つまでです', 'コミュニティに同時に参加できるのは3つまでです。');
-      return;
-    }
-    // 参加したらそのまま入室する
-    router.push({
-      pathname: '/community/[code]',
-      params: { code: c, name, category: '', tagline: 'コードで参加', members: '' },
-    });
-  };
 }
 
 const styles = StyleSheet.create({
@@ -389,5 +408,18 @@ const styles = StyleSheet.create({
   },
   joinedPillText: { fontSize: font.small, fontWeight: '800', color: colors.success },
 
+  centerBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xl,
+  },
+  centerText: {
+    fontSize: font.sub,
+    color: colors.textSub,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
   note: { fontSize: font.small, color: colors.textMuted, lineHeight: 18, marginTop: spacing.md },
 });
