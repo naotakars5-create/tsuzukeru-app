@@ -22,7 +22,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.naotaka0131.kakugo"
+      "bundleIdentifier": "com.naotaka0131.kakugo",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -49,7 +50,8 @@
         {
           "enableGooglePay": false
         }
-      ]
+      ],
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true

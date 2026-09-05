@@ -15,6 +15,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { Card } from '@/components/Card';
 import { colors, font, radius, spacing } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
+import { AppleSignInButton } from '@/components/AppleSignInButton';
 import { notifyAsync } from '@/logic/confirm';
 
 /**
@@ -72,6 +73,26 @@ export default function LinkAccountScreen() {
                 機種変更やアプリの再インストールをしても、記録と請求の状況が引き継がれます。
               </Text>
             </View>
+          </View>
+
+          {/* Appleでサインイン（iOSのみ表示。メール入力もパスワードも不要） */}
+          <AppleSignInButton
+            onLinked={({ changedUser }) => {
+              notifyAsync(
+                'Apple IDを登録しました',
+                changedUser
+                  ? 'これまでの記録はこの端末に残っています。目標を作り直すと、新しいIDに引き継がれます。'
+                  : 'これで機種変更しても記録が引き継がれます。'
+              );
+              router.back();
+            }}
+            onError={(m) => setError(m)}
+          />
+
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>または</Text>
+            <View style={styles.orLine} />
           </View>
 
           <Text style={styles.label}>メールアドレス</Text>
@@ -146,6 +167,9 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: font.heading, fontWeight: '900', color: colors.text },
   desc: { fontSize: font.small, color: colors.textSub, marginTop: 4, lineHeight: 19 },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg },
+  orLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  orText: { fontSize: font.small, color: colors.textMuted },
   label: { fontSize: font.small, fontWeight: '700', color: colors.textSub, marginTop: spacing.lg },
   input: {
     marginTop: 6,
