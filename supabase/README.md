@@ -1,7 +1,17 @@
 # Stripe課金サーバー（Supabase）セットアップ手順
 
 案C（開始時は課金しない・達成週は¥0・未達週だけ後から自動課金）を実現するための
-バックエンド一式です。`migrations/` がDBスキーマ、`functions/` が4つのEdge Function。
+バックエンド一式です。`migrations/` がDBスキーマ、`functions/` がEdge Function。
+
+Edge Function の役割:
+| 名前 | 役割 |
+|---|---|
+| `create-goal` | 目標と、週ごとの判定データ（weeks）を作る |
+| `create-setup-intent` | アプリ版のカード登録（PaymentSheet用） |
+| `create-setup-session` | Web版のカード登録（Stripeのホスト型Checkout） |
+| `judge-weeks` | 週次の達成判定と、未達週の自動課金 |
+| `stripe-webhook` | Stripeからの結果をDBに反映 |
+| `delete-account` | アカウントの完全削除 |
 
 ## 全体の流れ
 
@@ -41,6 +51,8 @@
 ```
 npx supabase functions deploy create-goal
 npx supabase functions deploy create-setup-intent
+npx supabase functions deploy create-setup-session
+npx supabase functions deploy delete-account
 npx supabase functions deploy judge-weeks --no-verify-jwt
 npx supabase functions deploy stripe-webhook --no-verify-jwt
 ```
