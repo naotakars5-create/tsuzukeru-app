@@ -32,7 +32,7 @@ export default function SettingsScreen() {
     communityCreationsThisMonth,
     reloadAll,
   } = useApp();
-  const { session, signOut, backendEnabled } = useAuth();
+  const { session, signOut, backendEnabled, isAnonymous } = useAuth();
 
   // バックアップ: JSONを書き出す（Webはダウンロード、ネイティブは共有）
   const onBackup = async () => {
@@ -268,7 +268,29 @@ export default function SettingsScreen() {
       </Card>
 
       {/* アカウント（サーバー未設定のローカル専用モードでは表示しない） */}
-      {session && (
+      {session && isAnonymous && (
+        <Card>
+          <Text style={styles.sectionLabel}>アカウント</Text>
+          <Text style={styles.goalMeta}>
+            IDを登録していません。このままアプリを削除すると記録は失われます。
+          </Text>
+          <PrimaryButton
+            label="IDを登録する"
+            icon="shield-checkmark"
+            variant="secondary"
+            onPress={() => router.push('/link-account')}
+            style={{ marginTop: spacing.md }}
+          />
+          <PrimaryButton
+            label="すでにアカウントをお持ちの方はログイン"
+            variant="ghost"
+            onPress={() => router.push('/login')}
+            style={{ marginTop: spacing.xs }}
+          />
+        </Card>
+      )}
+
+      {session && !isAnonymous && (
         <Card>
           <Text style={styles.sectionLabel}>アカウント</Text>
           <Text style={styles.goalMeta}>{session.user.email}</Text>

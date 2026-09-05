@@ -1,13 +1,10 @@
 import React from 'react';
-import { Stack } from 'expo-router';
 import { AuthScreen } from '@/components/AuthScreen';
 
-/** ログイン/新規登録。未ログインのときはここへリダイレクトされる。 */
+/**
+ * 既存アカウントでのログイン。
+ * 起動時に強制されることはなく、設定タブや「IDの登録」画面から開く。
+ */
 export default function LoginScreen() {
-  return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <AuthScreen />
-    </>
-  );
+  return <AuthScreen />;
 }
