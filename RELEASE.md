@@ -44,6 +44,7 @@ export const OPERATOR = {
 npx supabase db push
 npx supabase functions deploy create-goal
 npx supabase functions deploy delete-account
+npx supabase functions deploy create-setup-session
 ```
 
 `0003_social.sql` で user_stats / communities などのテーブルが作られます。
