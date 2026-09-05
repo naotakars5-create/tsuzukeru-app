@@ -1,23 +1,26 @@
 import { supabase } from './supabase';
 
 /**
- * カード登録用の SetupIntent をサーバー（Edge Function）に発行してもらう。
- * ここでは¥0。実際のカード入力・保存は呼び出し側で PaymentSheet を開いて行う。
+ * カード登録用の Stripe Checkout ページ（setup モード）のURLをサーバーに発行してもらう。
+ * カード番号の入力は Stripe 側のページで行うため、このアプリは番号に触れない。
+ *
+ * Web版専用。iOSアプリ内に外部決済の導線を置くことは
+ * App Store 審査ガイドライン 3.1.1 で認められていない。
  */
-export async function requestCardSetup(): Promise<{ clientSecret: string; customerId: string }> {
+export async function requestCardSetupUrl(): Promise<string> {
   const { data: session } = await supabase.auth.getSession();
   const token = session.session?.access_token;
   if (!token) throw new Error('ログインが必要です');
 
-  const { data, error } = await supabase.functions.invoke<{
-    clientSecret: string;
-    customerId: string;
-  }>('create-setup-intent', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const { data, error } = await supabase.functions.invoke<{ url: string }>(
+    'create-setup-checkout',
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
 
-  if (error || !data) throw new Error(error?.message ?? 'カード登録の準備に失敗しました');
-  return data;
+  if (error || !data?.url) {
+    throw new Error(error?.message ?? 'カード登録ページを開けませんでした');
+  }
+  return data.url;
 }
 
 export interface CardOnFile {

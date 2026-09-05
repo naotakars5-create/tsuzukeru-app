@@ -1,25 +1,22 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useStripe } from '@stripe/stripe-react-native';
-import { PrimaryButton } from '@/components/PrimaryButton';
 import { Card } from '@/components/Card';
+import { CardOnFileRow } from '@/components/CardOnFileRow';
 import { colors, font, spacing } from '@/theme';
-import { requestCardSetup, fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
-import { notifyAsync } from '@/logic/confirm';
+import { fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
 
 /**
- * カード登録パネル（案C: ここでは¥0。保存のみ）。
- * 達成した週は課金されず、未達の週だけ後からこのカードに自動課金される。
+ * ネイティブ版（iOS/Android）の支払い方法パネル。表示専用で、登録・変更はできない。
  *
- * Stripeはネイティブ専用モジュールのため、Web版には CardSetupPanel.web.tsx が使われ、
- * この import 自体が Web バンドルに入らないようにしている。
+ * App Store 審査ガイドライン 3.1.1 は、iOSアプリ内で外部の決済手段
+ * （Stripe のカード入力画面など）を提供することを認めていない。
+ * そのため実際の登録は Web 版（CardSetupPanel.web.tsx）だけに置き、
+ * ここでは登録済みかどうかと、課金のルールだけを示す。
  */
 export function CardSetupPanel() {
   const [card, setCard] = useState<CardOnFile | null | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const load = useCallback(async () => {
     setCard(await fetchCardOnFile());
@@ -30,35 +27,6 @@ export function CardSetupPanel() {
       load();
     }, [load])
   );
-
-  const onRegister = async () => {
-    setBusy(true);
-    try {
-      const { clientSecret } = await requestCardSetup();
-      const initResult = await initPaymentSheet({
-        setupIntentClientSecret: clientSecret,
-        merchantDisplayName: '覚悟の勉強',
-        style: 'alwaysDark',
-      });
-      if (initResult.error) {
-        notifyAsync('準備に失敗しました', initResult.error.message);
-        return;
-      }
-      const presentResult = await presentPaymentSheet();
-      if (presentResult.error) {
-        if (presentResult.error.code !== 'Canceled') {
-          notifyAsync('登録できませんでした', presentResult.error.message);
-        }
-        return;
-      }
-      notifyAsync('カードを登録しました', '未達の週だけ、このカードから自動で引き落とされます。');
-      await load();
-    } catch (e) {
-      notifyAsync('エラーが発生しました', e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <View style={styles.screen}>
@@ -75,31 +43,13 @@ export function CardSetupPanel() {
           </View>
         </View>
 
-        {card === undefined ? (
-          <ActivityIndicator style={{ marginVertical: spacing.lg }} color={colors.primary} />
-        ) : card ? (
-          <View style={styles.cardRow}>
-            <Ionicons name="card-outline" size={20} color={colors.text} />
-            <Text style={styles.cardText}>
-              {(card.cardBrand ?? 'カード').toUpperCase()} •••• {card.cardLast4}
-            </Text>
-            <View style={styles.registeredTag}>
-              <Text style={styles.registeredText}>登録済み</Text>
-            </View>
-          </View>
-        ) : (
-          <Text style={styles.noCard}>まだカードが登録されていません。</Text>
-        )}
+        <CardOnFileRow card={card} />
 
-        <PrimaryButton
-          label={card ? 'カードを変更する' : 'カードを登録する'}
-          icon="card"
-          onPress={onRegister}
-          loading={busy}
-          style={{ marginTop: spacing.lg }}
-        />
         <Text style={styles.helper}>
-          ※ ここでは課金されません（¥0）。カード情報はStripe社が安全に保管し、このアプリでは保存しません。
+          支払い方法の登録・変更は、このアプリでは行えません。ウェブ版からお手続きいただけます。
+        </Text>
+        <Text style={styles.helper}>
+          ※ カード情報はStripe社が安全に保管し、このアプリでは保存しません。
         </Text>
       </Card>
     </View>
@@ -119,23 +69,5 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: font.heading, fontWeight: '900', color: colors.text },
   desc: { fontSize: font.small, color: colors.textSub, marginTop: 3, lineHeight: 18 },
-  cardRow: {
-    marginTop: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 14,
-    padding: spacing.md,
-  },
-  cardText: { flex: 1, color: colors.text, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  registeredTag: {
-    backgroundColor: colors.successBg,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  registeredText: { color: colors.success, fontSize: 11, fontWeight: '800' },
-  noCard: { marginTop: spacing.lg, color: colors.textSub, fontSize: font.sub },
   helper: { marginTop: spacing.md, color: colors.textMuted, fontSize: font.small, lineHeight: 17 },
 });
