@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
@@ -9,14 +9,12 @@ import { StripeGate } from '@/components/StripeGate';
 import { TimerBar } from '@/components/TimerBar';
 import { colors } from '@/theme';
 
-/** ログインしていなくても開ける画面（ログイン自身と、規約類） */
-const PUBLIC_SEGMENTS = ['login', 'legal'];
-
 /**
  * アプリ全体のルートレイアウト。
- * 未ログインならログイン画面へ誘導する（カード登録・週次の自動課金判定に
- * アカウントが必須なため）。Supabase の鍵が未設定のビルドでは
- * ログインを求めず、ローカル専用モードで起動する。
+ *
+ * 起動時にログイン画面は出さない。認証は裏で匿名アカウントとして始まり、
+ * カードを登録するときに初めてIDの紐付けを求める
+ * （App Store ガイドライン 5.1.1(i) への対応でもある）。
  */
 export default function RootLayout() {
   return (
@@ -25,7 +23,7 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <StripeGate>
           <AppProvider>
-            <AuthRedirect />
+            <AuthLoading />
             <RootStack />
             <TimerBar />
           </AppProvider>
@@ -35,28 +33,15 @@ export default function RootLayout() {
   );
 }
 
-/** ログイン状態に応じて、行き先を入れ替える */
-function AuthRedirect() {
-  const { session, loading, backendEnabled } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    // サーバー未設定のときはログインを求めない（ローカル専用モード）
-    if (loading || !backendEnabled) return;
-    const inPublic = PUBLIC_SEGMENTS.includes(segments[0] ?? '');
-    if (!session && !inPublic) router.replace('/login');
-    else if (session && segments[0] === 'login') router.replace('/');
-  }, [session, loading, backendEnabled, segments, router]);
-
-  if (loading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-  return null;
+/** 認証の初期化中だけ、上にローディングを重ねる */
+function AuthLoading() {
+  const { loading } = useAuth();
+  if (!loading) return null;
+  return (
+    <View style={styles.loading}>
+      <ActivityIndicator color={colors.primary} />
+    </View>
+  );
 }
 
 function RootStack() {
@@ -71,7 +56,7 @@ function RootStack() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ title: 'ログイン', presentation: 'modal' }} />
       <Stack.Screen name="goal-setup" options={{ title: '目標を設定', presentation: 'modal' }} />
       <Stack.Screen name="today" options={{ title: '今日の達成', presentation: 'card' }} />
       <Stack.Screen name="journal" options={{ title: '学習メモ', presentation: 'card' }} />
@@ -91,6 +76,7 @@ function RootStack() {
       />
       <Stack.Screen name="share-card" options={{ title: '成果カード', presentation: 'modal' }} />
       <Stack.Screen name="card-setup" options={{ title: '支払い方法', presentation: 'modal' }} />
+      <Stack.Screen name="link-account" options={{ title: 'IDの登録' }} />
       <Stack.Screen name="legal/[doc]" options={{ title: '規約' }} />
     </Stack>
   );
