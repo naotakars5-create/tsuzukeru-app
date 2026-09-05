@@ -1,16 +1,19 @@
 # Stripe課金サーバー（Supabase）セットアップ手順
 
 案C（開始時は課金しない・達成週は¥0・未達週だけ後から自動課金）を実現するための
-バックエンド一式です。`migrations/` がDBスキーマ、`functions/` が4つのEdge Function。
+バックエンド一式です。`migrations/` がDBスキーマ、`functions/` が5つのEdge Function。
 
 ## 全体の流れ
 
 1. ログイン（メール＋パスワード、Supabase Auth）
 2. 目標を作る: `create-goal` が目標と週ごとの判定データ（`weeks`）をサーバーに作る
-3. カード登録: `create-setup-intent` が Stripe の SetupIntent を発行 → アプリの PaymentSheet でカードを保存（¥0）
+3. カード登録: `create-setup-checkout` が Stripe Checkout（setupモード）のURLを発行 → **Web版**でカードを保存（¥0）
+   - iOSアプリ内に決済導線を置くことは App Store 審査ガイドライン 3.1.1 で認められていないため、
+     カード登録はWeb版だけに置いている。ネイティブ版は登録状態の表示のみ。
 4. 毎日の記録: 勉強時間を `daily_logs` にも同期
 5. 毎週月曜: `judge-weeks` が先週分を判定し、未達週だけ自動課金
 6. `stripe-webhook` が Stripe からの結果（成功/失敗）を正として DB に反映
+7. 退会: `delete-account` が Stripe顧客と認証ユーザーを削除（各テーブルは cascade で連鎖削除）
 
 ## あなたがやること（アカウント作成・鍵の設定）
 
@@ -37,21 +40,29 @@
    npx supabase secrets set STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
    ```
 
-### 3. Edge Functions をデプロイ
+### 3. Web版のURLを設定
+Checkout から戻る先を組み立てるために必要（クライアントから受け取ったURLは使わない）。
 ```
-npx supabase functions deploy create-goal
-npx supabase functions deploy create-setup-intent
-npx supabase functions deploy judge-weeks --no-verify-jwt
-npx supabase functions deploy stripe-webhook --no-verify-jwt
+npx supabase secrets set APP_WEB_URL=https://<Web版のURL>
 ```
-（`judge-weeks` は定期実行、`stripe-webhook` はStripeから直接呼ばれるため JWT検証を無効化）
+
+### 4. Edge Functions をデプロイ
+```
+npx supabase functions deploy
+```
+JWT検証の要否は `config.toml` の `[functions.*]` に書いてあるため、`--no-verify-jwt` は不要
+（`judge-weeks` は定期実行、`stripe-webhook` はStripeから直接呼ばれるため無効化している）。
+
+CLIを使わず、GitHub Actions からデプロイすることもできる。
+`.github/workflows/deploy-supabase.yml` が `supabase/functions/**` の変更で自動実行されるので、
+GitHub の Secrets に `SUPABASE_ACCESS_TOKEN` と `SUPABASE_PROJECT_ID` を登録しておくだけでよい。
 
 スキーマを更新した場合（`0002_weeks_daily_target.sql` を追加済み）は、先に反映してください：
 ```
 npx supabase db push
 ```
 
-### 4. Stripe Webhook を設定
+### 5. Stripe Webhook を設定
 1. Stripeダッシュボード > 開発者 > Webhook > エンドポイントを追加
 2. URL: `https://<project-ref>.supabase.co/functions/v1/stripe-webhook`
 3. 購読するイベント: `setup_intent.succeeded`, `payment_intent.succeeded`, `payment_intent.payment_failed`
@@ -60,13 +71,13 @@ npx supabase db push
    npx supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
    ```
 
-### 5. 毎週の自動判定をスケジュール実行
+### 6. 毎週の自動判定をスケジュール実行
 Supabase ダッシュボード > Edge Functions > `judge-weeks` > Cron のトリガーを追加。
 例: 毎週月曜 00:10（JST）に実行する場合、UTC で `10 15 * * 0`（日曜15:10 UTC）。
 
 ## テストの仕方
 1. `.env` にテストモードの鍵（`pk_test_...`）を設定してアプリを起動
-2. Stripeのテストカード `4242 4242 4242 4242`（任意の有効期限・CVC）でカード登録
+2. Web版を開き、Stripeのテストカード `4242 4242 4242 4242`（任意の有効期限・CVC）でカード登録
 3. `weeks` テーブルの `end_date` を過去日に手動で書き換えてから `judge-weeks` を手動実行すると、
    課金フローを即座に確認できます
    ```
@@ -76,7 +87,9 @@ Supabase ダッシュボード > Edge Functions > `judge-weeks` > Cron のトリ
 ## 実装済み
 - ログイン/新規登録画面（`src/components/AuthScreen.tsx`、メール確認が必要な場合は案内表示）
 - 未ログイン時はアプリ全体をログイン画面に差し替え（`app/_layout.tsx`）
-- カード登録画面（`app/card-setup.tsx`、設定タブから遷移。Web版は非対応の案内のみ）
+- カード登録画面（`app/card-setup.tsx`、設定タブから遷移。登録できるのはWeb版のみ、ネイティブ版は表示専用）
+- アカウント削除（設定タブ →「アカウントを削除」。審査ガイドライン 5.1.1(v) で必須）
+- プライバシーポリシー（`app/privacy.tsx`。App Store用にログインなしでも開ける）
 - 目標を作る/次シーズンを始めるたびに `create-goal` を呼び、`goals`/`weeks` をサーバーに同期
 - 毎日の勉強時間を `daily_logs` に同期（`addStudyMinutes` のたびに）
 

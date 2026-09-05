@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AuthScreen } from '@/components/AuthScreen';
+import { PrivacyPolicy } from '@/components/PrivacyPolicy';
 import { AppProvider } from '@/context/AppContext';
 import { TimerBar } from '@/components/TimerBar';
 import { colors } from '@/theme';
@@ -13,6 +14,7 @@ import { colors } from '@/theme';
  * アプリ全体のルートレイアウト。
  * ログイン状態でゲートし、未ログインなら AuthScreen のみを表示する
  * （カード登録・週次の自動課金判定にはアカウントが必須なため）。
+ * 例外はプライバシーポリシーで、ここはログインなしでも開けるようにしている。
  */
 export default function RootLayout() {
   return (
@@ -27,6 +29,7 @@ export default function RootLayout() {
 
 function Gate() {
   const { session, loading } = useAuth();
+  const pathname = usePathname();
 
   if (loading) {
     return (
@@ -36,7 +39,13 @@ function Gate() {
     );
   }
 
-  if (!session) return <AuthScreen />;
+  if (!session) {
+    // プライバシーポリシーは App Store Connect に登録するURLとして
+    // ログインなしで開ける必要があるため、ここだけログイン画面を出さない。
+    // ログイン中は通常どおり Stack 内の app/privacy.tsx が表示される。
+    if (pathname === '/privacy') return <PrivacyPolicy />;
+    return <AuthScreen />;
+  }
 
   return <AppContent />;
 }
@@ -73,6 +82,10 @@ function AppContent() {
         />
         <Stack.Screen name="share-card" options={{ title: '成果カード', presentation: 'modal' }} />
         <Stack.Screen name="card-setup" options={{ title: '支払い方法', presentation: 'modal' }} />
+        <Stack.Screen
+          name="privacy"
+          options={{ title: 'プライバシーポリシー', presentation: 'modal' }}
+        />
       </Stack>
       <TimerBar />
     </AppProvider>

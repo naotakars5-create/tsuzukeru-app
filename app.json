@@ -21,8 +21,11 @@
       "backgroundColor": "#0A0D12"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.naotaka0131.kakugo"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.naotaka0131.kakugo",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {

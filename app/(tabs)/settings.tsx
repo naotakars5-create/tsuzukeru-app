@@ -11,6 +11,7 @@ import { formatDisplay } from '@/logic/date';
 import { frequencyLabel } from '@/logic/schedule';
 import { categoryOf } from '@/logic/category';
 import { confirmAsync, notifyAsync, promptAsync } from '@/logic/confirm';
+import { deleteAccount } from '@/lib/account';
 import { exportAll, importAll } from '@/storage';
 import { todayStr } from '@/logic/date';
 
@@ -106,6 +107,33 @@ export default function SettingsScreen() {
       '削除する'
     );
     if (ok) resetAll();
+  };
+
+  // アカウント削除。審査ガイドライン 5.1.1(v) が「無効化」ではなく完全削除を求めるため、
+  // サーバー上のデータと Stripe の顧客ごと消す。取り消せないので二段階で確認する。
+  const onDeleteAccount = async () => {
+    const ok = await confirmAsync(
+      'アカウントを削除',
+      'アカウントと、サーバー上の目標・記録・登録カードをすべて削除します。この操作は取り消せません。',
+      '削除に進む'
+    );
+    if (!ok) return;
+
+    const sure = await confirmAsync(
+      '本当に削除しますか？',
+      '復元はできません。同じメールアドレスで登録し直しても、これまでの記録は戻りません。',
+      '完全に削除する'
+    );
+    if (!sure) return;
+
+    try {
+      await deleteAccount();
+      await resetAll();
+      notifyAsync('アカウントを削除しました', 'ご利用ありがとうございました。');
+      await signOut();
+    } catch (e) {
+      notifyAsync('削除できませんでした', e instanceof Error ? e.message : String(e));
+    }
   };
 
   const timeLabel = `${String(reminder.hour).padStart(2, '0')}:${String(
@@ -283,6 +311,26 @@ export default function SettingsScreen() {
           }}
           style={{ marginTop: spacing.sm }}
         />
+        <PrimaryButton
+          label="アカウントを削除"
+          variant="ghost"
+          onPress={onDeleteAccount}
+          style={{ marginTop: spacing.sm }}
+        />
+        <Text style={styles.helperNote}>
+          アカウントとサーバー上のデータをすべて削除します。取り消せません。
+        </Text>
+      </Card>
+
+      {/* プライバシー */}
+      <Card>
+        <Pressable style={styles.rowBetween} onPress={() => router.push('/privacy')}>
+          <View style={styles.titleRow}>
+            <Ionicons name="shield-checkmark" size={18} color={colors.primary} />
+            <Text style={styles.sectionTitle}>プライバシーポリシー</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
       </Card>
 
       {/* 将来の機能 */}
@@ -295,9 +343,9 @@ export default function SettingsScreen() {
       <Card>
         <Text style={styles.sectionLabel}>データ管理</Text>
         <Text style={styles.goalMeta}>
-          データはこの端末内にのみ保存されます（サーバーなし）。
+          学習記録はこの端末に保存し、目標と週ごとの達成状況はサーバーにも同期しています。
           <Text style={{ color: colors.warning }}>
-            {' '}機種変更やキャッシュ削除で消えるため、ときどきバックアップしてください。
+            {' '}端末内のメモなどは機種変更やキャッシュ削除で消えるため、ときどきバックアップしてください。
           </Text>
         </Text>
         <View style={styles.backupRow}>
