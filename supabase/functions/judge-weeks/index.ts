@@ -65,15 +65,21 @@ Deno.serve(async (_req) => {
     }
 
     try {
-      const pi = await stripe.paymentIntents.create({
-        amount: week.stake_amount,
-        currency: 'jpy',
-        customer: customer.stripe_customer_id,
-        payment_method: customer.default_payment_method_id,
-        off_session: true,
-        confirm: true,
-        metadata: { week_id: week.id, goal_id: week.goal_id, user_id: week.user_id },
-      });
+      // 冪等キーに week.id を使う。この関数はJWT検証なしで呼べるため、
+      // cron と手動実行が重なっても同じ週が二重に課金されないようにしておく。
+      // Stripe 側で同じキーの請求は1回しか作られない。
+      const pi = await stripe.paymentIntents.create(
+        {
+          amount: week.stake_amount,
+          currency: 'jpy',
+          customer: customer.stripe_customer_id,
+          payment_method: customer.default_payment_method_id,
+          off_session: true,
+          confirm: true,
+          metadata: { week_id: week.id, goal_id: week.goal_id, user_id: week.user_id },
+        },
+        { idempotencyKey: `week-charge-${week.id}` }
+      );
       await supabase
         .from('weeks')
         .update({ stripe_payment_intent_id: pi.id })

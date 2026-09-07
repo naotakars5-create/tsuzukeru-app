@@ -64,7 +64,18 @@ JWT検証の要否は `supabase/config.toml` に書いてあるので、関数�
 npx supabase db push
 ```
 
-`0003_social.sql` で user_stats / communities などのテーブルが作られます。
+`0003_social.sql` で user_stats / communities などのテーブルが作られ、
+`0004_judge_weeks_cron.sql` で週次判定の自動実行（pg_cron）が登録されます。
+
+`0004` が `permission denied` などで失敗する場合は、Supabaseダッシュボードの
+Database → Extensions で `pg_cron` と `pg_net` を有効にしてから、もう一度
+`npx supabase db push` を実行してください。
+
+登録されたか確認するには、SQL Editor で:
+
+```sql
+select jobname, schedule, active from cron.job;
+```
 
 あわせて、Edge Function 用のシークレットに戻り先URLを登録してください
 （Web版のカード登録で使います）。
@@ -182,7 +193,6 @@ App Review に添える説明（英訳して Review Notes に記載する）:
 ## 残っている技術的な宿題
 
 - 課金失敗（カード期限切れ等）をアプリ内で通知し、再登録を促すUI
-- `judge-weeks` の週次cron設定（Supabaseダッシュボードで設定。UTCで `10 15 * * 0`）
 - Appleでサインインの実機確認（Apple Developer と Supabase の
   Apple プロバイダ設定が必要。匿名からの引き継ぎ挙動も要確認）
 - Googleでサインイン（Google Cloud Console でのOAuthクライアント作成が必要）
