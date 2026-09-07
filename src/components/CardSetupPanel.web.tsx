@@ -41,8 +41,7 @@ export function CardSetupPanel() {
   const onRegister = async () => {
     setBusy(true);
     try {
-      const returnUrl = `${window.location.origin}/card-setup`;
-      const url = await requestCardSetupSession(returnUrl);
+      const url = await requestCardSetupSession();
       window.location.href = url;
     } catch (e) {
       notifyAsync('エラーが発生しました', e instanceof Error ? e.message : String(e));

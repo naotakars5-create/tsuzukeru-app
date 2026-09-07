@@ -49,14 +49,29 @@ Authentication → Sign In / Providers で：
 
 ### 3. Supabase に新しいスキーマとFunctionを反映
 
+**Edge Function は GitHub Actions が自動でデプロイします。** そのために、
+GitHub の Settings → Secrets and variables → Actions に以下を登録してください。
+
+- `SUPABASE_ACCESS_TOKEN` … https://supabase.com/dashboard/account/tokens で発行
+- `SUPABASE_PROJECT_ID` … `psrhlrphivkopltedtps`
+
+登録すると、`supabase/functions/**` を変更するたびに自動でデプロイされます。
+JWT検証の要否は `supabase/config.toml` に書いてあるので、関数ごとの指定は不要です。
+
+**スキーマ（マイグレーション）だけは手動**です。
+
 ```
 npx supabase db push
-npx supabase functions deploy create-goal
-npx supabase functions deploy delete-account
-npx supabase functions deploy create-setup-session
 ```
 
 `0003_social.sql` で user_stats / communities などのテーブルが作られます。
+
+あわせて、Edge Function 用のシークレットに戻り先URLを登録してください
+（Web版のカード登録で使います）。
+
+```
+npx supabase secrets set APP_WEB_URL=https://tsuzukeru-app.expo.app
+```
 
 ### 4. Stripe を本番モードに切り替え
 
@@ -89,6 +104,14 @@ npx eas-cli env:create --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY --value "pk_liv
 
 ### 7. 本番ビルドと提出
 
+GitHub の Actions タブ →「iOS ビルド（App Store へ提出）」→ Run workflow
+で実行できます（手元にCLI不要）。
+
+事前に expo.dev 上で以下を済ませておくこと:
+- Credentials に App Store Connect の API キー（.p8）を登録
+- Environment Variables の production に `EXPO_PUBLIC_*` を登録
+
+手元から実行する場合:
 ```
 npx eas-cli build --platform ios --profile production
 npx eas-cli submit --platform ios
@@ -107,6 +130,7 @@ npx eas-cli submit --platform ios
 | カテゴリ | 教育 |
 | 年齢制限 | 17+ を推奨（課金を伴うため） |
 | スクリーンショット | 6.7インチ必須。実機のスクショを使用 |
+| iPad対応 | なし（`supportsTablet: false`。iPad用のレイアウトとスクショが未整備のため） |
 
 ### App Privacy（データ収集の申告）
 
@@ -121,15 +145,29 @@ npx eas-cli submit --platform ios
 
 **Q. なぜ App内課金（IAP）を使わないのか**
 
-本アプリの料金は、デジタルコンテンツや機能の解放に対する対価ではなく、
-利用者が自ら設定した学習目標を達成できなかった場合にのみ発生する
-サービス利用料です。アプリの機能はすべて無料で利用でき、
-支払いの有無によって使える機能は変わりません。
-（ガイドライン3.1.1が対象とする「アプリ内で利用するコンテンツ・機能の購入」には該当しない、という整理）
+App Review に添える説明（英訳して Review Notes に記載する）:
 
-**リジェクトされた場合の代替案**
-- Web版（`tsuzukeru-app.expo.app`）で決済を完結させ、iOSアプリからは
-  課金機能を外す（Web版へ誘導するリンクも置けないため、完全に切り離す必要あり）
+> 本アプリの料金は、デジタルコンテンツや機能の解放に対する対価ではありません。
+> 利用者が自ら設定した学習目標を達成できなかった場合にのみ発生する、
+> 後払いのサービス利用料です。
+>
+> ・アプリのすべての機能は無料で利用できます
+> ・支払いの有無によって、使える機能は一切変わりません
+> ・支払いによって取得されるデジタルコンテンツはありません
+>
+> またIAPは購入のたびに本人の承認操作を必要とするため、
+> 「未達を検知して自動的に請求する」という本アプリの仕組みは実装できません。
+>
+> ガイドライン3.1.1が対象とする「アプリ内で利用するコンテンツ・機能の購入」には
+> 該当しないと考えています。
+
+**リジェクトされた場合の段階的な代替案**
+
+1. 上記の説明でリジェクト理由に反論する（まずここ）
+2. iOSアプリからカード登録UIを外し、登録状態の表示のみにする
+   （Web版で登録してもらう。ただし3.1.1は誘導リンクも禁じているため、
+   アプリ内からWeb版へ導けない点に注意）
+3. iOS版を課金機能なしで出す（勉強記録＋コミュニティのみ。課金はWeb版だけ）
 
 ---
 

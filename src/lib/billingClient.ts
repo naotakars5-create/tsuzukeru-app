@@ -27,8 +27,9 @@ export async function requestCardSetup(): Promise<{ clientSecret: string; custom
 /**
  * Web版のカード登録。Stripe のホスト型 Checkout（setupモード）のURLを取得する。
  * ネイティブの PaymentSheet が使えないWeb用の経路で、ここでも課金は発生しない（0円）。
+ * 戻り先URLはサーバー側の APP_WEB_URL から組み立てる（オープンリダイレクト対策）。
  */
-export async function requestCardSetupSession(returnUrl: string): Promise<string> {
+export async function requestCardSetupSession(): Promise<string> {
   if (!isBackendConfigured) throw new Error(NOT_CONFIGURED);
   const { data: session } = await supabase.auth.getSession();
   const token = session.session?.access_token;
@@ -36,10 +37,7 @@ export async function requestCardSetupSession(returnUrl: string): Promise<string
 
   const { data, error } = await supabase.functions.invoke<{ url?: string; error?: string }>(
     'create-setup-session',
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      body: { returnUrl },
-    }
+    { headers: { Authorization: `Bearer ${token}` } }
   );
 
   if (data?.error) throw new Error(data.error);
