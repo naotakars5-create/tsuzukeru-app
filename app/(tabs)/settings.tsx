@@ -12,6 +12,7 @@ import { frequencyLabel } from '@/logic/schedule';
 import { categoryOf } from '@/logic/category';
 import { confirmAsync, notifyAsync, promptAsync } from '@/logic/confirm';
 import { exportAll, importAll } from '@/storage';
+import { deleteAccount } from '@/lib/billingClient';
 import { todayStr } from '@/logic/date';
 
 /** リマインドで選べる時刻（時） */
@@ -27,13 +28,11 @@ export default function SettingsScreen() {
     updateReminder,
     resetAll,
     profile,
-    premium,
-    setPremium,
     communityLimit,
     communityCreationsThisMonth,
     reloadAll,
   } = useApp();
-  const { session, signOut } = useAuth();
+  const { session, signOut, backendEnabled, isAnonymous } = useAuth();
 
   // バックアップ: JSONを書き出す（Webはダウンロード、ネイティブは共有）
   const onBackup = async () => {
@@ -74,16 +73,6 @@ export default function SettingsScreen() {
     notifyAsync('復元しました', '記録を読み込みました。');
   };
 
-  const onTogglePremium = async (v: boolean) => {
-    if (v) {
-      await setPremium(true);
-      notifyAsync('プレミアムに登録しました', `コミュニティを毎月${communityLimit}個まで作成できます（モック）。`);
-    } else {
-      const ok = await confirmAsync('プレミアムを解約', 'コミュニティの作成ができなくなります（参加は引き続き無料）。解約しますか？', '解約する');
-      if (ok) await setPremium(false);
-    }
-  };
-
   const category = categoryOf(goal?.category);
 
   const onToggleReminder = async (enabled: boolean) => {
@@ -98,6 +87,22 @@ export default function SettingsScreen() {
 
   const onPickHour = (hour: number) => updateReminder({ ...reminder, hour });
   const onPickMinute = (minute: number) => updateReminder({ ...reminder, minute });
+
+  const onDeleteAccount = async () => {
+    const ok = await confirmAsync(
+      'アカウントを削除しますか？',
+      '学習記録・コミュニティの参加状況・登録したカード情報がすべて削除されます。この操作は取り消せません。',
+      '完全に削除する'
+    );
+    if (!ok) return;
+    const error = await deleteAccount();
+    if (error) {
+      notifyAsync('削除できませんでした', error);
+      return;
+    }
+    await resetAll();
+    notifyAsync('アカウントを削除しました', 'ご利用ありがとうございました。');
+  };
 
   const onReset = async () => {
     const ok = await confirmAsync(
@@ -234,26 +239,16 @@ export default function SettingsScreen() {
         )}
       </Card>
 
-      {/* プレミアム会員（モック） */}
+      {/* コミュニティ */}
       <Card>
-        <View style={styles.rowBetween}>
-          <View style={styles.titleRow}>
-            <Ionicons name="star" size={18} color={colors.primary} />
-            <Text style={styles.sectionTitle}>プレミアム会員</Text>
-          </View>
-          <Switch
-            value={premium}
-            onValueChange={onTogglePremium}
-            trackColor={{ false: colors.surfaceAlt, true: colors.primary }}
-            thumbColor="#ffffff"
-          />
+        <View style={styles.titleRow}>
+          <Ionicons name="people" size={18} color={colors.primary} />
+          <Text style={styles.sectionTitle}>コミュニティ</Text>
         </View>
         <Text style={styles.goalMeta}>
-          {premium
-            ? `加入中 ・ コミュニティを毎月${communityLimit}個まで作成できます（今月 ${communityCreationsThisMonth}/${communityLimit} 個）。`
-            : `コミュニティの作成はプレミアム限定です（月${communityLimit}個まで）。参加は誰でも無料。`}
+          今月あと {Math.max(0, communityLimit - communityCreationsThisMonth)}/{communityLimit} 個
+          作成できます。参加は無制限に無料です。
         </Text>
-        <Text style={styles.helperNote}>※ 課金はすべてモックです。実際の決済はしません。</Text>
       </Card>
 
       {/* 支払い方法（実際のカード登録・課金） */}
@@ -266,24 +261,60 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </Pressable>
         <Text style={styles.goalMeta}>
-          達成した週は¥0。未達の週だけ、登録したカードから自動で引き落とされます。
+          {backendEnabled
+            ? '達成した週は¥0。未達の週だけ、登録したカードから自動で引き落とされます。'
+            : 'サーバー未設定のため、いまはカード登録を利用できません（課金は行われません）。'}
         </Text>
       </Card>
 
-      {/* アカウント */}
-      <Card>
-        <Text style={styles.sectionLabel}>アカウント</Text>
-        <Text style={styles.goalMeta}>{session?.user.email}</Text>
-        <PrimaryButton
-          label="ログアウト"
-          variant="ghost"
-          onPress={async () => {
-            const ok = await confirmAsync('ログアウト', 'ログアウトしますか？', 'ログアウト');
-            if (ok) await signOut();
-          }}
-          style={{ marginTop: spacing.sm }}
-        />
-      </Card>
+      {/* アカウント（サーバー未設定のローカル専用モードでは表示しない） */}
+      {session && isAnonymous && (
+        <Card>
+          <Text style={styles.sectionLabel}>アカウント</Text>
+          <Text style={styles.goalMeta}>
+            IDを登録していません。このままアプリを削除すると記録は失われます。
+          </Text>
+          <PrimaryButton
+            label="IDを登録する"
+            icon="shield-checkmark"
+            variant="secondary"
+            onPress={() => router.push('/link-account')}
+            style={{ marginTop: spacing.md }}
+          />
+          <PrimaryButton
+            label="すでにアカウントをお持ちの方はログイン"
+            variant="ghost"
+            onPress={() => router.push('/login')}
+            style={{ marginTop: spacing.xs }}
+          />
+        </Card>
+      )}
+
+      {session && !isAnonymous && (
+        <Card>
+          <Text style={styles.sectionLabel}>アカウント</Text>
+          <Text style={styles.goalMeta}>{session.user.email}</Text>
+          <PrimaryButton
+            label="ログアウト"
+            variant="secondary"
+            onPress={async () => {
+              const ok = await confirmAsync('ログアウト', 'ログアウトしますか？', 'ログアウト');
+              if (ok) await signOut();
+            }}
+            style={{ marginTop: spacing.md }}
+          />
+          <PrimaryButton
+            label="アカウントを削除"
+            variant="ghost"
+            onPress={onDeleteAccount}
+            style={{ marginTop: spacing.xs }}
+          />
+          <Text style={styles.helperNote}>
+            ※ アカウントを削除すると、学習記録・コミュニティの参加状況・登録したカード情報が
+            すべて完全に削除されます。この操作は取り消せません。
+          </Text>
+        </Card>
+      )}
 
       {/* 将来の機能 */}
       <Card>
@@ -324,9 +355,29 @@ export default function SettingsScreen() {
         />
       </Card>
 
+      {/* 規約・法務 */}
+      <Card>
+        <Text style={styles.sectionLabel}>規約・運営情報</Text>
+        <LegalLink label="利用規約" onPress={() => router.push('/legal/terms')} />
+        <LegalLink label="プライバシーポリシー" onPress={() => router.push('/legal/privacy')} />
+        <LegalLink
+          label="特定商取引法に基づく表記"
+          onPress={() => router.push('/legal/tokushoho')}
+        />
+      </Card>
+
       <Text style={styles.version}>覚悟の勉強 — MVP v1.2.0</Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
+  );
+}
+
+function LegalLink({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable style={styles.legalRow} onPress={onPress}>
+      <Text style={styles.legalText}>{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+    </Pressable>
   );
 }
 
@@ -361,6 +412,15 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
   sectionTitle: { fontSize: font.body, fontWeight: '900', color: colors.text },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  legalText: { fontSize: font.sub, color: colors.text, fontWeight: '600' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },

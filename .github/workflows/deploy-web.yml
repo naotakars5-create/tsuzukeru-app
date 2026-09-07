@@ -1,9 +1,11 @@
 name: Deploy Web (EAS Hosting)
 
-# コードが更新されたら、GitHub が自動で Web 版を書き出して本番公開する。
-# もう Codespace でコマンドを打つ必要はなく、更新＝自動反映になる。
-#   - main か claude/** ブランチへの push で自動実行
-#   - Actions タブの「Run workflow」ボタンで手動実行も可能
+# main が更新されたら、GitHub が自動で Web 版を書き出して本番公開する。
+#
+# 本番へ出すのは main だけにしている。以前は claude/** への push でも
+# --prod でデプロイしていたため、作業中のブランチが本番を上書きしてしまい、
+# 「main にマージしたのに古い画面が出る」という事故が起きていた。
+# 作業ブランチはプレビュー（本番とは別のURL）へ出す。
 on:
   push:
     branches:
@@ -35,16 +37,34 @@ jobs:
       - name: 依存をインストール
         run: npm ci
 
+      # EXPO_PUBLIC_ の値はここでバンドルに埋め込まれる。未設定なら
+      # アプリはログイン不要の「ローカル専用モード」で動く（起動はする）。
+      # 有効にするには GitHub の Settings > Secrets に3つを登録する。
+      # --clear は必須。Metro の変換キャッシュが残っていると、
+      # process.env.EXPO_PUBLIC_* が undefined のまま埋め込まれた結果を
+      # 使い回してしまい、鍵を設定してもローカル専用モードで公開される。
       - name: Web 版を書き出す
-        run: npx expo export --platform web
+        run: npx expo export --platform web --clear
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
 
       # ホーム画面に追加したときにロゴが出るよう、apple-touch-icon 等を注入する
       - name: ホーム画面アイコンの設定を注入
         run: node scripts/inject-web-icons.mjs
 
+      # main のときだけ本番URLを差し替える
       - name: 本番へデプロイ（EAS Hosting）
+        if: github.ref == 'refs/heads/main'
         run: npx eas-cli@latest deploy --prod --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # 作業ブランチはプレビューURLへ。本番は上書きしない
+      - name: プレビューへデプロイ（作業ブランチ）
+        if: github.ref != 'refs/heads/main'
+        run: npx eas-cli@latest deploy --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

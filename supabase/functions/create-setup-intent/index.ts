@@ -3,6 +3,7 @@
 import Stripe from 'https://esm.sh/stripe@17?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { resolveStripeCustomer } from '../_shared/stripeCustomer.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2024-06-20' });
 
@@ -26,24 +27,14 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const userId = userData.user.id;
-    const email = userData.user.email ?? undefined;
-
-    // 既存の Stripe Customer があれば使い回す。無ければ作成。
-    const { data: existing } = await supabase
-      .from('stripe_customers')
-      .select('stripe_customer_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    let customerId = existing?.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({ email, metadata: { supabase_user_id: userId } });
-      customerId = customer.id;
-      await supabase
-        .from('stripe_customers')
-        .insert({ user_id: userId, stripe_customer_id: customerId });
-    }
+    // カード登録の入口はアプリ版とWeb版の2つあるため、
+    // Customer が重複しないよう共通ヘルパーに寄せている
+    const customerId = await resolveStripeCustomer(
+      stripe,
+      supabase,
+      userData.user.id,
+      userData.user.email ?? undefined
+    );
 
     // usage: off_session -> あとで本人不在でも自動課金できるようにするための設定
     const setupIntent = await stripe.setupIntents.create({

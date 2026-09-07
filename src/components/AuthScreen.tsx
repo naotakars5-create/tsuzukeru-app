@@ -13,6 +13,7 @@ import { Logo } from '@/components/Logo';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'expo-router';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -22,6 +23,7 @@ type Mode = 'signIn' | 'signUp';
  */
 export function AuthScreen() {
   const { signIn, signUp } = useAuth();
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -116,6 +118,20 @@ export function AuthScreen() {
             style={{ marginTop: spacing.lg }}
           />
 
+          {mode === 'signUp' && (
+            <Text style={styles.consent}>
+              アカウントを作成すると、
+              <Text style={styles.consentLink} onPress={() => router.push('/legal/terms')}>
+                利用規約
+              </Text>
+              と
+              <Text style={styles.consentLink} onPress={() => router.push('/legal/privacy')}>
+                プライバシーポリシー
+              </Text>
+              に同意したものとみなします。未達の週にのみ料金が発生します。
+            </Text>
+          )}
+
           <Pressable
             onPress={() => {
               setMode(mode === 'signIn' ? 'signUp' : 'signIn');
@@ -155,6 +171,14 @@ const styles = StyleSheet.create({
     fontSize: font.body,
   },
   error: { color: colors.danger, fontSize: font.small, marginTop: spacing.sm },
+  consent: {
+    fontSize: font.small,
+    color: colors.textMuted,
+    lineHeight: 18,
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  consentLink: { color: colors.primary, fontWeight: '700' },
   switchRow: { alignItems: 'center', marginTop: spacing.lg, padding: spacing.sm },
   switchText: { color: colors.primary, fontSize: font.small, fontWeight: '700' },
 });

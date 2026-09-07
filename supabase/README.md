@@ -1,7 +1,17 @@
 # Stripe課金サーバー（Supabase）セットアップ手順
 
 案C（開始時は課金しない・達成週は¥0・未達週だけ後から自動課金）を実現するための
-バックエンド一式です。`migrations/` がDBスキーマ、`functions/` が4つのEdge Function。
+バックエンド一式です。`migrations/` がDBスキーマ、`functions/` がEdge Function。
+
+Edge Function の役割:
+| 名前 | 役割 |
+|---|---|
+| `create-goal` | 目標と、週ごとの判定データ（weeks）を作る |
+| `create-setup-intent` | アプリ版のカード登録（PaymentSheet用） |
+| `create-setup-session` | Web版のカード登録（Stripeのホスト型Checkout） |
+| `judge-weeks` | 週次の達成判定と、未達週の自動課金 |
+| `stripe-webhook` | Stripeからの結果をDBに反映 |
+| `delete-account` | アカウントの完全削除 |
 
 ## 全体の流れ
 
@@ -41,6 +51,8 @@
 ```
 npx supabase functions deploy create-goal
 npx supabase functions deploy create-setup-intent
+npx supabase functions deploy create-setup-session
+npx supabase functions deploy delete-account
 npx supabase functions deploy judge-weeks --no-verify-jwt
 npx supabase functions deploy stripe-webhook --no-verify-jwt
 ```
@@ -63,6 +75,26 @@ npx supabase db push
 ### 5. 毎週の自動判定をスケジュール実行
 Supabase ダッシュボード > Edge Functions > `judge-weeks` > Cron のトリガーを追加。
 例: 毎週月曜 00:10（JST）に実行する場合、UTC で `10 15 * * 0`（日曜15:10 UTC）。
+
+### 6. Web版（GitHub Actions の自動デプロイ）にも鍵を渡す
+`.env` はコミットされないため、GitHub の自動デプロイには別途 Secrets の登録が必要です。
+リポジトリの Settings > Secrets and variables > Actions で次の3つを追加してください。
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+
+未登録でもデプロイは成功し、Web版は下記の「ローカル専用モード」で起動します。
+
+## 鍵が未設定のとき（ローカル専用モード）
+`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` が無いビルドでは、
+アプリはログイン不要の**ローカル専用モード**で起動します。
+
+- 勉強の記録・ランク・コミュニティは、これまで通り端末内だけで動く
+- ログイン画面は出ない。設定タブの「アカウント」欄も出ない
+- カード登録・課金は無効（設定タブにその旨を表示）
+
+鍵を設定すると、自動的にログイン必須モードに切り替わります。
 
 ## テストの仕方
 1. `.env` にテストモードの鍵（`pk_test_...`）を設定してアプリを起動

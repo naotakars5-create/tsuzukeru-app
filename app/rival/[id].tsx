@@ -1,22 +1,52 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '@/components/Card';
 import { colors, font, radius, spacing } from '@/theme';
-import { buildRivalProfile } from '@/logic/social';
+import { fetchRival, RivalStats } from '@/lib/socialApi';
 import { categoryOf } from '@/logic/category';
 import { formatMinutes } from '@/logic/time';
-import { GoalCategory } from '@/types';
+import { IconName } from '@/types';
 
-/** 相手のプロフィール（モック） */
+/** 同じ資格を目指している相手のプロフィール（実データ） */
 export default function RivalProfileScreen() {
-  const params = useLocalSearchParams<{ id: string; category: string }>();
+  const params = useLocalSearchParams<{ id: string }>();
   const id = String(params.id ?? '');
-  const category = (String(params.category ?? 'other') as GoalCategory) || 'other';
+  const [profile, setProfile] = useState<RivalStats | null | undefined>(undefined);
 
-  const profile = useMemo(() => buildRivalProfile(category, id), [category, id]);
-  const cat = categoryOf(category);
+  useEffect(() => {
+    let alive = true;
+    fetchRival(id).then((p) => {
+      if (alive) setProfile(p);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  if (profile === undefined) {
+    return (
+      <View style={styles.loading}>
+        <Stack.Screen options={{ title: 'プロフィール' }} />
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (profile === null) {
+    return (
+      <View style={styles.loading}>
+        <Stack.Screen options={{ title: 'プロフィール' }} />
+        <Ionicons name="person-outline" size={40} color={colors.textMuted} />
+        <Text style={styles.emptyText}>このユーザーの情報は取得できませんでした。</Text>
+      </View>
+    );
+  }
+
+  const cat = categoryOf(profile.category ?? undefined);
+  const avatarColor = profile.color ?? colors.primary;
+  const avatarIcon = (profile.icon as IconName | null) ?? 'person';
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -24,8 +54,8 @@ export default function RivalProfileScreen() {
 
       {/* ヘッダー */}
       <View style={styles.header}>
-        <View style={[styles.avatar, { backgroundColor: `${profile.color}22`, borderColor: profile.color }]}>
-          <Ionicons name={profile.icon} size={44} color={profile.color} />
+        <View style={[styles.avatar, { backgroundColor: `${avatarColor}22`, borderColor: avatarColor }]}>
+          <Ionicons name={avatarIcon} size={44} color={avatarColor} />
         </View>
         <Text style={styles.name}>{profile.name}</Text>
         <View style={styles.rankRow}>
@@ -35,21 +65,23 @@ export default function RivalProfileScreen() {
       </View>
 
       {/* 意気込み */}
-      <Card>
-        <Text style={styles.label}>意気込み</Text>
-        <Text style={styles.motivation}>“{profile.motivation}”</Text>
-      </Card>
+      {profile.motivation ? (
+        <Card>
+          <Text style={styles.label}>意気込み</Text>
+          <Text style={styles.motivation}>“{profile.motivation}”</Text>
+        </Card>
+      ) : null}
 
-      {/* 目標 */}
+      {/* 目指している資格 */}
       <Card>
-        <Text style={styles.label}>取り組んでいる目標</Text>
+        <Text style={styles.label}>目指している資格</Text>
         <View style={styles.goalRow}>
           <View style={[styles.goalIcon, { backgroundColor: `${cat.color}22` }]}>
             <Ionicons name={cat.icon} size={20} color={cat.color} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.goalName}>{profile.goalName}</Text>
-            <Text style={styles.goalMeta}>{cat.label}カテゴリ</Text>
+            <Text style={styles.goalName}>{cat.label}</Text>
+            <Text style={styles.goalMeta}>同じ資格を目指す仲間</Text>
           </View>
         </View>
       </Card>
@@ -59,18 +91,17 @@ export default function RivalProfileScreen() {
         <Text style={styles.label}>これまでの記録</Text>
         <View style={styles.statsRow}>
           <Stat value={profile.streak} label="連続達成" icon="flame" color={colors.primary} />
-          <Stat value={profile.bestStreak} label="最高連続" icon="medal" color={colors.silver} />
-          <Stat value={profile.totalDone} label="通算達成" icon="layers" color={colors.primary} />
+          <Stat value={profile.points} label="通算pt" icon="medal" color={colors.silver} />
         </View>
         <View style={styles.totalMinRow}>
           <Ionicons name="time" size={16} color={colors.primary} />
           <Text style={styles.totalMinText}>
-            総勉強時間 <Text style={styles.totalMinValue}>{formatMinutes(profile.totalMinutes)}</Text>
+            今月の勉強時間{' '}
+            <Text style={styles.totalMinValue}>{formatMinutes(profile.monthMinutes)}</Text>
           </Text>
         </View>
       </Card>
 
-      <Text style={styles.note}>※ このプロフィールは試作用のダミーデータです。</Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
   );
@@ -150,5 +181,19 @@ const styles = StyleSheet.create({
   statValue: { fontSize: font.heading, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
   statLabel: { fontSize: 10, color: colors.textSub, fontWeight: '600' },
 
+  loading: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xl,
+  },
+  emptyText: {
+    fontSize: font.sub,
+    color: colors.textSub,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
   note: { fontSize: font.small, color: colors.textMuted },
 });
