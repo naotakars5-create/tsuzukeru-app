@@ -121,10 +121,31 @@ npx eas-cli env:create --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY --value "pk_liv
   `{"processed":1,"results":{"<week id>":"missed-charge-succeeded"}}` のような
   JSON が返れば成功。
 
-### 7. 本番ビルドと提出
+### 7. 署名証明書の作成（最初の1回だけ・手元で対話モード）
 
-GitHub の Actions タブ →「iOS ビルド（App Store へ提出）」→ Run workflow
-で実行できます（手元にCLI不要）。
+GitHub Actions は `--non-interactive` で走るため、**証明書を新規作成できない**。
+未作成のまま Actions を回すと、こう言われて必ず失敗する:
+
+```
+Distribution Certificate is not validated for non-interactive builds.
+Credentials are not set up. Run this command again in interactive mode.
+```
+
+最初の1回だけ、手元で対話モードから作る。作られた証明書は Expo のサーバーに
+保存されるので、以降は Actions から使える。
+
+```
+npx eas-cli whoami                                    # ログイン確認
+npx eas-cli build --platform ios --profile production # 対話モード
+```
+
+途中の質問は、Appleアカウントへのログイン → Yes、
+Distribution Certificate の生成 → Yes、Provisioning Profile の生成 → Yes。
+
+### 8. 本番ビルドと提出
+
+証明書ができていれば、GitHub の Actions タブ →
+「iOS ビルド（App Store へ提出）」→ Run workflow で実行できる（手元にCLI不要）。
 
 事前に expo.dev 上で以下を済ませておくこと:
 - Credentials に App Store Connect の API キー（.p8）を登録
@@ -133,7 +154,7 @@ GitHub の Actions タブ →「iOS ビルド（App Store へ提出）」→ Run
 手元から実行する場合:
 ```
 npx eas-cli build --platform ios --profile production
-npx eas-cli submit --platform ios
+npx eas-cli submit --platform ios --latest
 ```
 
 ---
