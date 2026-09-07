@@ -29,7 +29,7 @@ App Store（iOS）へのリリースまでに必要な作業をまとめたも�
 
 ### 1. 事業者情報 ✅ 記入済み
 
-`src/logic/legal.ts` の `OPERATOR` は記入済みです（販売事業者: 山路直孝、
+`src/logic/legal.ts` の `OPERATOR` は記入済みです（販売事業者: 山路直卓、
 問い合わせ先: kakugo.support@gmail.com）。
 
 所在地と電話番号は「請求があれば遅滞なく開示します」方式にしています。
