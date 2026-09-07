@@ -99,8 +99,16 @@ npx eas-cli env:create --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY --value "pk_liv
 
 - アカウント作成 → 目標設定 → カード登録（テストカード `4242 4242 4242 4242`）
 - Supabase の Table Editor で `goals` / `weeks` / `stripe_customers` / `user_stats` にデータが入るか
-- `weeks` の `end_date` を過去日に書き換えて `npx supabase functions invoke judge-weeks` を実行し、
-  課金フローが動くか（テストモードで）
+- `weeks` の `end_date` を過去日に書き換えて judge-weeks を手動実行し、
+  課金フローが動くか（テストモードで）。CLI に `functions invoke` は無いので HTTP で直接叩く:
+
+  ```
+  curl -i -X POST https://psrhlrphivkopltedtps.supabase.co/functions/v1/judge-weeks
+  ```
+
+  `verify_jwt = false`（`supabase/config.toml`）なので認証ヘッダは不要。
+  `{"processed":1,"results":{"<week id>":"missed-charge-succeeded"}}` のような
+  JSON が返れば成功。
 
 ### 7. 本番ビルドと提出
 

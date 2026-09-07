@@ -175,7 +175,9 @@ refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
 enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
-enable_anonymous_sign_ins = false
+# 起動直後にログイン画面を出さない設計（App Store ガイドライン5.1.1(i)）のため必須。
+# 本番プロジェクト側はダッシュボードでオンにしてある。
+enable_anonymous_sign_ins = true
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
