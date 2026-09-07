@@ -1,0 +1,51 @@
+name: iOS ビルド（App Store へ提出）
+
+# iPhone 版をビルドして、そのまま App Store Connect にアップロードする。
+# 手元の PC に Node.js を入れなくても、GitHub 上のコンピュータが全部やってくれる。
+#
+# 使い方:
+#   1. GitHub の「Actions」タブを開く
+#   2. 左の一覧から「iOS ビルド（App Store へ提出）」を選ぶ
+#   3. 右の「Run workflow」ボタン → ブランチを選んで「Run workflow」
+#
+# 事前に必要な準備（どちらも expo.dev のサイト上だけで完了する）:
+#   - Credentials に App Store Connect の API キー（.p8）を登録しておく
+#     → これが無いと、証明書を作れずビルドが失敗する
+#   - Environment Variables の production に EXPO_PUBLIC_* を登録しておく
+#     → これが無いと、ビルドは通るがアプリ起動時に「未設定です」で落ちる
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: 'ビルド後、App Store Connect へ自動でアップロードする'
+        type: boolean
+        default: true
+
+# 同時に何本もビルドしないようにする（EAS のビルド枠を無駄にしないため）
+concurrency:
+  group: build-ios
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 実際のビルドは EAS 側で 15〜25 分ほどかかるので、待ち時間に余裕をもたせる
+    timeout-minutes: 60
+    steps:
+      - name: コードを取得
+        uses: actions/checkout@v4
+
+      - name: Node.js を用意
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # app.json のプラグイン（expo-router など）を読むのに必要
+      - name: 依存をインストール
+        run: npm ci
+
+      - name: iOS をビルド（＋App Store Connect へ提出）
+        run: npx eas-cli@latest build --platform ios --profile production --non-interactive ${{ inputs.submit && '--auto-submit' || '' }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

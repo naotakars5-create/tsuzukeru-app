@@ -385,6 +385,16 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Edge Function ごとのJWT検証の要否。
+# judge-weeks は定期実行、stripe-webhook は Stripe から直接呼ばれるため、
+# 利用者のJWTが付かない。ここに書いておけば、デプロイのたびに
+# --no-verify-jwt を付け忘れて壊す事故を防げる。
+[functions.judge-weeks]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

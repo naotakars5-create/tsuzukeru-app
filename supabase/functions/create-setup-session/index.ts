@@ -1,7 +1,7 @@
 // Web版のカード登録用に、Stripe のホスト型 Checkout（setupモード）を作る。
 //
 // アプリ版は PaymentSheet（ネイティブ）を使うが、Webではネイティブモジュールが
-// 使えないため、Stripe が用意している決済ページへ遷移させる方式にする。
+// 使えないため、Stripe が用意している決済ページへ遷移させる。
 // どちらの経路でも、登録の完了は setup_intent.succeeded の Webhook で
 // stripe_customers に反映されるので、保存処理はここには書かない。
 //
@@ -9,82 +9,62 @@
 import Stripe from 'https://esm.sh/stripe@17?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { resolveStripeCustomer } from '../_shared/stripeCustomer.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2024-06-20' });
 
-interface Payload {
-  /** 登録後に戻ってくるURL（アプリのカード登録画面） */
-  returnUrl: string;
-}
+// 戻り先URLはサーバー側の設定だけから組み立てる。
+// クライアントから受け取った値をそのまま Stripe に渡すと、
+// 任意のサイトへ飛ばせるオープンリダイレクトになるため。
+const appWebUrl = Deno.env.get('APP_WEB_URL')?.replace(/\/$/, '');
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
   try {
+    if (!appWebUrl) {
+      console.error('APP_WEB_URL が未設定のため Checkout の戻り先を決められない');
+      return json({ error: 'サーバー設定が未完了です' }, 500);
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // 呼び出し元の JWT からユーザーを特定（なりすまし防止）
     const authHeader = req.headers.get('Authorization') ?? '';
     const { data: userData, error: userErr } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', '')
     );
-    if (userErr || !userData.user) {
-      return new Response(JSON.stringify({ error: '未ログインです' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    const userId = userData.user.id;
-    const email = userData.user.email ?? undefined;
+    if (userErr || !userData.user) return json({ error: '未ログインです' }, 401);
 
-    const payload = (await req.json()) as Payload;
-    // 任意のURLへ飛ばされないよう、https のみ受け付ける
-    if (!payload.returnUrl || !payload.returnUrl.startsWith('https://')) {
-      return new Response(JSON.stringify({ error: '戻り先URLが不正です' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const customerId = await resolveStripeCustomer(
+      stripe,
+      supabase,
+      userData.user.id,
+      userData.user.email ?? undefined
+    );
 
-    // 既存の Stripe Customer があれば使い回す（アプリ版と同じ顧客に紐づける）
-    const { data: existing } = await supabase
-      .from('stripe_customers')
-      .select('stripe_customer_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    let customerId = existing?.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email,
-        metadata: { supabase_user_id: userId },
-      });
-      customerId = customer.id;
-      await supabase
-        .from('stripe_customers')
-        .insert({ user_id: userId, stripe_customer_id: customerId });
-    }
-
+    const returnUrl = `${appWebUrl}/card-setup`;
     const session = await stripe.checkout.sessions.create({
       mode: 'setup',
       customer: customerId,
-      // あとで本人不在でも自動課金できるようにする
       payment_method_types: ['card'],
-      success_url: `${payload.returnUrl}?card=success`,
-      cancel_url: `${payload.returnUrl}?card=cancel`,
+      success_url: `${returnUrl}?card=success`,
+      cancel_url: `${returnUrl}?card=cancel`,
       locale: 'ja',
     });
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ url: session.url });
   } catch (e) {
     console.error(e);
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ error: String(e) }, 500);
   }
 });
