@@ -8,7 +8,8 @@ App Store（iOS）へのリリースまでに必要な作業をまとめたも�
 ## ✅ コード側で完了しているもの
 
 - ソーシャル機能の実データ化（モックのライバル・メンバー・投稿はすべて削除）
-- ログイン（メール＋パスワード）とアカウント必須化
+- 匿名スタート（起動時にログイン画面を出さない。ガイドライン5.1.1(i)対応）
+- カード登録の直前にIDを紐付ける導線（メール / Appleでサインイン）
 - カード登録（Stripe PaymentSheet・登録時は0円）
 - 週次の自動判定と、未達週のみの自動課金（Supabase Edge Function）
 - 法務ページ3種（利用規約・プライバシーポリシー・特定商取引法に基づく表記）
@@ -38,7 +39,15 @@ export const OPERATOR = {
 「請求があれば遅滞なく開示します」という記載での運用が一般的ですが、
 最終的にはご自身で判断してください。
 
-### 2. Supabase に新しいスキーマとFunctionを反映
+### 2. Supabase の認証設定
+
+Authentication → Sign In / Providers で：
+
+- **匿名サインインを許可** → **オン**（これが無いと全員ローカル専用モードになる）
+- **メール確認** → テスト中はオフが楽。**本番前にオンへ戻すこと**
+  （オフのままだと他人のメールアドレスで登録できてしまう）
+
+### 3. Supabase に新しいスキーマとFunctionを反映
 
 ```
 npx supabase db push
@@ -49,7 +58,7 @@ npx supabase functions deploy create-setup-session
 
 `0003_social.sql` で user_stats / communities などのテーブルが作られます。
 
-### 3. Stripe を本番モードに切り替え
+### 4. Stripe を本番モードに切り替え
 
 Stripeの本人確認・銀行口座登録が完了してから：
 
@@ -61,7 +70,7 @@ npx supabase secrets set STRIPE_WEBHOOK_SECRET=<本番モードのwhsec_...>
 `.env` の `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` も `pk_live_...` に変更。
 Webhookエンドポイントは本番モード側でも登録し直す必要があります。
 
-### 4. 本番ビルド用の環境変数をEASに登録
+### 5. 本番ビルド用の環境変数をEASに登録
 
 `.env` はGit管理外でEASに届かないため、別途登録が必要です。
 
@@ -71,14 +80,14 @@ npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "sb_publisha
 npx eas-cli env:create --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY --value "pk_live_..." --environment production
 ```
 
-### 5. 実機で一通り動作確認
+### 6. 実機で一通り動作確認
 
 - アカウント作成 → 目標設定 → カード登録（テストカード `4242 4242 4242 4242`）
 - Supabase の Table Editor で `goals` / `weeks` / `stripe_customers` / `user_stats` にデータが入るか
 - `weeks` の `end_date` を過去日に書き換えて `npx supabase functions invoke judge-weeks` を実行し、
   課金フローが動くか（テストモードで）
 
-### 6. 本番ビルドと提出
+### 7. 本番ビルドと提出
 
 ```
 npx eas-cli build --platform ios --profile production
@@ -128,3 +137,6 @@ npx eas-cli submit --platform ios
 
 - 課金失敗（カード期限切れ等）をアプリ内で通知し、再登録を促すUI
 - `judge-weeks` の週次cron設定（Supabaseダッシュボードで設定。UTCで `10 15 * * 0`）
+- Appleでサインインの実機確認（Apple Developer と Supabase の
+  Apple プロバイダ設定が必要。匿名からの引き継ぎ挙動も要確認）
+- Googleでサインイン（Google Cloud Console でのOAuthクライアント作成が必要）
