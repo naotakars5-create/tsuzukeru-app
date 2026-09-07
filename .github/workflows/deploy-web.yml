@@ -1,9 +1,11 @@
 name: Deploy Web (EAS Hosting)
 
-# コードが更新されたら、GitHub が自動で Web 版を書き出して本番公開する。
-# もう Codespace でコマンドを打つ必要はなく、更新＝自動反映になる。
-#   - main か claude/** ブランチへの push で自動実行
-#   - Actions タブの「Run workflow」ボタンで手動実行も可能
+# main が更新されたら、GitHub が自動で Web 版を書き出して本番公開する。
+#
+# 本番へ出すのは main だけにしている。以前は claude/** への push でも
+# --prod でデプロイしていたため、作業中のブランチが本番を上書きしてしまい、
+# 「main にマージしたのに古い画面が出る」という事故が起きていた。
+# 作業ブランチはプレビュー（本番とは別のURL）へ出す。
 on:
   push:
     branches:
@@ -53,7 +55,16 @@ jobs:
       - name: ホーム画面アイコンの設定を注入
         run: node scripts/inject-web-icons.mjs
 
+      # main のときだけ本番URLを差し替える
       - name: 本番へデプロイ（EAS Hosting）
+        if: github.ref == 'refs/heads/main'
         run: npx eas-cli@latest deploy --prod --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # 作業ブランチはプレビューURLへ。本番は上書きしない
+      - name: プレビューへデプロイ（作業ブランチ）
+        if: github.ref != 'refs/heads/main'
+        run: npx eas-cli@latest deploy --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
