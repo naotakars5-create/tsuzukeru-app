@@ -36,7 +36,7 @@ const KEY_PREMIUM = 'tsuzukeru.premium.v1';
 const KEY_COMMUNITY_CREATIONS = 'tsuzukeru.communityCreations.v1';
 const KEY_CHATS = 'tsuzukeru.chats.v1';
 const KEY_CHAT_READS = 'tsuzukeru.chatReads.v1';
-const KEY_CARD_ONBOARDING = 'tsuzukeru.cardOnboarding.v1';
+const KEY_PENDING_GOAL = 'tsuzukeru.pendingGoal.v1';
 
 const DEFAULT_COMMUNITY_CREATIONS: CommunityCreations = { month: '', count: 0 };
 
@@ -248,24 +248,28 @@ export async function importAll(json: string): Promise<boolean> {
 }
 
 /**
- * 目標を作った直後の「カード登録ステップ」の途中かどうか。
- * Webでは Stripe の決済ページへ一度出てから戻るのでURLの状態が消える。
- * 戻ってきたときに続きの案内を出せるよう、端末側に印を残しておく。
+ * 「コミットして始める」の途中にある目標の入力内容。
+ * カード登録が終わるまで目標は作らないので、フォームの内容をここに置いておく。
+ * Webでは Stripe の決済ページへ一度出て戻るため、メモリではなく端末に残す必要がある。
  */
-export async function loadCardOnboarding(): Promise<boolean> {
+export async function loadPendingGoal<T>(): Promise<T | null> {
   try {
-    return (await AsyncStorage.getItem(KEY_CARD_ONBOARDING)) === '1';
+    const raw = await AsyncStorage.getItem(KEY_PENDING_GOAL);
+    return raw ? (JSON.parse(raw) as T) : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function saveCardOnboarding(active: boolean): Promise<void> {
+export async function savePendingGoal(input: unknown): Promise<void> {
+  await AsyncStorage.setItem(KEY_PENDING_GOAL, JSON.stringify(input));
+}
+
+export async function clearPendingGoal(): Promise<void> {
   try {
-    if (active) await AsyncStorage.setItem(KEY_CARD_ONBOARDING, '1');
-    else await AsyncStorage.removeItem(KEY_CARD_ONBOARDING);
+    await AsyncStorage.removeItem(KEY_PENDING_GOAL);
   } catch {
-    // 保存できなくても流れは止めない
+    // 消せなくても次に開いたときに上書きされる
   }
 }
 
@@ -285,6 +289,6 @@ export async function clearAll(): Promise<void> {
     KEY_COMMUNITY_CREATIONS,
     KEY_CHATS,
     KEY_CHAT_READS,
-    KEY_CARD_ONBOARDING,
+    KEY_PENDING_GOAL,
   ]);
 }

@@ -1,33 +1,25 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { Card } from '@/components/Card';
 import { colors, font, spacing } from '@/theme';
-import { requestCardSetupSession, fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
+import { fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
+import { useCardRegistration } from '@/lib/cardRegistration';
 import { notifyAsync } from '@/logic/confirm';
-import type { CardSetupPanelProps } from '@/components/CardSetupPanel.types';
 
 /**
  * Web版のカード登録パネル。
  * ネイティブの PaymentSheet が使えないため、Stripe のホスト型 Checkout に遷移する。
  * どちらの経路でも、登録完了は setup_intent.succeeded の Webhook で反映される。
- *
- * ネイティブ版と同じく、前置き（intro）・下に置く操作（footer）・
- * 登録できたときの通知（onRegistered）を差し込める。
  */
-export function CardSetupPanel({ intro, footer, onRegistered, onCardChange }: CardSetupPanelProps) {
+export function CardSetupPanel() {
   const [card, setCard] = useState<CardOnFile | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
-
-  // 呼び出し側が毎回新しい関数を渡しても読み込みが繰り返されないよう、参照で持つ
-  const callbacks = useRef({ onRegistered, onCardChange });
-  callbacks.current = { onRegistered, onCardChange };
+  const { register } = useCardRegistration();
 
   const load = useCallback(async () => {
-    const found = await fetchCardOnFile();
-    setCard(found);
-    callbacks.current.onCardChange?.(found);
+    setCard(await fetchCardOnFile());
   }, []);
 
   useEffect(() => {
@@ -45,15 +37,13 @@ export function CardSetupPanel({ intro, footer, onRegistered, onCardChange }: Ca
       notifyAsync('カードを登録しました', '未達の週だけ、このカードから自動で引き落とされます。');
       // Webhook の反映に少し間があるので、待ってから読み直す
       setTimeout(() => void load(), 1500);
-      callbacks.current.onRegistered?.();
     }
   }, [load]);
 
   const onRegister = async () => {
     setBusy(true);
     try {
-      const url = await requestCardSetupSession();
-      window.location.href = url;
+      await register('settings');
     } catch (e) {
       notifyAsync('エラーが発生しました', e instanceof Error ? e.message : String(e));
       setBusy(false);
@@ -61,8 +51,7 @@ export function CardSetupPanel({ intro, footer, onRegistered, onCardChange }: Ca
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {intro}
+    <View style={styles.screen}>
       <Card>
         <View style={styles.head}>
           <View style={styles.icon}>
@@ -104,14 +93,12 @@ export function CardSetupPanel({ intro, footer, onRegistered, onCardChange }: Ca
           カード情報はStripe社が保管し、このアプリでは保存しません。
         </Text>
       </Card>
-      {footer}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, gap: spacing.lg },
+  screen: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   head: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   icon: {
     width: 40,

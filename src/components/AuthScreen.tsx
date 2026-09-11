@@ -15,61 +15,72 @@ import { colors, font, radius, spacing } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 
-type Mode = 'signIn' | 'signUp';
+type Mode = 'code' | 'password';
 
 /**
- * ログイン/新規登録画面。未ログインのときアプリ全体をこれに差し替える。
- * カード登録・週次の自動課金判定にはアカウントが必須なため、最初に必ず通る。
+ * 既存アカウントに戻るためのログイン画面。
+ * 起動時に強制されることはなく、設定タブから開く（機種変更・アプリの入れ直しのとき用）。
+ *
+ * 新しいアカウントはここでは作らない。目標にコミットするときにメールを1つ登録する流れが
+ * 入口なので、ここは「メールに届くコードで戻る」が基本。パスワードを作った人向けに
+ * パスワードでのログインも残している。
  */
 export function AuthScreen() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, sendLoginCode, verifyLoginCode } = useAuth();
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>('signIn');
+  const [mode, setMode] = useState<Mode>('code');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmSent, setConfirmSent] = useState(false);
 
-  const onSubmit = async () => {
+  const mail = email.trim();
+
+  const onSendCode = async () => {
     setError(null);
-    const mail = email.trim();
+    if (!mail) {
+      setError('メールアドレスを入力してください。');
+      return;
+    }
+    setLoading(true);
+    const result = await sendLoginCode(mail);
+    setLoading(false);
+    if (result) {
+      setError(result);
+      return;
+    }
+    setCodeSent(true);
+  };
+
+  const onVerify = async () => {
+    setError(null);
+    setLoading(true);
+    const result = await verifyLoginCode(mail, code);
+    setLoading(false);
+    if (result) {
+      setError(result);
+      return;
+    }
+    router.back();
+  };
+
+  const onPasswordSignIn = async () => {
+    setError(null);
     if (!mail || !password) {
       setError('メールアドレスとパスワードを入力してください。');
       return;
     }
     setLoading(true);
-    const result = mode === 'signIn' ? await signIn(mail, password) : await signUp(mail, password);
+    const result = await signIn(mail, password);
     setLoading(false);
-    if (result === 'CONFIRM_EMAIL') {
-      setConfirmSent(true);
+    if (result) {
+      setError(result);
       return;
     }
-    if (result) setError(result);
+    router.back();
   };
-
-  if (confirmSent) {
-    return (
-      <View style={styles.screen}>
-        <View style={styles.center}>
-          <Logo size={96} />
-          <Text style={styles.title}>確認メールを送りました</Text>
-          <Text style={styles.desc}>
-            {email} 宛に届いた確認メールのリンクを開いてから、{'\n'}ログインしてください。
-          </Text>
-          <PrimaryButton
-            label="ログイン画面に戻る"
-            variant="secondary"
-            onPress={() => {
-              setConfirmSent(false);
-              setMode('signIn');
-            }}
-            style={{ marginTop: spacing.xl }}
-          />
-        </View>
-      </View>
-    );
-  }
 
   return (
     <KeyboardAvoidingView
@@ -81,8 +92,7 @@ export function AuthScreen() {
           <Logo size={100} />
           <Text style={styles.appName}>覚悟の勉強</Text>
           <Text style={styles.desc}>
-            サボると課金、続けると報酬。{'\n'}
-            {mode === 'signIn' ? 'アカウントにログインしてください。' : 'アカウントを作成してください。'}
+            機種変更やアプリの入れ直しのあと、{'\n'}前の記録と請求の状況に戻ります。
           </Text>
         </View>
 
@@ -91,57 +101,91 @@ export function AuthScreen() {
           <TextInput
             style={styles.input}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(v) => {
+              setEmail(v);
+              setCodeSent(false);
+            }}
             placeholder="you@example.com"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
-          />
-          <Text style={styles.label}>パスワード</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="6文字以上"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-          />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <PrimaryButton
-            label={mode === 'signIn' ? 'ログイン' : 'アカウントを作成'}
-            onPress={onSubmit}
-            loading={loading}
-            style={{ marginTop: spacing.lg }}
+            textContentType="emailAddress"
           />
 
-          {mode === 'signUp' && (
-            <Text style={styles.consent}>
-              アカウントを作成すると、
-              <Text style={styles.consentLink} onPress={() => router.push('/legal/terms')}>
-                利用規約
-              </Text>
-              と
-              <Text style={styles.consentLink} onPress={() => router.push('/legal/privacy')}>
-                プライバシーポリシー
-              </Text>
-              に同意したものとみなします。未達の週にのみ料金が発生します。
-            </Text>
+          {mode === 'code' ? (
+            codeSent ? (
+              <>
+                <Text style={styles.label}>メールに届いた6桁のコード</Text>
+                <TextInput
+                  style={styles.input}
+                  value={code}
+                  onChangeText={setCode}
+                  placeholder="123456"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="number-pad"
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
+                  maxLength={8}
+                />
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+                <PrimaryButton
+                  label="ログイン"
+                  onPress={onVerify}
+                  loading={loading}
+                  disabled={code.trim().length < 6}
+                  style={{ marginTop: spacing.lg }}
+                />
+                <Pressable onPress={onSendCode} style={styles.switchRow} hitSlop={8}>
+                  <Text style={styles.switchText}>コードを再送する</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+                <PrimaryButton
+                  label="ログインコードを送る"
+                  icon="mail"
+                  onPress={onSendCode}
+                  loading={loading}
+                  style={{ marginTop: spacing.lg }}
+                />
+              </>
+            )
+          ) : (
+            <>
+              <Text style={styles.label}>パスワード</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="パスワード"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+              />
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              <PrimaryButton
+                label="ログイン"
+                onPress={onPasswordSignIn}
+                loading={loading}
+                style={{ marginTop: spacing.lg }}
+              />
+            </>
           )}
 
           <Pressable
             onPress={() => {
-              setMode(mode === 'signIn' ? 'signUp' : 'signIn');
+              setMode(mode === 'code' ? 'password' : 'code');
               setError(null);
+              setCodeSent(false);
             }}
             style={styles.switchRow}
             hitSlop={8}
           >
             <Text style={styles.switchText}>
-              {mode === 'signIn' ? 'アカウントをお持ちでない方はこちら' : 'すでにアカウントをお持ちの方はこちら'}
+              {mode === 'code' ? 'パスワードでログインする' : 'メールに届くコードでログインする'}
             </Text>
           </Pressable>
         </View>
@@ -155,7 +199,6 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing.xl, justifyContent: 'center' },
   center: { alignItems: 'center', gap: spacing.sm },
   appName: { fontSize: font.title, fontWeight: '900', color: colors.text, marginTop: spacing.sm },
-  title: { fontSize: font.heading, fontWeight: '800', color: colors.text, marginTop: spacing.lg },
   desc: { fontSize: font.sub, color: colors.textSub, textAlign: 'center', lineHeight: 21 },
   form: { marginTop: spacing.xxl, gap: spacing.xs },
   label: { fontSize: font.small, fontWeight: '700', color: colors.textSub, marginTop: spacing.md },
@@ -171,14 +214,6 @@ const styles = StyleSheet.create({
     fontSize: font.body,
   },
   error: { color: colors.danger, fontSize: font.small, marginTop: spacing.sm },
-  consent: {
-    fontSize: font.small,
-    color: colors.textMuted,
-    lineHeight: 18,
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
-  consentLink: { color: colors.primary, fontWeight: '700' },
   switchRow: { alignItems: 'center', marginTop: spacing.lg, padding: spacing.sm },
   switchText: { color: colors.primary, fontSize: font.small, fontWeight: '700' },
 });

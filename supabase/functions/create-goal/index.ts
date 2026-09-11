@@ -2,8 +2,52 @@
 // weeks（課金の元になるテーブル）はクライアントから直接書けない設計にしているため、
 // ローカルで目標を作った/次シーズンを始めたタイミングでここを呼び、
 // 判定・課金の元になる週データをサーバー側で作る。
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+//
+// カードが登録されていないユーザーの目標は作らない（card_required で断る）。
+// 「コミットしたのに課金先がない」という漏れを、アプリ側の導線だけでなくここでも塞ぐ。
+import Stripe from 'https://esm.sh/stripe@17?target=deno';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2024-06-20' });
+
+/**
+ * そのユーザーに課金できるカードがあるか。
+ * Webhook（setup_intent.succeeded）の反映がカード登録の直後に間に合わないことがあるので、
+ * DBに無ければ Stripe に直接問い合わせ、見つかればその場でDBにも書いておく。
+ */
+async function ensureCardOnFile(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data: customer } = await supabase
+    .from('stripe_customers')
+    .select('stripe_customer_id, default_payment_method_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!customer) return false;
+  if (customer.default_payment_method_id) return true;
+
+  const methods = await stripe.paymentMethods.list({
+    customer: customer.stripe_customer_id,
+    type: 'card',
+    limit: 1,
+  });
+  const pm = methods.data[0];
+  if (!pm) return false;
+
+  await stripe.customers.update(customer.stripe_customer_id, {
+    invoice_settings: { default_payment_method: pm.id },
+  });
+  await supabase
+    .from('stripe_customers')
+    .update({
+      default_payment_method_id: pm.id,
+      card_brand: pm.card?.brand ?? null,
+      card_last4: pm.card?.last4 ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_customer_id', customer.stripe_customer_id);
+  return true;
+}
 
 interface WeekPlan {
   weekIndex: number;
@@ -47,6 +91,13 @@ Deno.serve(async (req) => {
     if (!payload.name || !payload.weeks?.length) {
       return new Response(JSON.stringify({ error: '不正なリクエストです' }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!(await ensureCardOnFile(supabase, userId))) {
+      return new Response(JSON.stringify({ error: 'card_required' }), {
+        status: 402,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
