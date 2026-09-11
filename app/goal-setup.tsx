@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
@@ -20,6 +21,7 @@ import { DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
 import { CategoryPicker } from '@/components/CategoryPicker';
 import { fetchCategoryCount } from '@/lib/socialApi';
 import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
+import { fetchCardOnFile } from '@/lib/billingClient';
 import { randomHotQuote } from '@/logic/quotes';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
 import { DAILY_TARGET_OPTIONS, formatMinutes } from '@/logic/time';
@@ -42,6 +44,7 @@ const TARGET_HOURS_PRESETS = [100, 300, 500, 1000];
 export default function GoalSetupScreen() {
   const router = useRouter();
   const { goal, createGoal } = useApp();
+  const { backendEnabled } = useAuth();
 
   const [name, setName] = useState(goal?.name ?? '');
   const [category, setCategory] = useState<GoalCategory>(goal?.category ?? DEFAULT_CATEGORY);
@@ -106,8 +109,9 @@ export default function GoalSetupScreen() {
     }
 
     const depositMsg =
-      `コミット額 ¥${deposit.toLocaleString()} で始めます（モック・実際の決済はしません）。\n` +
-      `お金は預かりません。達成すれば¥0、サボった週ぶん（¥${perWeekStake.toLocaleString()}/週）だけ後から課金されます。`;
+      `コミット額 ¥${deposit.toLocaleString()} で始めます。\n` +
+      `お金は預かりません。達成すれば¥0、サボった週ぶん（¥${perWeekStake.toLocaleString()}/週）だけ後から課金されます。\n` +
+      `このあと支払い方法（カード）の登録に進みます（登録時は¥0）。`;
     const confirmMsg = goal
       ? `これまでの記録はリセットされ、新しい4週間が始まります。\n${depositMsg}`
       : depositMsg;
@@ -131,8 +135,10 @@ export default function GoalSetupScreen() {
       targetTotalHours: targetHours,
       durationWeeks: DURATION_WEEKS,
     });
-    // 「火がつく」演出を挟んでホームへ
-    router.replace('/ignite');
+    // カードがまだなら、ここで登録まで案内する（登録時は¥0・あとで登録も選べる）。
+    // 終わったら「火がつく」演出を挟んでホームへ。
+    const needsCard = backendEnabled && !(await fetchCardOnFile());
+    router.replace(needsCard ? '/card-setup?onboarding=1' : '/ignite');
   };
 
   return (
@@ -372,6 +378,7 @@ export default function GoalSetupScreen() {
           <Text style={styles.label}>コミット額を決める</Text>
           <Text style={styles.helper}>
             お金は預かりません。達成すれば¥0、サボった週ぶんだけ後からカードに課金される方式です。
+            {backendEnabled ? '\nこのあと、そのカードを登録します（登録時は¥0）。' : ''}
           </Text>
           <View style={styles.countRow}>
             {DEPOSIT_OPTIONS.map((d) => {

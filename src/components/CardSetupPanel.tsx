@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStripe } from '@stripe/stripe-react-native';
@@ -8,6 +8,7 @@ import { Card } from '@/components/Card';
 import { colors, font, spacing } from '@/theme';
 import { requestCardSetup, fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
 import { notifyAsync } from '@/logic/confirm';
+import type { CardSetupPanelProps } from '@/components/CardSetupPanel.types';
 
 /**
  * カード登録パネル（案C: ここでは¥0。保存のみ）。
@@ -15,14 +16,23 @@ import { notifyAsync } from '@/logic/confirm';
  *
  * Stripeはネイティブ専用モジュールのため、Web版には CardSetupPanel.web.tsx が使われ、
  * この import 自体が Web バンドルに入らないようにしている。
+ *
+ * 目標を作った直後の登録ステップからも使うので、前置き（intro）と
+ * 下に置く操作（footer）、登録できたときの通知（onRegistered）を差し込めるようにしている。
  */
-export function CardSetupPanel() {
+export function CardSetupPanel({ intro, footer, onRegistered, onCardChange }: CardSetupPanelProps) {
   const [card, setCard] = useState<CardOnFile | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
+  // 呼び出し側が毎回新しい関数を渡しても読み込みが繰り返されないよう、参照で持つ
+  const callbacks = useRef({ onRegistered, onCardChange });
+  callbacks.current = { onRegistered, onCardChange };
+
   const load = useCallback(async () => {
-    setCard(await fetchCardOnFile());
+    const found = await fetchCardOnFile();
+    setCard(found);
+    callbacks.current.onCardChange?.(found);
   }, []);
 
   useFocusEffect(
@@ -53,6 +63,7 @@ export function CardSetupPanel() {
       }
       notifyAsync('カードを登録しました', '未達の週だけ、このカードから自動で引き落とされます。');
       await load();
+      callbacks.current.onRegistered?.();
     } catch (e) {
       notifyAsync('エラーが発生しました', e instanceof Error ? e.message : String(e));
     } finally {
@@ -61,7 +72,8 @@ export function CardSetupPanel() {
   };
 
   return (
-    <View style={styles.screen}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      {intro}
       <Card>
         <View style={styles.head}>
           <View style={styles.icon}>
@@ -102,12 +114,14 @@ export function CardSetupPanel() {
           ※ ここでは課金されません（¥0）。カード情報はStripe社が安全に保管し、このアプリでは保存しません。
         </Text>
       </Card>
-    </View>
+      {footer}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: spacing.lg, gap: spacing.lg },
   head: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   icon: {
     width: 40,
