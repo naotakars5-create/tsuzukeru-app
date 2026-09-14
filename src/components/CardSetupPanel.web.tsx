@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { Card } from '@/components/Card';
 import { colors, font, spacing } from '@/theme';
-import { requestCardSetupSession, fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
+import { fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
+import { useCardRegistration } from '@/lib/cardRegistration';
 import { notifyAsync } from '@/logic/confirm';
 
 /**
@@ -15,6 +16,7 @@ import { notifyAsync } from '@/logic/confirm';
 export function CardSetupPanel() {
   const [card, setCard] = useState<CardOnFile | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const { register } = useCardRegistration();
 
   const load = useCallback(async () => {
     setCard(await fetchCardOnFile());
@@ -41,8 +43,7 @@ export function CardSetupPanel() {
   const onRegister = async () => {
     setBusy(true);
     try {
-      const url = await requestCardSetupSession();
-      window.location.href = url;
+      await register('settings');
     } catch (e) {
       notifyAsync('エラーが発生しました', e instanceof Error ? e.message : String(e));
       setBusy(false);

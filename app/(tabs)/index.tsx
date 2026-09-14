@@ -8,10 +8,12 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { confirmAsync } from '@/logic/confirm';
+import { confirmAsync, notifyAsync } from '@/logic/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
+import { fetchCardOnFile } from '@/lib/billingClient';
 import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -50,6 +52,7 @@ export default function HomeScreen() {
     isTodayScheduled,
     todayStatus,
   } = useApp();
+  const { backendEnabled, emailPending } = useAuth();
 
   // 毎回変わる“熱い格言”（ホームを開くたびに選び直す）
   const [quote, setQuote] = React.useState(() => randomHotQuote());
@@ -114,7 +117,14 @@ export default function HomeScreen() {
         `「${goal.name}」で新しい4週間を始めます。連続日数・ポイント・実績は引き継がれます。\nコミット額は ¥${goal.deposit.toLocaleString()}（お金は預かりません。未達の週だけ課金）。`,
         '始める'
       );
-      if (ok) startNextSeason();
+      if (!ok) return;
+      // 次のシーズンもカードが要る（サーバーはカード無しの目標を作らない）
+      if (backendEnabled && !(await fetchCardOnFile())) {
+        notifyAsync('カードを登録してください', '次のシーズンを始めるには、支払い方法の登録が必要です。');
+        router.push('/card-setup');
+        return;
+      }
+      startNextSeason();
     };
 
     return (
@@ -226,6 +236,16 @@ export default function HomeScreen() {
             <Ionicons name="notifications-outline" size={20} color={colors.textSub} />
           </Pressable>
         </View>
+
+        {/* 復元用メールの確認がまだなら、一行だけ */}
+        {emailPending && (
+          <Pressable onPress={() => router.push('/settings')} style={styles.mailNotice}>
+            <Ionicons name="mail-unread-outline" size={16} color={colors.warning} />
+            <Text style={styles.mailNoticeText}>
+              確認メールのリンクを開くと、機種変更しても記録と請求を引き継げます。
+            </Text>
+          </Pressable>
+        )}
 
         {/* 試験日カウントダウン */}
         {exam && !exam.passed && (
@@ -471,6 +491,16 @@ function Pillar({
 }
 
 const styles = StyleSheet.create({
+  mailNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  mailNoticeText: { flex: 1, fontSize: font.small, color: colors.textSub, fontWeight: '600', lineHeight: 17 },
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 22, paddingTop: spacing.sm, gap: spacing.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },

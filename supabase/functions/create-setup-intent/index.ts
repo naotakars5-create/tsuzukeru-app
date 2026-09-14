@@ -33,7 +33,8 @@ Deno.serve(async (req) => {
       stripe,
       supabase,
       userData.user.id,
-      userData.user.email ?? undefined
+      // 確認待ちの復元用メール（new_email）も、領収メールの宛先として使う
+      userData.user.email ?? userData.user.new_email ?? undefined
     );
 
     // usage: off_session -> あとで本人不在でも自動課金できるようにするための設定

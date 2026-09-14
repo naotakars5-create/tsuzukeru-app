@@ -13,7 +13,7 @@ import { colors } from '@/theme';
  * アプリ全体のルートレイアウト。
  *
  * 起動時にログイン画面は出さない。認証は裏で匿名アカウントとして始まり、
- * カードを登録するときに初めてIDの紐付けを求める
+ * 目標にコミットする（カードを登録する）ときに初めて復元用のメールを1つ求める
  * （App Store ガイドライン 5.1.1(i) への対応でもある）。
  */
 export default function RootLayout() {
@@ -58,6 +58,10 @@ function RootStack() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ title: 'ログイン', presentation: 'modal' }} />
       <Stack.Screen name="goal-setup" options={{ title: '目標を設定', presentation: 'modal' }} />
+      <Stack.Screen
+        name="commit"
+        options={{ title: 'コミットして始める', presentation: 'modal' }}
+      />
       <Stack.Screen name="today" options={{ title: '今日の達成', presentation: 'card' }} />
       <Stack.Screen name="journal" options={{ title: '学習メモ', presentation: 'card' }} />
       <Stack.Screen

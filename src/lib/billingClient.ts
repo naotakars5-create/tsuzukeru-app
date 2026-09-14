@@ -4,6 +4,21 @@ const NOT_CONFIGURED =
   'サーバーが未設定のため、カード登録は利用できません（.env に Supabase の鍵を設定してください）。';
 
 /**
+ * カード登録をどこから始めたか。Web版で Stripe の画面から戻る先を決めるのに使う。
+ * - commit: 目標作成の「コミットして始める」から（戻り先は /commit）
+ * - settings: 設定の「支払い方法」から（戻り先は /card-setup）
+ */
+export type CardFlow = 'commit' | 'settings';
+
+/**
+ * カード登録の結果。
+ * - registered: その場で登録できた（ネイティブ）
+ * - canceled: 利用者が閉じた
+ * - redirected: Stripe の画面へ移動した（Web。結果は戻ってきてから分かる）
+ */
+export type CardRegisterResult = 'registered' | 'canceled' | 'redirected';
+
+/**
  * カード登録用の SetupIntent をサーバー（Edge Function）に発行してもらう。
  * ここでは¥0。実際のカード入力・保存は呼び出し側で PaymentSheet を開いて行う。
  */
@@ -29,7 +44,7 @@ export async function requestCardSetup(): Promise<{ clientSecret: string; custom
  * ネイティブの PaymentSheet が使えないWeb用の経路で、ここでも課金は発生しない（0円）。
  * 戻り先URLはサーバー側の APP_WEB_URL から組み立てる（オープンリダイレクト対策）。
  */
-export async function requestCardSetupSession(): Promise<string> {
+export async function requestCardSetupSession(flow: CardFlow = 'settings'): Promise<string> {
   if (!isBackendConfigured) throw new Error(NOT_CONFIGURED);
   const { data: session } = await supabase.auth.getSession();
   const token = session.session?.access_token;
@@ -37,7 +52,7 @@ export async function requestCardSetupSession(): Promise<string> {
 
   const { data, error } = await supabase.functions.invoke<{ url?: string; error?: string }>(
     'create-setup-session',
-    { headers: { Authorization: `Bearer ${token}` } }
+    { headers: { Authorization: `Bearer ${token}` }, body: { flow } }
   );
 
   if (data?.error) throw new Error(data.error);

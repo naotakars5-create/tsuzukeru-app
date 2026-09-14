@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, font, radius, spacing } from '@/theme';
@@ -20,6 +21,7 @@ import { DEFAULT_CATEGORY, categoryOf } from '@/logic/category';
 import { CategoryPicker } from '@/components/CategoryPicker';
 import { fetchCategoryCount } from '@/lib/socialApi';
 import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
+import { savePendingGoal } from '@/storage';
 import { randomHotQuote } from '@/logic/quotes';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
 import { DAILY_TARGET_OPTIONS, formatMinutes } from '@/logic/time';
@@ -42,6 +44,7 @@ const TARGET_HOURS_PRESETS = [100, 300, 500, 1000];
 export default function GoalSetupScreen() {
   const router = useRouter();
   const { goal, createGoal } = useApp();
+  const { backendEnabled } = useAuth();
 
   const [name, setName] = useState(goal?.name ?? '');
   const [category, setCategory] = useState<GoalCategory>(goal?.category ?? DEFAULT_CATEGORY);
@@ -105,21 +108,7 @@ export default function GoalSetupScreen() {
       return;
     }
 
-    const depositMsg =
-      `コミット額 ¥${deposit.toLocaleString()} で始めます（モック・実際の決済はしません）。\n` +
-      `お金は預かりません。達成すれば¥0、サボった週ぶん（¥${perWeekStake.toLocaleString()}/週）だけ後から課金されます。`;
-    const confirmMsg = goal
-      ? `これまでの記録はリセットされ、新しい4週間が始まります。\n${depositMsg}`
-      : depositMsg;
-
-    const ok = await confirmAsync(
-      goal ? '目標を作り直しますか？' : `コミット ¥${deposit.toLocaleString()} で始めますか？`,
-      confirmMsg,
-      goal ? '作り直す' : 'この覚悟で始める'
-    );
-    if (!ok) return;
-
-    await createGoal({
+    const input = {
       name: trimmed,
       category,
       frequency,
@@ -130,7 +119,25 @@ export default function GoalSetupScreen() {
       examDate,
       targetTotalHours: targetHours,
       durationWeeks: DURATION_WEEKS,
-    });
+    };
+
+    if (goal) {
+      const ok = await confirmAsync(
+        '目標を作り直しますか？',
+        `これまでの記録はリセットされ、新しい4週間が始まります。\nコミット額 ¥${deposit.toLocaleString()}（お金は預かりません。未達の週ぶん ¥${perWeekStake.toLocaleString()} だけ後から課金）。`,
+        '作り直す'
+      );
+      if (!ok) return;
+    }
+
+    // サーバーが使えるときは、メールとカードを確認する「コミット」画面を経てから目標を作る。
+    // 鍵未設定のローカル専用モードだけは、ここでそのまま作って始める。
+    if (backendEnabled) {
+      await savePendingGoal(input);
+      router.push('/commit');
+      return;
+    }
+    await createGoal(input);
     // 「火がつく」演出を挟んでホームへ
     router.replace('/ignite');
   };
@@ -372,6 +379,7 @@ export default function GoalSetupScreen() {
           <Text style={styles.label}>コミット額を決める</Text>
           <Text style={styles.helper}>
             お金は預かりません。達成すれば¥0、サボった週ぶんだけ後からカードに課金される方式です。
+            {backendEnabled ? '\n次の画面でメールアドレスとカードを登録して開始します（登録時は¥0）。' : ''}
           </Text>
           <View style={styles.countRow}>
             {DEPOSIT_OPTIONS.map((d) => {
@@ -418,7 +426,13 @@ export default function GoalSetupScreen() {
         </Card>
 
         <PrimaryButton
-          label={goal ? '目標を作り直す' : `コミット ¥${deposit.toLocaleString()} で始める`}
+          label={
+            goal
+              ? '目標を作り直す'
+              : backendEnabled
+                ? `コミット ¥${deposit.toLocaleString()} へ進む`
+                : `コミット ¥${deposit.toLocaleString()} で始める`
+          }
           icon="flame"
           onPress={onSave}
           style={{ marginTop: spacing.sm }}

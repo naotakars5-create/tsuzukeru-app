@@ -11,13 +11,14 @@ import { useAuth } from '@/context/AuthContext';
 /**
  * カード登録画面（案C: ここでは¥0。保存のみ）。
  *
- * 匿名のまま使っている人には、先にIDの登録をお願いする。
+ * 復元用のメールがまだ無い人には、先にその登録をお願いする。
  * 請求先を確定させるためと、機種変更で請求の状況が宙に浮かないようにするため。
+ * （通常は目標作成の「コミット」画面で済んでいるので、ここに来るのは例外的なケース）
  * 中身は CardSetupPanel（ネイティブ/Webでファイルが分かれている）に委譲する。
  */
 export default function CardSetupScreen() {
   const router = useRouter();
-  const { backendEnabled, isAnonymous } = useAuth();
+  const { backendEnabled, recoveryEmail } = useAuth();
 
   if (!backendEnabled) {
     return (
@@ -32,7 +33,7 @@ export default function CardSetupScreen() {
     );
   }
 
-  if (isAnonymous) {
+  if (!recoveryEmail) {
     return (
       <View style={styles.screen}>
         <Card>

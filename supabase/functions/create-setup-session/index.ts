@@ -16,7 +16,12 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '202
 // 戻り先URLはサーバー側の設定だけから組み立てる。
 // クライアントから受け取った値をそのまま Stripe に渡すと、
 // 任意のサイトへ飛ばせるオープンリダイレクトになるため。
+// クライアントが選べるのは、下の決まったパスのどれかだけ。
 const appWebUrl = Deno.env.get('APP_WEB_URL')?.replace(/\/$/, '');
+const RETURN_PATHS: Record<string, string> = {
+  commit: '/commit', // 目標作成の「コミットして始める」から
+  settings: '/card-setup', // 設定の「支払い方法」から
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -49,10 +54,18 @@ Deno.serve(async (req) => {
       stripe,
       supabase,
       userData.user.id,
-      userData.user.email ?? undefined
+      // 確認待ちの復元用メール（new_email）も、領収メールの宛先として使う
+      userData.user.email ?? userData.user.new_email ?? undefined
     );
 
-    const returnUrl = `${appWebUrl}/card-setup`;
+    let flow = 'settings';
+    try {
+      const body = await req.json();
+      if (typeof body?.flow === 'string' && Object.hasOwn(RETURN_PATHS, body.flow)) flow = body.flow;
+    } catch {
+      // 本文なしは設定からの登録として扱う
+    }
+    const returnUrl = `${appWebUrl}${RETURN_PATHS[flow]}`;
     const session = await stripe.checkout.sessions.create({
       mode: 'setup',
       customer: customerId,

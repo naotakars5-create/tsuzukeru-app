@@ -2,24 +2,24 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useStripe } from '@stripe/stripe-react-native';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { Card } from '@/components/Card';
 import { colors, font, spacing } from '@/theme';
-import { requestCardSetup, fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
+import { fetchCardOnFile, CardOnFile } from '@/lib/billingClient';
+import { useCardRegistration } from '@/lib/cardRegistration';
 import { notifyAsync } from '@/logic/confirm';
 
 /**
  * カード登録パネル（案C: ここでは¥0。保存のみ）。
  * 達成した週は課金されず、未達の週だけ後からこのカードに自動課金される。
  *
- * Stripeはネイティブ専用モジュールのため、Web版には CardSetupPanel.web.tsx が使われ、
- * この import 自体が Web バンドルに入らないようにしている。
+ * カード入力そのものは useCardRegistration（ネイティブ/Webで実装が分かれている）に任せ、
+ * ここは登録済みカードの表示と、登録後の読み直しだけを受け持つ。
  */
 export function CardSetupPanel() {
   const [card, setCard] = useState<CardOnFile | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { register } = useCardRegistration();
 
   const load = useCallback(async () => {
     setCard(await fetchCardOnFile());
@@ -34,27 +34,12 @@ export function CardSetupPanel() {
   const onRegister = async () => {
     setBusy(true);
     try {
-      const { clientSecret } = await requestCardSetup();
-      const initResult = await initPaymentSheet({
-        setupIntentClientSecret: clientSecret,
-        merchantDisplayName: '覚悟の勉強',
-        style: 'alwaysDark',
-      });
-      if (initResult.error) {
-        notifyAsync('準備に失敗しました', initResult.error.message);
-        return;
-      }
-      const presentResult = await presentPaymentSheet();
-      if (presentResult.error) {
-        if (presentResult.error.code !== 'Canceled') {
-          notifyAsync('登録できませんでした', presentResult.error.message);
-        }
-        return;
-      }
+      const result = await register('settings');
+      if (result !== 'registered') return;
       notifyAsync('カードを登録しました', '未達の週だけ、このカードから自動で引き落とされます。');
       await load();
     } catch (e) {
-      notifyAsync('エラーが発生しました', e instanceof Error ? e.message : String(e));
+      notifyAsync('登録できませんでした', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }

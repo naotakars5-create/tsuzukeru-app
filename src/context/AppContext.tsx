@@ -57,7 +57,8 @@ import {
 import { scheduleDailyReminder, cancelReminders, scheduleSmartReminders } from '@/logic/reminder';
 import { BADGES, satisfiedBadgeKeys } from '@/logic/badges';
 import { weekStake } from '@/logic/billing';
-import { syncGoalToServer, syncDailyMinutes } from '@/lib/sync';
+import { syncGoalToServer, registerGoalOnServer, syncDailyMinutes } from '@/lib/sync';
+import { isBackendConfigured } from '@/lib/supabase';
 import { syncUserStats, fetchMyCommunities, fetchUnreadCounts } from '@/lib/socialApi';
 import { POINTS_PER_DONE } from '@/logic/rank';
 
@@ -322,6 +323,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // 案C: 開始時は課金しない（カード登録＋コミットのみ）。お金は預からない
       const nextLifetime = base;
       const newGoal = makeGoal(input);
+      // サーバーが使えるときは、先にサーバーに登録できてから端末に保存する。
+      // カード未登録などで断られたら例外になり、目標は作られない（漏れ防止）。
+      // ローカル専用モード（鍵未設定）だけは、そのまま端末内で始める。
+      if (isBackendConfigured) await registerGoalOnServer(newGoal);
       setLifetime(nextLifetime);
       setGoal(newGoal);
       setMinutes({});
@@ -329,7 +334,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (reminder.enabled) {
         await scheduleDailyReminder(reminder.hour, reminder.minute, newGoal.name);
       }
-      void syncGoalToServer(newGoal);
     },
     [goal, lifetime, foldSeasonIntoLifetime, makeGoal, reminder]
   );
