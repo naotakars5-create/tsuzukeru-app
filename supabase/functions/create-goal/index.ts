@@ -26,11 +26,19 @@ async function ensureCardOnFile(supabase: SupabaseClient, userId: string): Promi
   if (!customer) return false;
   if (customer.default_payment_method_id) return true;
 
-  const methods = await stripe.paymentMethods.list({
-    customer: customer.stripe_customer_id,
-    type: 'card',
-    limit: 1,
-  });
+  // DBの顧客が Stripe 側に無いことがある（テストモードの顧客のまま本番の鍵に切り替えた等）。
+  // その場合は「カード未登録」として扱い、登録し直してもらう（登録時に顧客も作り直される）。
+  let methods: Stripe.ApiList<Stripe.PaymentMethod>;
+  try {
+    methods = await stripe.paymentMethods.list({
+      customer: customer.stripe_customer_id,
+      type: 'card',
+      limit: 1,
+    });
+  } catch (e) {
+    console.error('カードの確認に失敗（顧客が見つからない可能性）', e);
+    return false;
+  }
   const pm = methods.data[0];
   if (!pm) return false;
 
