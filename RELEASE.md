@@ -103,6 +103,18 @@ npx supabase secrets set STRIPE_WEBHOOK_SECRET=<本番モードのwhsec_...>
 `.env` の `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` も `pk_live_...` に変更。
 Webhookエンドポイントは本番モード側でも登録し直す必要があります。
 
+**切り替えたら、テストモードで作ったデータを消してください。** テストモードの顧客IDは
+本番モードには存在しないため、そのままだと課金先が見つかりません。SQL Editor で:
+
+```sql
+delete from weeks;
+delete from goals;
+delete from stripe_customers;
+```
+
+（消し忘れても、カードを登録し直せば顧客は作り直されます。ただし古い goals /
+weeks は課金先のないまま残るので、消しておくのが安全です。）
+
 ### 5. 本番ビルド用の環境変数をEASに登録
 
 `.env` はGit管理外でEASに届かないため、別途登録が必要です。
