@@ -342,14 +342,14 @@ export default function SettingsScreen() {
             icon="download"
             variant="secondary"
             onPress={onBackup}
-            style={{ flex: 1, height: 46 }}
+            style={styles.backupBtn}
           />
           <PrimaryButton
             label="復元する"
             icon="cloud-upload"
             variant="secondary"
             onPress={onRestore}
-            style={{ flex: 1, height: 46 }}
+            style={styles.backupBtn}
           />
         </View>
         <PrimaryButton
@@ -483,6 +483,8 @@ const styles = StyleSheet.create({
   },
   soonText: { fontSize: 10, color: colors.textSub, fontWeight: '700' },
 
-  backupRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  // 幅が足りないスマホでは縦に並ぶ（横並びのままだと文字が折り返してはみ出る）
+  backupRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  backupBtn: { flexGrow: 1, flexBasis: 170, height: 46 },
   version: { textAlign: 'center', fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm },
 });

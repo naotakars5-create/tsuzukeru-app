@@ -80,5 +80,5 @@ const styles = StyleSheet.create({
   ghost: { backgroundColor: 'transparent' },
   pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
   disabled: { opacity: 0.45 },
-  label: { fontSize: font.body, fontWeight: '800', letterSpacing: 0.2 },
+  label: { fontSize: font.body, fontWeight: '800', letterSpacing: 0.2, textAlign: 'center' },
 });
