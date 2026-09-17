@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+} from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -19,8 +27,17 @@ const POMODORO_MIN = 25;
  * 今日の合計が1日の目標時間に届いたら「達成」になる。
  * 計測はアプリ全体で継続する（他画面へ移動しても止まらない）。
  */
+/** リングの大きさ。小さい画面では縮めて、上下の要素と重ならないようにする */
+const RING_MAX = 260;
+const RING_MIN = 180;
+
 export default function TodayScreen() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
+  // 画面の高さの3割ほど。横幅にも収める（Web版のスマホ表示で高さが足りないことがある）
+  const ringSize = Math.round(
+    Math.max(RING_MIN, Math.min(RING_MAX, height * 0.32, width - 88))
+  );
   const {
     goal,
     progress,
@@ -112,7 +129,11 @@ export default function TodayScreen() {
   const stake = goal ? weekStake(goal.deposit, goal.durationWeeks) : 0;
 
   return (
-    <View style={styles.screen}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
       <Stack.Screen options={{ title: goal?.name ?? '勉強タイマー' }} />
 
       {!isTodayScheduled ? (
@@ -137,12 +158,19 @@ export default function TodayScreen() {
           <View style={styles.heroArea}>
             <ProgressRing
               ratio={ratio}
-              size={260}
+              size={ringSize}
               strokeWidth={12}
               color={reached ? colors.success : colors.primary}
             >
               <Text style={styles.timerLabel}>{running ? '計測中' : '今日の勉強'}</Text>
-              <Text style={styles.timer}>{formatStopwatch(sessionSec)}</Text>
+              <Text
+                style={[
+                  styles.timer,
+                  { fontSize: Math.round(ringSize * 0.2), lineHeight: Math.round(ringSize * 0.22) },
+                ]}
+              >
+                {formatStopwatch(sessionSec)}
+              </Text>
               <Text style={styles.todayTotal}>
                 合計 {formatMinutes(totalTodayMin)} / 目標 {formatMinutes(targetMin)}
               </Text>
@@ -240,12 +268,13 @@ export default function TodayScreen() {
           </View>
         </>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 22 },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  content: { flexGrow: 1, paddingHorizontal: 22, paddingBottom: spacing.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   notSched: { fontSize: font.body, color: colors.textSub, fontWeight: '700' },
 
@@ -263,7 +292,13 @@ const styles = StyleSheet.create({
   },
   bannerText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.danger },
 
-  heroArea: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+  heroArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    paddingVertical: spacing.md,
+  },
   timerLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.8, color: colors.textSub },
   timer: {
     fontSize: 52,
