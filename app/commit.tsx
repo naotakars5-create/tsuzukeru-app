@@ -26,6 +26,8 @@ import { useCardRegistration } from '@/lib/cardRegistration';
 import { GoalRegisterError } from '@/lib/sync';
 import { loadPendingGoal, clearPendingGoal } from '@/storage';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * 「コミットして始める」画面。目標フォームの直後に通る、最後の1画面。
  *
@@ -50,6 +52,8 @@ export default function CommitScreen() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [codeSentTo, setCodeSentTo] = useState<string | null>(null);
+  // コード入力に切り替わった理由。登録済みを自動で見つけたのか、本人が選んだのか
+  const [codeAuto, setCodeAuto] = useState(false);
   const [card, setCard] = useState<CardOnFile | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +128,7 @@ export default function CommitScreen() {
     try {
       if (!recoveryEmail) {
         const mail = email.trim();
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+        if (!EMAIL_RE.test(mail)) {
           setError('メールアドレスの形式が正しくありません。');
           return;
         }
@@ -135,6 +139,7 @@ export default function CommitScreen() {
             setError(sendErr);
             return;
           }
+          setCodeAuto(true);
           setCodeSentTo(mail);
           return;
         }
@@ -144,6 +149,33 @@ export default function CommitScreen() {
         }
       }
       await continueWithCard();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * 「すでに登録した方はこちら」。本人が選んでコードを送る。
+   *
+   * Supabase の設定によっては、登録済みのメールでもエラーが返らず自動で気づけない
+   * （メールアドレスの存在を隠す保護）。そのときに二重登録にならないための逃げ道。
+   */
+  const onUseExistingAccount = async () => {
+    setError(null);
+    const mail = email.trim();
+    if (!EMAIL_RE.test(mail)) {
+      setError('引き継ぐメールアドレスを入力してください。');
+      return;
+    }
+    setBusy(true);
+    try {
+      const sendErr = await sendLoginCode(mail);
+      if (sendErr) {
+        setError(sendErr);
+        return;
+      }
+      setCodeAuto(false);
+      setCodeSentTo(mail);
     } finally {
       setBusy(false);
     }
@@ -277,8 +309,10 @@ export default function CommitScreen() {
           ) : codeSentTo ? (
             <>
               <Text style={styles.helper}>
-                {codeSentTo} はすでに登録されています。届いた6桁のコードを入力すると、
-                前の記録とカードを引き継げます。
+                {codeAuto
+                  ? `${codeSentTo} はすでに登録されています。`
+                  : `${codeSentTo} に6桁のコードを送りました。`}
+                届いたコードを入力すると、前の記録とカードを引き継げます。
               </Text>
               <TextInput
                 style={styles.input}
@@ -324,6 +358,17 @@ export default function CommitScreen() {
                 onLinked={() => setError(null)}
                 onError={(m) => setError(m)}
               />
+              <Pressable
+                onPress={onUseExistingAccount}
+                disabled={busy}
+                hitSlop={8}
+                style={styles.takeoverRow}
+              >
+                <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
+                <Text style={styles.link}>
+                  すでにこのメールで登録した方はこちら（記録とカードを引き継ぐ）
+                </Text>
+              </Pressable>
             </>
           )}
         </Card>
@@ -451,7 +496,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  link: { color: colors.primary, fontSize: font.small, fontWeight: '800' },
+  link: { color: colors.primary, fontSize: font.small, fontWeight: '800', flexShrink: 1 },
+  takeoverRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+    paddingVertical: spacing.xs,
+  },
   cardRow: {
     marginTop: spacing.md,
     flexDirection: 'row',
