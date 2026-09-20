@@ -13,6 +13,10 @@ name: iOS ビルド（App Store へ提出）
 #     → これが無いと、証明書を作れずビルドが失敗する
 #   - Environment Variables の production に EXPO_PUBLIC_* を登録しておく
 #     → これが無いと、ビルドは通るがアプリ起動時に「未設定です」で落ちる
+#
+# 提出先（Apple Team ID と App Store Connect のアプリID）は eas.json の
+# submit.production に書いてある。これが無いと、ビルドは通っても提出だけ
+# 「Set ascAppId in the submit profile」で失敗する。
 on:
   workflow_dispatch:
     inputs:
@@ -20,6 +24,10 @@ on:
         description: 'ビルド後、App Store Connect へ自動でアップロードする'
         type: boolean
         default: true
+      submit_latest_only:
+        description: 'ビルドせず、EAS にある最新のビルドを提出するだけ（提出だけ失敗したときの再実行用）'
+        type: boolean
+        default: false
 
 # 同時に何本もビルドしないようにする（EAS のビルド枠を無駄にしないため）
 concurrency:
@@ -46,6 +54,15 @@ jobs:
         run: npm ci
 
       - name: iOS をビルド（＋App Store Connect へ提出）
+        if: ${{ !inputs.submit_latest_only }}
         run: npx eas-cli@latest build --platform ios --profile production --non-interactive ${{ inputs.submit && '--auto-submit' || '' }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # ビルドは通ったのに提出だけ失敗したとき用。ビルドし直さずに済むので
+      # EAS のビルド枠を無駄にしない（提出先は eas.json の submit.production）。
+      - name: 最新のビルドを App Store Connect へ提出するだけ
+        if: ${{ inputs.submit_latest_only }}
+        run: npx eas-cli@latest submit --platform ios --profile production --latest --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
