@@ -1,4 +1,5 @@
 import 'react-native-url-polyfill/auto';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
@@ -32,7 +33,10 @@ export const supabase = createClient(
       storage: AsyncStorage,
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false,
+      // Web版は「Googleで続ける」でGoogleの画面から戻ってくる。
+      // そのときURLに付いてくるトークンを拾ってログイン状態にするため、Webだけ有効にする。
+      // ネイティブにはURLで戻ってくる経路が無いので false のまま。
+      detectSessionInUrl: Platform.OS === 'web',
     },
   }
 );

@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Logo } from '@/components/Logo';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { GoogleSignInButton } from '@/components/GoogleSignInButton';
+import { AppleSignInButton } from '@/components/AppleSignInButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
@@ -97,6 +99,16 @@ export function AuthScreen() {
         </View>
 
         <View style={styles.form}>
+          {/* 1タップで戻れる経路を先に出す */}
+          <AppleSignInButton onLinked={() => router.back()} onError={setError} />
+          <GoogleSignInButton
+            mode="signIn"
+            redirectPath="/settings"
+            label="Googleでログイン"
+            onError={setError}
+          />
+          <Text style={styles.orLabel}>または、メールアドレスで</Text>
+
           <Text style={styles.label}>メールアドレス</Text>
           <TextInput
             style={styles.input}
@@ -214,6 +226,13 @@ const styles = StyleSheet.create({
     fontSize: font.body,
   },
   error: { color: colors.danger, fontSize: font.small, marginTop: spacing.sm },
+  orLabel: {
+    marginTop: spacing.lg,
+    fontSize: font.small,
+    color: colors.textMuted,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
   switchRow: { alignItems: 'center', marginTop: spacing.lg, padding: spacing.sm },
   switchText: { color: colors.primary, fontSize: font.small, fontWeight: '700' },
 });
