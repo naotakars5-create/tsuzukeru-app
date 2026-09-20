@@ -14,7 +14,7 @@ import { useApp } from '@/context/AppContext';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressRing } from '@/components/ProgressRing';
 import { colors, font, spacing, radius } from '@/theme';
-import { formatStopwatch, formatMinutes } from '@/logic/time';
+import { formatStopwatch, formatMinutes, splitMinutes } from '@/logic/time';
 import { weekStake } from '@/logic/billing';
 import { subjectsForCategory } from '@/logic/subjects';
 import { notifyAsync, promptAsync } from '@/logic/confirm';
@@ -56,7 +56,8 @@ export default function TodayScreen() {
   // 集中モード（ポモドーロ）と科目
   const [pomodoro, setPomodoro] = useState(false);
   const [onBreak, setOnBreak] = useState(false);
-  const [subject, setSubject] = useState<string>('');
+  // 科目は複数選べる（法令と商品を同じ時間に進めることもあるため）
+  const [subjects, setSubjects] = useState<string[]>([]);
   const notified = useRef(false);
 
   const targetMin = goal?.dailyTargetMin ?? 120;
@@ -87,16 +88,29 @@ export default function TodayScreen() {
     return () => loop.stop();
   }, [running]);
 
+  /**
+   * 選んだ科目に時間を振り分けて記録する。
+   * 複数選んでいるときは等分する。それぞれに全部の時間を足すと、
+   * 科目ごとの合計がその日の勉強時間を超えてしまうため。
+   */
+  const recordSubjects = async (min: number) => {
+    if (min <= 0 || subjects.length === 0) return;
+    const parts = splitMinutes(min, subjects.length);
+    for (let i = 0; i < subjects.length; i++) {
+      if (parts[i] > 0) await addSubjectMinutes(subjects[i], parts[i]);
+    }
+  };
+
   const quickAdd = async (m: number) => {
     if (running) return;
     await addStudyMinutes(m);
-    if (subject) await addSubjectMinutes(subject, m);
+    await recordSubjects(m);
   };
 
   // 計測を止めて、科目にも記録する
   const onStop = async () => {
     const min = await stopTimer();
-    if (min > 0 && subject) await addSubjectMinutes(subject, min);
+    await recordSubjects(min);
     setOnBreak(false);
     notified.current = false;
   };
@@ -121,7 +135,13 @@ export default function TodayScreen() {
     const t = v?.trim();
     if (!t) return;
     if (!subjectOptions.includes(t)) setExtraSubjects((prev) => [...prev, t]);
-    setSubject(t);
+    setSubjects((prev) => (prev.includes(t) ? prev : [...prev, t]));
+  };
+
+  const toggleSubject = (name: string) => {
+    setSubjects((prev) =>
+      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]
+    );
   };
 
   const currentWeek = weeks.find((w) => w.isCurrent);
@@ -187,16 +207,24 @@ export default function TodayScreen() {
           {/* 科目と集中モード */}
           <View style={styles.optionArea}>
             <View style={styles.optRow}>
-              <Text style={styles.optLabel}>科目</Text>
+              <View style={styles.optLabelRow}>
+                <Text style={styles.optLabel}>科目（複数選べます）</Text>
+                {subjects.length > 1 ? (
+                  <Text style={styles.optNote}>時間は等分して記録</Text>
+                ) : null}
+              </View>
               <View style={styles.subjWrap}>
                 {subjectOptions.map((sName) => {
-                  const active = subject === sName;
+                  const active = subjects.includes(sName);
                   return (
                     <Pressable
                       key={sName}
-                      onPress={() => setSubject(active ? '' : sName)}
+                      onPress={() => toggleSubject(sName)}
                       style={[styles.subjChip, active && styles.subjChipActive]}
                     >
+                      {active ? (
+                        <Ionicons name="checkmark" size={13} color={colors.primary} />
+                      ) : null}
                       <Text style={[styles.subjText, active && styles.subjTextActive]}>{sName}</Text>
                     </Pressable>
                   );
@@ -323,7 +351,9 @@ const styles = StyleSheet.create({
 
   optionArea: { gap: spacing.md, marginBottom: spacing.md },
   optRow: { gap: spacing.sm },
+  optLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   optLabel: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
+  optNote: { fontSize: font.small, color: colors.textMuted, fontWeight: '600' },
   subjWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   subjChip: {
     flexDirection: 'row',

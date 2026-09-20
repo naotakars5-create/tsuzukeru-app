@@ -28,5 +28,22 @@ export function formatStopwatch(totalSec: number): string {
   return `${h}:${m}:${sec}`;
 }
 
-/** 1日の目標時間の選択肢（分） */
+/** 1日の目標時間の選択肢（分）。これ以外は自由入力で決められる */
 export const DAILY_TARGET_OPTIONS = [30, 60, 90, 120, 180];
+
+/** 自由入力で受け付ける1日の目標時間の範囲（分） */
+export const DAILY_TARGET_MIN = 5;
+export const DAILY_TARGET_MAX = 1440;
+
+/**
+ * 勉強時間を、選んだ科目の数で分ける。
+ * 科目ごとの合計が1日の勉強時間を超えないよう、足し算ではなく等分にする。
+ * 余りは先頭から1分ずつ配るので、合計は元の時間とぴったり一致する。
+ */
+export function splitMinutes(total: number, count: number): number[] {
+  if (count <= 0) return [];
+  const whole = Math.max(0, Math.round(total));
+  const base = Math.floor(whole / count);
+  const rest = whole - base * count;
+  return Array.from({ length: count }, (_, i) => base + (i < rest ? 1 : 0));
+}

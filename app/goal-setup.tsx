@@ -24,7 +24,12 @@ import { DEPOSIT_OPTIONS, DEFAULT_DEPOSIT, weekStake } from '@/logic/billing';
 import { savePendingGoal } from '@/storage';
 import { randomHotQuote } from '@/logic/quotes';
 import { confirmAsync, notifyAsync } from '@/logic/confirm';
-import { DAILY_TARGET_OPTIONS, formatMinutes } from '@/logic/time';
+import {
+  DAILY_TARGET_OPTIONS,
+  DAILY_TARGET_MIN,
+  DAILY_TARGET_MAX,
+  formatMinutes,
+} from '@/logic/time';
 import { addDays, todayStr, daysBetween, formatDisplay } from '@/logic/date';
 import { promptAsync } from '@/logic/confirm';
 
@@ -52,6 +57,23 @@ export default function GoalSetupScreen() {
   const [weekdays, setWeekdays] = useState<number[]>(goal?.weekdays ?? [1, 2, 3, 4, 5]);
   const [weeklyTarget, setWeeklyTarget] = useState<number>(goal?.weeklyTarget ?? 3);
   const [dailyTargetMin, setDailyTargetMin] = useState<number>(goal?.dailyTargetMin ?? 120);
+  // 選択肢に無い時間（75分、4時間など）を自分で入れるための欄
+  const [customMin, setCustomMin] = useState<string>(() => {
+    const m = goal?.dailyTargetMin;
+    return m != null && !DAILY_TARGET_OPTIONS.includes(m) ? String(m) : '';
+  });
+
+  /** 自由入力を受け取る。範囲内の数字になったときだけ目標に反映する */
+  const onChangeCustomMin = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, '').slice(0, 4);
+    setCustomMin(digits);
+    const n = Number(digits);
+    if (digits && n >= DAILY_TARGET_MIN && n <= DAILY_TARGET_MAX) setDailyTargetMin(n);
+  };
+
+  const customValue = Number(customMin);
+  const customValid =
+    !!customMin && customValue >= DAILY_TARGET_MIN && customValue <= DAILY_TARGET_MAX;
   const [deposit, setDeposit] = useState<number>(goal?.deposit ?? DEFAULT_DEPOSIT);
   const [examDate, setExamDate] = useState<string | null>(goal?.examDate ?? null);
   const [targetHours, setTargetHours] = useState<number | null>(goal?.targetTotalHours ?? null);
@@ -180,7 +202,10 @@ export default function GoalSetupScreen() {
               return (
                 <Pressable
                   key={m}
-                  onPress={() => setDailyTargetMin(m)}
+                  onPress={() => {
+                    setDailyTargetMin(m);
+                    setCustomMin('');
+                  }}
                   style={[styles.timeChip, active && styles.countChipActive]}
                 >
                   <Text style={[styles.countValue, active && styles.countValueActive]}>
@@ -193,6 +218,26 @@ export default function GoalSetupScreen() {
               );
             })}
           </View>
+
+          {/* 選択肢に無い時間（75分、4時間など）を自分で決める */}
+          <View style={styles.customRow}>
+            <Text style={styles.customLabel}>自由に決める</Text>
+            <TextInput
+              style={[styles.customInput, customValid && styles.customInputActive]}
+              value={customMin}
+              onChangeText={onChangeCustomMin}
+              placeholder="240"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={4}
+            />
+            <Text style={styles.customUnit}>分</Text>
+          </View>
+          <Text style={styles.helper}>
+            {customMin && !customValid
+              ? `${DAILY_TARGET_MIN}〜${DAILY_TARGET_MAX}分の範囲で入力してください。`
+              : `いまの設定は 1日 ${formatMinutes(dailyTargetMin)} です。`}
+          </Text>
         </Card>
 
         {/* コミュニティ（目指す資格） */}
@@ -500,6 +545,24 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   helper: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 17 },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  customLabel: { fontSize: font.small, fontWeight: '800', color: colors.textSub },
+  customInput: {
+    flex: 1,
+    fontSize: font.body,
+    fontWeight: '800',
+    color: colors.text,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  customInputActive: { borderColor: colors.primary },
+  customUnit: { fontSize: font.sub, fontWeight: '800', color: colors.textSub },
   fixedValue: { marginTop: spacing.sm, fontSize: font.heading, fontWeight: '900', color: colors.text },
 
   catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
