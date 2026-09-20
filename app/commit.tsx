@@ -17,6 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Card } from '@/components/Card';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { AppleSignInButton } from '@/components/AppleSignInButton';
+import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { colors, font, radius, spacing } from '@/theme';
 import { weekStake } from '@/logic/billing';
 import { notifyAsync } from '@/logic/confirm';
@@ -44,7 +45,7 @@ export default function CommitScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ card?: string }>();
   const { createGoal } = useApp();
-  const { recoveryEmail, emailPending, setRecoveryEmail, sendLoginCode, verifyLoginCode } =
+  const { isAnonymous, recoveryEmail, emailPending, setRecoveryEmail, sendLoginCode, verifyLoginCode } =
     useAuth();
   const { register } = useCardRegistration();
 
@@ -65,6 +66,31 @@ export default function CommitScreen() {
     if (v) window.history.replaceState({}, '', window.location.pathname);
     return v ?? params.card ?? null;
   });
+
+  /**
+   * Googleの画面から戻ってきたときのエラー。
+   * よくあるのは「そのGoogleアカウントは別の記録で使われている」。
+   * エラーはURLの # の後ろに付いてくる。
+   */
+  const [linkError] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const query = new URLSearchParams(window.location.search);
+    const desc = hash.get('error_description') ?? query.get('error_description');
+    const code = hash.get('error') ?? query.get('error');
+    if (!desc && !code) return null;
+    window.history.replaceState({}, '', window.location.pathname);
+    return desc ?? code;
+  });
+
+  useEffect(() => {
+    if (!linkError) return;
+    setError(
+      /already|exists|linked/i.test(linkError)
+        ? 'このGoogleアカウントは、すでに別の記録で使われています。下の「すでに登録した方はこちら」から引き継いでください。'
+        : linkError
+    );
+  }, [linkError]);
 
   useEffect(() => {
     let alive = true;
@@ -341,7 +367,8 @@ export default function CommitScreen() {
             <>
               <Text style={styles.helper}>
                 パスワードは要りません。機種変更やアプリの入れ直しのとき、
-                このメールに届くコードで記録と請求の状況を引き継ぎます。
+                ここで決めたIDで記録と請求の状況を引き継ぎます。
+                下のボタンなら1タップで済みます。
               </Text>
               <TextInput
                 style={styles.input}
@@ -356,6 +383,11 @@ export default function CommitScreen() {
               />
               <AppleSignInButton
                 onLinked={() => setError(null)}
+                onError={(m) => setError(m)}
+              />
+              <GoogleSignInButton
+                mode={isAnonymous ? 'link' : 'signIn'}
+                redirectPath="/commit"
                 onError={(m) => setError(m)}
               />
               <Pressable

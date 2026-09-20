@@ -54,6 +54,37 @@ Authentication → Sign In / Providers で：
 - **メール確認** → テスト中はオフが楽。**本番前にオンへ戻すこと**
   （オフのままだと他人のメールアドレスで登録できてしまう）
 
+### 2-2. Googleでログインできるようにする（Web版の1タップ導線）
+
+コミット画面の「Googleで続ける」を動かすのに必要な設定です。
+入れておくと、メールの入力なしにIDが決まります。
+
+1. Google Cloud Console → APIとサービス → 認証情報 → OAuth クライアント ID を作成
+   （種類はウェブアプリケーション）。**承認済みのリダイレクト URI** に次を入れる:
+
+   ```
+   https://psrhlrphivkopltedtps.supabase.co/auth/v1/callback
+   ```
+
+2. 発行されたクライアントIDとシークレットを、Supabase の
+   Authentication → Sign In / Providers → **Google** に貼ってオンにする。
+
+3. 同じ画面の User Signups にある **Allow manual linking** を**オン**にする。
+   匿名アカウントに Google を紐付ける（`linkIdentity`）ために必要で、
+   オフのままだと「Googleで続ける」が失敗する。オンにすると、
+   紐付けてもユーザーIDが変わらないので勉強記録と登録済みカードがそのまま残る。
+
+4. Authentication → URL Configuration の **Redirect URLs** に、
+   戻り先を追加しておく:
+
+   ```
+   https://tsuzukeru-app.expo.app/commit
+   https://tsuzukeru-app.expo.app/settings
+   ```
+
+iOSは「Appleでサインイン」があるのでこの設定は不要。
+Android版でGoogleを出すのは未対応（`expo-web-browser` の追加が必要）。
+
 ### 3. Supabase に新しいスキーマとFunctionを反映
 
 **Edge Function は GitHub Actions が自動でデプロイします。** そのために、
