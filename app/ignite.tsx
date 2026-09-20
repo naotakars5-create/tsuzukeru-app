@@ -32,41 +32,59 @@ export default function IgniteScreen() {
   ).current;
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.parallel([
-        Animated.spring(mascotScale, { toValue: 1, friction: 5, tension: 90, useNativeDriver: true }),
-        Animated.timing(burst, { toValue: 1, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(textOp, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(textY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]),
-    ]).start();
+    // 動かしたアニメーションは全部ここに控えて、画面を離れるときに止める。
+    // 止めずに残すと、消えたはずの部品を動かそうとしてネイティブ側で
+    // 例外になり、アプリごと落ちることがある（この画面は3秒で次へ進む）。
+    const running: Animated.CompositeAnimation[] = [];
+    const run = (a: Animated.CompositeAnimation) => {
+      running.push(a);
+      a.start();
+    };
 
-    Animated.loop(
+    run(
       Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0, duration: 750, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.spring(mascotScale, { toValue: 1, friction: 5, tension: 90, useNativeDriver: true }),
+          Animated.timing(burst, { toValue: 1, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(textOp, { toValue: 1, duration: 500, useNativeDriver: true }),
+          Animated.timing(textY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        ]),
       ])
-    ).start();
+    );
 
-    sparks.forEach((s) => {
+    run(
       Animated.loop(
         Animated.sequence([
-          Animated.delay(s.delay),
-          Animated.timing(s.progress, {
-            toValue: 1,
-            duration: 1500,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(s.progress, { toValue: 0, duration: 0, useNativeDriver: true }),
+          Animated.timing(glow, { toValue: 1, duration: 750, useNativeDriver: true }),
+          Animated.timing(glow, { toValue: 0, duration: 750, useNativeDriver: true }),
         ])
-      ).start();
+      )
+    );
+
+    sparks.forEach((s) => {
+      run(
+        Animated.loop(
+          Animated.sequence([
+            Animated.delay(s.delay),
+            Animated.timing(s.progress, {
+              toValue: 1,
+              duration: 1500,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(s.progress, { toValue: 0, duration: 0, useNativeDriver: true }),
+          ])
+        )
+      );
     });
 
     const t = setTimeout(() => router.replace('/'), 3000);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      running.forEach((a) => a.stop());
+    };
   }, []);
 
   const glowStyle = {
