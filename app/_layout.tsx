@@ -61,10 +61,12 @@ function RootStack() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ title: 'ログイン', presentation: 'modal' }} />
       <Stack.Screen name="goal-setup" options={{ title: '目標を設定', presentation: 'modal' }} />
-      <Stack.Screen
-        name="commit"
-        options={{ title: 'コミットして始める', presentation: 'modal' }}
-      />
+      {/*
+        commit と card-setup はモーダルにしない。
+        目標設定（モーダル）の上にモーダルを重ねると、iOSで落ちることがあるため。
+        同じ流れの続きなので、横からスライドして出る形の方が自然でもある。
+      */}
+      <Stack.Screen name="commit" options={{ title: 'コミットして始める' }} />
       <Stack.Screen name="today" options={{ title: '今日の達成', presentation: 'card' }} />
       <Stack.Screen name="journal" options={{ title: '学習メモ', presentation: 'card' }} />
       <Stack.Screen
@@ -82,7 +84,7 @@ function RootStack() {
         options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
       />
       <Stack.Screen name="share-card" options={{ title: '成果カード', presentation: 'modal' }} />
-      <Stack.Screen name="card-setup" options={{ title: '支払い方法', presentation: 'modal' }} />
+      <Stack.Screen name="card-setup" options={{ title: '支払い方法' }} />
       <Stack.Screen name="link-account" options={{ title: 'IDの登録' }} />
       <Stack.Screen name="legal/[doc]" options={{ title: '規約' }} />
     </Stack>
