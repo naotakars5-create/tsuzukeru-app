@@ -1,0 +1,57 @@
+name: アプリの中身だけ更新（OTA）
+
+# ビルドし直さずに、アプリの中身（JavaScript）だけを差し替える。
+# ネイティブの部分は変わらないので、ライブラリの追加や app.json の変更は届かない。
+#
+# 使い方:
+#   1. GitHub の「Actions」タブ →「アプリの中身だけ更新（OTA）」
+#   2. 「Run workflow」→ ブランチと branch(配信先) を選んで実行
+#   3. 2〜3分で完了。端末側はアプリを一度閉じて開き直すと新しい中身になる
+#      （起動時に裏でダウンロードし、次の起動から反映される）
+#
+# 配信先は eas.json の channel と対応している。production の TestFlight/App Store 版に
+# 届けるなら branch は production のまま。
+#
+# 注意: 端末のアプリと同じ runtimeVersion（= app.json の version）でないと届かない。
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '配信先（eas.json の channel に対応）'
+        type: string
+        default: 'production'
+      message:
+        description: '更新の内容メモ'
+        type: string
+        default: 'OTA update'
+
+concurrency:
+  group: update-ota
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: コードを取得
+        uses: actions/checkout@v4
+
+      - name: Node.js を用意
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 依存をインストール
+        run: npm ci
+
+      # EXPO_PUBLIC_ の値はここでバンドルに埋め込まれる。ビルド時と同じものを渡さないと、
+      # 更新した瞬間にアプリが「サーバー未設定」の状態に戻ってしまう。
+      - name: 中身を配信
+        run: npx eas-cli@latest update --branch "${{ inputs.branch }}" --message "${{ inputs.message }}" --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}

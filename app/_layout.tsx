@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AppProvider } from '@/context/AppContext';
 import { StripeGate } from '@/components/StripeGate';
 import { TimerBar } from '@/components/TimerBar';
+import { CrashReporter } from '@/components/CrashReporter';
 import { colors } from '@/theme';
 
 /**
@@ -19,6 +20,8 @@ import { colors } from '@/theme';
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
+      {/* 原因調査用。JS側のエラーを画面に出す（原因が分かったら外す） */}
+      <CrashReporter />
       <AuthProvider>
         <StatusBar style="light" />
         <StripeGate>
